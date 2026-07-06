@@ -17,7 +17,7 @@ streamlit run app.py
 | 상단 위젯 | 코스피·코스닥·환율 실시간 조회 (네이버 증권, 5분 캐시, 실패 시 데모 값) |
 | **Section 1 · 핵심** | **시장 순매수 분석** — 순매수강도 TOP N + DiD 이중차분 4단계 (처치군/대조군 선택, 순효과 계량화) |
 | **Section 2 · 핵심** | **테마 분석** — 테마별 주간 수익률, 수익률×매수강도 버블맵, 라이징/하락 테마, Gemini's Pick |
-| Section 3 | ETF 이슈 키워드 + 4대 운용사(KODEX·TIGER·RISE·ACE) 동향 요약 |
+| Section 3 | ETF 이슈 키워드 + 8대 ETF 브랜드(KODEX·TIGER·ACE·SOL·HANARO·RISE·PLUS·TIMEFOLIO) 동향 요약 |
 | Section 4 | AI 종합 마케팅 인사이트 — 카드형 UI |
 
 ## 데이터
