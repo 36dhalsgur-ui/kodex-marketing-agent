@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
@@ -129,6 +130,11 @@ def demo_theme_returns(n_weeks: int = 8) -> pd.DataFrame:
 # ──────────────────────────────────────────────
 # 뉴스 키워드 / 운용사 동향 / AI 인사이트 (데모)
 # ──────────────────────────────────────────────
+def news_url(query: str) -> str:
+    """네이버 뉴스 검색 링크. 실운영 시 크롤링한 기사 원문 URL로 대체."""
+    return "https://search.naver.com/search.naver?where=news&query=" + quote(query)
+
+
 NEWS_KEYWORDS = [
     {"키워드": "AI 전력 인프라", "언급량": 128, "증감": 41, "방향": "라이징"},
     {"키워드": "금리 인하 기대", "언급량": 96, "증감": 18, "방향": "라이징"},
@@ -139,40 +145,48 @@ NEWS_KEYWORDS = [
     {"키워드": "금 현물 투자", "언급량": 48, "증감": 15, "방향": "라이징"},
     {"키워드": "커버드콜 전략", "언급량": 41, "증감": -4, "방향": "유지"},
 ]
+for _kw in NEWS_KEYWORDS:
+    _kw["url"] = news_url(_kw["키워드"] + " ETF")
 
-ISSUER_NEWS = {
+# 운용사별 뉴스 (제목, 검색 질의) — url은 아래에서 일괄 생성
+_ISSUER_NEWS_RAW = {
     "KODEX": [
-        "AI전력핵심설비 ETF 순자산 5,000억 돌파 — 데이터센터 전력주 수요 지속",
-        "'강남역 8번출구' 시즌2 공개, 초보 투자자 대상 콘텐츠 마케팅 강화",
+        ("AI전력핵심설비 ETF 순자산 5,000억 돌파 — 데이터센터 전력주 수요 지속", "KODEX AI전력핵심설비"),
+        ("'강남역 8번출구' 시즌2 공개, 초보 투자자 대상 콘텐츠 마케팅 강화", "KODEX 강남역 8번출구"),
     ],
     "TIGER": [
-        "미국배당다우존스 월배당 시리즈 라인업 확대 발표",
-        "타깃데이트펀드(TDF) 액티브 ETF 신규 상장 예고",
-    ],
-    "RISE": [
-        "리브랜딩 1주년 — 미국AI밸류체인 중심 해외 테마 강화",
-        "고배당 라인업 보수 인하로 연금계좌 수요 공략",
+        ("미국배당다우존스 월배당 시리즈 라인업 확대 발표", "TIGER 미국배당다우존스"),
+        ("타깃데이트펀드(TDF) 액티브 ETF 신규 상장 예고", "TIGER TDF 액티브 ETF"),
     ],
     "ACE": [
-        "KRX금현물 ETF 순자산 3조 돌파, 금 투자 열풍 수혜",
-        "'ACE RUN' 러닝 커뮤니티 이벤트로 2030 접점 확대",
+        ("KRX금현물 ETF 순자산 3조 돌파, 금 투자 열풍 수혜", "ACE KRX금현물"),
+        ("'ACE RUN' 러닝 커뮤니티 이벤트로 2030 접점 확대", "ACE RUN 한국투자신탁운용"),
     ],
     "SOL": [
-        "조선TOP3플러스 순자산 1조 돌파 — K-조선 슈퍼사이클 수혜 지속",
-        "미국배당다우존스 월배당 시리즈로 연금 투자자 공략 강화",
+        ("조선TOP3플러스 순자산 1조 돌파 — K-조선 슈퍼사이클 수혜 지속", "SOL 조선TOP3플러스"),
+        ("미국배당다우존스 월배당 시리즈로 연금 투자자 공략 강화", "SOL 미국배당다우존스"),
     ],
     "HANARO": [
-        "원자력iSelect, SMR 모멘텀에 기관 자금 유입 지속",
-        "퇴직연금 채널 연계 마케팅으로 라인업 확장 추진",
+        ("원자력iSelect, SMR 모멘텀에 기관 자금 유입 지속", "HANARO 원자력 ETF"),
+        ("퇴직연금 채널 연계 마케팅으로 라인업 확장 추진", "HANARO ETF 퇴직연금"),
+    ],
+    "RISE": [
+        ("리브랜딩 1주년 — 미국AI밸류체인 중심 해외 테마 강화", "RISE 미국AI밸류체인"),
+        ("고배당 라인업 보수 인하로 연금계좌 수요 공략", "RISE 고배당 ETF"),
     ],
     "PLUS": [
-        "K방산 ETF, 방산 수출 모멘텀에 순자산 최고치 경신",
-        "리브랜딩 이후 시그니처 테마 선점 전략 지속",
+        ("K방산 ETF, 방산 수출 모멘텀에 순자산 최고치 경신", "PLUS K방산"),
+        ("리브랜딩 이후 시그니처 테마 선점 전략 지속", "PLUS ETF 한화자산운용"),
     ],
     "TIMEFOLIO": [
-        "액티브 ETF 수익률 상위권 석권 — 운용 역량 부각",
-        "K바이오액티브에 기관 자금 유입 확대",
+        ("액티브 ETF 수익률 상위권 석권 — 운용 역량 부각", "TIMEFOLIO 액티브 ETF"),
+        ("K바이오액티브에 기관 자금 유입 확대", "TIMEFOLIO K바이오액티브"),
     ],
+}
+
+ISSUER_NEWS = {
+    issuer: [{"title": t, "url": news_url(q)} for t, q in items]
+    for issuer, items in _ISSUER_NEWS_RAW.items()
 }
 
 AI_INSIGHTS = [

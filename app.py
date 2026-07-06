@@ -145,6 +145,29 @@ st.markdown(
     .ins-title {{ font-size: 0.98rem; font-weight: 800; color: {NAVY}; margin: 10px 0 7px; }}
     .ins-body {{ font-size: 0.83rem; color: #475467; line-height: 1.65; }}
 
+    /* 지수 그룹 라벨 */
+    .idx-group {{
+        font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em;
+        color: {FAINT}; margin: 16px 0 6px;
+    }}
+    .idx-group:first-of-type {{ margin-top: 18px; }}
+
+    /* 뉴스 카드 (카드뉴스) */
+    .news-item {{
+        display: block; background: #FAFBFC; border: 1px solid #EEF1F5;
+        border-radius: 8px; padding: 11px 13px; margin-bottom: 8px;
+        text-decoration: none; transition: border-color 0.15s;
+    }}
+    .news-item:hover {{ border-color: {NAVY}; }}
+    .news-item, .news-item:hover, .news-item * {{ text-decoration: none !important; }}
+    a.kw-link, a.kw-link * {{ text-decoration: none !important; }}
+    a.kw-link:hover .kw-name {{ text-decoration: underline !important; }}
+    .news-title {{ font-size: 0.8rem; font-weight: 600; color: #344054; line-height: 1.5; }}
+    .news-cta {{ font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; color: {FAINT}; margin-top: 5px; }}
+    .news-item:hover .news-cta {{ color: {NAVY}; }}
+    a.kw-link {{ text-decoration: none; color: inherit; display: block; }}
+    a.kw-link:hover .kw-name {{ color: {NAVY}; text-decoration: underline; }}
+
     hr.sec-divider {{ border: none; border-top: 1px solid {LINE}; margin: 2.4rem 0 1.8rem; }}
     </style>
     """,
@@ -238,17 +261,26 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-idx_html = '<div class="idx-strip">'
-for ix in load_indices():
+def idx_card(ix: dict) -> str:
     cls = "idx-up" if ix["up"] else "idx-down"
     arrow = "▲" if ix["up"] else "▼"
-    idx_html += (
+    return (
         f'<div class="idx-card"><div class="idx-name">{ix["name"]}</div>'
         f'<div class="idx-val">{ix["value"]}</div>'
         f'<div class="idx-chg {cls}">{arrow} {ix["change"].lstrip("+-")}</div></div>'
     )
-idx_html += "</div>"
-st.markdown(idx_html, unsafe_allow_html=True)
+
+
+indices = load_indices()
+korea_fx = [ix for ix in indices if ix["name"] in ("코스피", "코스닥", "USD/KRW")]
+overseas = [ix for ix in indices if ix not in korea_fx]
+st.markdown(
+    '<div class="idx-group">KOREA MARKET · FX</div>'
+    f'<div class="idx-strip">{"".join(idx_card(ix) for ix in korea_fx)}</div>'
+    '<div class="idx-group">GLOBAL INDICES</div>'
+    f'<div class="idx-strip">{"".join(idx_card(ix) for ix in overseas)}</div>',
+    unsafe_allow_html=True,
+)
 st.caption("실시간 지수·환율 (네이버 증권 기준, 5분 캐시) · 시장 마감 시 종가 표시")
 
 st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
@@ -493,12 +525,14 @@ with n1:
     for kw in D.NEWS_KEYWORDS:
         cls = {"라이징": "kw-rise", "하락": "kw-fall", "정체": "kw-fall"}.get(kw["방향"], "kw-flat")
         rows += (
-            f'<div class="kw-row"><span class="kw-name">{kw["키워드"]}</span>'
+            f'<a class="kw-link" href="{kw["url"]}" target="_blank">'
+            f'<div class="kw-row"><span class="kw-name">{kw["키워드"]} ↗</span>'
             f'<span style="color:{GRAY};font-size:0.8rem;">언급 {kw["언급량"]}건</span>'
-            f'<span class="kw-badge {cls}">{kw["증감"]:+d}% {kw["방향"]}</span></div>'
+            f'<span class="kw-badge {cls}">{kw["증감"]:+d}% {kw["방향"]}</span></div></a>'
         )
     st.markdown(
-        f'<div class="card"><div class="card-title">ETF 이슈 키워드 (구글 뉴스 · 주간)</div>{rows}</div>',
+        f'<div class="card"><div class="card-title">ETF 이슈 키워드 (구글 뉴스 · 주간)</div>{rows}'
+        f'<div style="font-size:0.7rem;color:{GRAY};margin-top:10px;">키워드를 클릭하면 관련 뉴스 검색으로 이동합니다</div></div>',
         unsafe_allow_html=True,
     )
 with n2:
@@ -508,12 +542,15 @@ with n2:
         with col:
             for issuer in issuers:
                 items = "".join(
-                    f'<div style="font-size:0.82rem;color:#4B5468;line-height:1.55;padding:5px 0;border-bottom:1px solid #F0F2F7;">· {n}</div>'
+                    f'<a class="news-item" href="{n["url"]}" target="_blank">'
+                    f'<div class="news-title">{n["title"]}</div>'
+                    f'<div class="news-cta">관련 기사 보기 ↗</div></a>'
                     for n in D.ISSUER_NEWS[issuer]
                 )
                 accent = NAVY if issuer == "KODEX" else "#5B6478"
                 st.markdown(
-                    f'<div class="card" style="margin-bottom:12px;"><div class="card-title" style="color:{accent};">{issuer}</div>{items}</div>',
+                    f'<div class="card" style="margin-bottom:12px;padding:16px 16px 9px;">'
+                    f'<div class="card-title" style="color:{accent};margin-bottom:9px;">{issuer}</div>{items}</div>',
                     unsafe_allow_html=True,
                 )
 
