@@ -159,21 +159,45 @@ st.markdown(
     }}
     .idx-group:first-of-type {{ margin-top: 18px; }}
 
-    /* 뉴스 카드 (카드뉴스) */
-    .news-item {{
-        display: block; background: #FAFBFC; border: 1px solid #EEF1F5;
-        border-radius: 8px; padding: 11px 13px; margin-bottom: 8px;
-        text-decoration: none; transition: border-color 0.15s;
+    /* 키워드 링크 */
+    a.kw-link, a.kw-link * {{ text-decoration: none !important; color: inherit; }}
+    a.kw-link {{ display: block; }}
+    a.kw-link:hover .kw-name {{ color: {NAVY}; text-decoration: underline !important; }}
+    .kw-cols {{ display: flex; gap: 32px; }}
+    .kw-col {{ flex: 1; min-width: 0; }}
+
+    /* 유튜브형 뉴스 카드 */
+    .yt-card {{
+        background: {BG_CARD}; border: 1px solid {LINE}; border-radius: 12px;
+        overflow: hidden; margin-bottom: 4px;
     }}
-    .news-item:hover {{ border-color: {NAVY}; }}
-    .news-item, .news-item:hover, .news-item * {{ text-decoration: none !important; }}
-    a.kw-link, a.kw-link * {{ text-decoration: none !important; }}
-    a.kw-link:hover .kw-name {{ text-decoration: underline !important; }}
-    .news-title {{ font-size: 0.8rem; font-weight: 600; color: #344054; line-height: 1.5; }}
-    .news-cta {{ font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; color: {FAINT}; margin-top: 5px; }}
-    .news-item:hover .news-cta {{ color: {NAVY}; }}
-    a.kw-link {{ text-decoration: none; color: inherit; display: block; }}
-    a.kw-link:hover .kw-name {{ color: {NAVY}; text-decoration: underline; }}
+    .yt-thumb {{
+        display: flex; flex-direction: column; justify-content: space-between;
+        aspect-ratio: 16 / 9; padding: 12px 14px;
+    }}
+    .yt-thumb, .yt-thumb * {{ text-decoration: none !important; }}
+    .yt-chip {{
+        align-self: flex-start; font-size: 0.6rem; font-weight: 700;
+        letter-spacing: 0.12em; color: rgba(255,255,255,0.85);
+        border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; padding: 2px 7px;
+    }}
+    .yt-brand {{
+        font-size: 1.3rem; font-weight: 800; color: white; letter-spacing: 0.01em;
+    }}
+    .yt-tag {{ font-size: 0.7rem; font-weight: 600; color: rgba(255,255,255,0.8); margin-top: 2px; }}
+    .yt-body {{ padding: 11px 13px 12px; }}
+    .yt-title {{
+        display: block; font-size: 0.8rem; font-weight: 700; color: {INK};
+        line-height: 1.45; text-decoration: none !important;
+        margin-bottom: 8px; min-height: 2.9em;
+    }}
+    .yt-title:hover {{ color: {NAVY}; text-decoration: underline !important; }}
+    .yt-sub {{
+        display: block; font-size: 0.72rem; font-weight: 500; color: {MUTED};
+        line-height: 1.4; text-decoration: none !important;
+        padding-top: 8px; border-top: 1px solid #F2F4F7;
+    }}
+    .yt-sub:hover {{ color: {NAVY}; text-decoration: underline !important; }}
 
     hr.sec-divider {{ border: none; border-top: 1px solid {LINE}; margin: 2.4rem 0 1.8rem; }}
     </style>
@@ -526,47 +550,74 @@ section_header(
 )
 st.write("")
 
-n1, n2 = st.columns([5, 7], gap="large")
-with n1:
-    rows = ""
-    for kw in D.NEWS_KEYWORDS:
-        cls = {"라이징": "kw-rise", "하락": "kw-fall", "정체": "kw-fall"}.get(kw["방향"], "kw-flat")
-        url = kw.get("url") or news_link(kw["키워드"] + " ETF")
-        rows += (
-            f'<a class="kw-link" href="{url}" target="_blank">'
-            f'<div class="kw-row"><span class="kw-name">{kw["키워드"]} ↗</span>'
-            f'<span style="color:{GRAY};font-size:0.8rem;">언급 {kw["언급량"]}건</span>'
-            f'<span class="kw-badge {cls}">{kw["증감"]:+d}% {kw["방향"]}</span></div></a>'
-        )
-    st.markdown(
-        f'<div class="card"><div class="card-title">ETF 이슈 키워드 (구글 뉴스 · 주간)</div>{rows}'
-        f'<div style="font-size:0.7rem;color:{GRAY};margin-top:10px;">키워드를 클릭하면 관련 뉴스 검색으로 이동합니다</div></div>',
-        unsafe_allow_html=True,
+# ETF 이슈 키워드 — 전폭 카드, 내부 2열
+def kw_row(kw: dict) -> str:
+    cls = {"라이징": "kw-rise", "하락": "kw-fall", "정체": "kw-fall"}.get(kw["방향"], "kw-flat")
+    url = kw.get("url") or news_link(kw["키워드"] + " ETF")
+    return (
+        f'<a class="kw-link" href="{url}" target="_blank">'
+        f'<div class="kw-row"><span class="kw-name">{kw["키워드"]} ↗</span>'
+        f'<span style="color:{GRAY};font-size:0.8rem;">언급 {kw["언급량"]}건</span>'
+        f'<span class="kw-badge {cls}">{kw["증감"]:+d}% {kw["방향"]}</span></div></a>'
     )
-with n2:
-    ic1, ic2 = st.columns(2)
-    issuer_list = getattr(D, "ISSUERS", list(D.ISSUER_NEWS.keys()))
-    half = len(issuer_list) // 2
-    for col, issuers in [(ic1, issuer_list[:half]), (ic2, issuer_list[half:])]:
-        with col:
-            for issuer in issuers:
-                # 구버전(문자열)·신버전(dict) 데이터 모두 허용 — 모듈 핫리로드 시 크래시 방지
-                entries = [
-                    n if isinstance(n, dict) else {"title": n, "url": news_link(f"{issuer} ETF")}
-                    for n in D.ISSUER_NEWS[issuer]
-                ]
-                items = "".join(
-                    f'<a class="news-item" href="{n["url"]}" target="_blank">'
-                    f'<div class="news-title">{n["title"]}</div>'
-                    f'<div class="news-cta">관련 기사 보기 ↗</div></a>'
-                    for n in entries
-                )
-                accent = NAVY if issuer == "KODEX" else "#5B6478"
-                st.markdown(
-                    f'<div class="card" style="margin-bottom:12px;padding:16px 16px 9px;">'
-                    f'<div class="card-title" style="color:{accent};margin-bottom:9px;">{issuer}</div>{items}</div>',
-                    unsafe_allow_html=True,
-                )
+
+
+mid = (len(D.NEWS_KEYWORDS) + 1) // 2
+col_a = "".join(kw_row(kw) for kw in D.NEWS_KEYWORDS[:mid])
+col_b = "".join(kw_row(kw) for kw in D.NEWS_KEYWORDS[mid:])
+st.markdown(
+    f'<div class="card"><div class="card-title">ETF 이슈 키워드 (구글 뉴스 · 주간)</div>'
+    f'<div class="kw-cols"><div class="kw-col">{col_a}</div><div class="kw-col">{col_b}</div></div>'
+    f'<div style="font-size:0.7rem;color:{GRAY};margin-top:10px;">키워드를 클릭하면 관련 뉴스 검색으로 이동합니다</div></div>',
+    unsafe_allow_html=True,
+)
+
+st.write("")
+
+# 운용사 동향 — 유튜브형 카드뉴스 (썸네일 + 설명)
+BRAND_STYLE = {
+    "KODEX": "linear-gradient(135deg,#16244D 0%,#3B5BA5 100%)",
+    "TIGER": "linear-gradient(135deg,#B45309 0%,#E88D2A 100%)",
+    "ACE": "linear-gradient(135deg,#7F1D1D 0%,#C0392B 100%)",
+    "SOL": "linear-gradient(135deg,#1E40AF 0%,#3B82F6 100%)",
+    "HANARO": "linear-gradient(135deg,#166534 0%,#34B364 100%)",
+    "RISE": "linear-gradient(135deg,#854D0E 0%,#C89312 100%)",
+    "PLUS": "linear-gradient(135deg,#9A3412 0%,#D9480F 100%)",
+    "TIMEFOLIO": "linear-gradient(135deg,#1F2937 0%,#4B5563 100%)",
+}
+
+
+def issuer_card(issuer: str) -> str:
+    # 구버전(문자열)·신버전(dict) 데이터 모두 허용 — 모듈 핫리로드 시 크래시 방지
+    entries = [
+        n if isinstance(n, dict) else {"title": n, "url": news_link(f"{issuer} ETF")}
+        for n in D.ISSUER_NEWS[issuer]
+    ]
+    primary = entries[0]
+    tag = primary["title"].split("—")[0].split(",")[0].strip()
+    tag = tag if len(tag) <= 26 else tag[:25] + "…"
+    grad = BRAND_STYLE.get(issuer, BRAND_STYLE["TIMEFOLIO"])
+    html = (
+        f'<div class="yt-card">'
+        f'<a class="yt-thumb" href="{primary["url"]}" target="_blank" style="background:{grad};">'
+        f'<span class="yt-chip">NEWS BRIEF</span>'
+        f'<span><span class="yt-brand">{issuer}</span>'
+        f'<div class="yt-tag">{tag}</div></span></a>'
+        f'<div class="yt-body">'
+        f'<a class="yt-title" href="{primary["url"]}" target="_blank">{primary["title"]}</a>'
+    )
+    if len(entries) > 1:
+        html += f'<a class="yt-sub" href="{entries[1]["url"]}" target="_blank">{entries[1]["title"]} ↗</a>'
+    html += "</div></div>"
+    return html
+
+
+issuer_list = getattr(D, "ISSUERS", list(D.ISSUER_NEWS.keys()))
+for row_start in range(0, len(issuer_list), 4):
+    row_cols = st.columns(4, gap="medium")
+    for col, issuer in zip(row_cols, issuer_list[row_start : row_start + 4]):
+        col.markdown(issuer_card(issuer), unsafe_allow_html=True)
+    st.write("")
 
 st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
 
