@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
@@ -195,56 +196,62 @@ AI_INSIGHTS = [
     },
 ]
 
+# 지수·환율 수집 대상 (라벨, 종류, 코드) — 국내 2 + 해외 4 + 환율 1
+INDEX_SOURCES = [
+    ("코스피", "domestic", "KOSPI"),
+    ("코스닥", "domestic", "KOSDAQ"),
+    ("S&P 500", "world", ".INX"),
+    ("나스닥", "world", ".IXIC"),
+    ("닛케이 225", "world", ".N225"),
+    ("가권", "world", ".TWII"),
+    ("USD/KRW", "fx", "FX_USDKRW"),
+]
+
 # 실시간 조회 실패 시 사용할 지수 폴백 값
 INDEX_FALLBACK = [
     {"name": "코스피", "value": "3,183.23", "change": "+0.42%", "up": True},
     {"name": "코스닥", "value": "812.44", "change": "-0.31%", "up": False},
+    {"name": "S&P 500", "value": "7,526.62", "change": "+0.58%", "up": True},
+    {"name": "나스닥", "value": "24,881.15", "change": "+0.72%", "up": True},
+    {"name": "닛케이 225", "value": "42,310.50", "change": "-0.18%", "up": False},
+    {"name": "가권", "value": "28,455.30", "change": "+0.35%", "up": True},
     {"name": "USD/KRW", "value": "1,368.50", "change": "+0.12%", "up": True},
-    {"name": "JPY/KRW(100)", "value": "948.10", "change": "-0.24%", "up": False},
-    {"name": "EUR/KRW", "value": "1,489.30", "change": "+0.08%", "up": True},
 ]
 
 
-def fetch_live_indices() -> list[dict]:
-    """네이버 증권에서 코스피·코스닥·환율을 조회. 실패 시 폴백 데모 값."""
-    out = []
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(
-            "https://m.stock.naver.com/api/index/KOSPI/basic", headers=headers, timeout=4
-        )
-        r2 = requests.get(
-            "https://m.stock.naver.com/api/index/KOSDAQ/basic", headers=headers, timeout=4
-        )
-        for label, resp in [("코스피", r), ("코스닥", r2)]:
-            d = resp.json()
-            rate = float(d["fluctuationsRatio"])
-            out.append(
-                {
-                    "name": label,
-                    "value": d["closePrice"],
-                    "change": f"{rate:+.2f}%",
-                    "up": rate >= 0,
-                }
-            )
-        fx = requests.get(
-            "https://m.stock.naver.com/front-api/marketIndex/prices"
-            "?category=exchange&reutersCode=FX_USDKRW&page=1",
-            headers=headers,
-            timeout=4,
+def _fetch_one_index(label: str, kind: str, code: str) -> dict:
+    headers = {"User-Agent": "Mozilla/5.0"}
+    if kind == "domestic":
+        d = requests.get(
+            f"https://m.stock.naver.com/api/index/{code}/basic", headers=headers, timeout=3
         ).json()
-        item = fx["result"][0]
-        rate = float(item["fluctuationsRatio"])
-        out.append(
-            {
-                "name": "USD/KRW",
-                "value": item["closePrice"],
-                "change": f"{rate:+.2f}%",
-                "up": rate >= 0,
-            }
-        )
-        # 나머지 환율은 폴백으로 채움
-        out.extend(INDEX_FALLBACK[3:])
-        return out
-    except Exception:
-        return INDEX_FALLBACK
+        price, rate = d["closePrice"], float(d["fluctuationsRatio"])
+    elif kind == "world":
+        d = requests.get(
+            f"https://api.stock.naver.com/index/{code}/basic", headers=headers, timeout=3
+        ).json()
+        price, rate = d["closePrice"], float(d["fluctuationsRatio"])
+    else:  # fx
+        d = requests.get(
+            "https://m.stock.naver.com/front-api/marketIndex/prices"
+            f"?category=exchange&reutersCode={code}&page=1",
+            headers=headers,
+            timeout=3,
+        ).json()
+        item = d["result"][0]
+        price, rate = item["closePrice"], float(item["fluctuationsRatio"])
+    return {"name": label, "value": price, "change": f"{rate:+.2f}%", "up": rate >= 0}
+
+
+def fetch_live_indices() -> list[dict]:
+    """네이버 증권에서 국내·해외 지수와 달러 환율을 병렬 조회. 실패 항목은 폴백 값."""
+    fallback = {f["name"]: f for f in INDEX_FALLBACK}
+    results: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=len(INDEX_SOURCES)) as ex:
+        futures = {ex.submit(_fetch_one_index, *src): src[0] for src in INDEX_SOURCES}
+        for fut, label in futures.items():
+            try:
+                results[label] = fut.result()
+            except Exception:
+                results[label] = fallback[label]
+    return [results[label] for label, _, _ in INDEX_SOURCES]

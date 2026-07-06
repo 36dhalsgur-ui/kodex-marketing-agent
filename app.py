@@ -20,11 +20,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-NAVY = "#1E2761"
-BLUE = "#3D5AF1"
-RED = "#E8505B"
-COOL = "#4A7CF0"
-GRAY = "#8A93A6"
+INK = "#101828"       # 본문 잉크
+MUTED = "#667085"     # 보조 텍스트
+FAINT = "#98A2B3"     # 미세 라벨
+LINE = "#E4E7EC"      # 헤어라인
+NAVY = "#16244D"      # 주 강조 (KODEX)
+RED = "#F04452"       # 상승 (국내 관례)
+COOL = "#3182F6"      # 하락
+GRAY = MUTED
 BG_CARD = "#FFFFFF"
 
 st.markdown(
@@ -34,88 +37,115 @@ st.markdown(
 
     html, body, [class*="css"] {{
         font-family: 'Pretendard', -apple-system, sans-serif;
+        color: {INK};
     }}
-    .block-container {{ padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1240px; }}
+    .block-container {{ padding-top: 1.5rem; padding-bottom: 3.5rem; max-width: 1280px; }}
     #MainMenu, footer {{ visibility: hidden; }}
+    header[data-testid="stHeader"] {{ background: transparent; }}
+    [data-testid="stSidebar"] {{ background: #FAFBFC; border-right: 1px solid {LINE}; }}
 
     /* 헤더 */
-    .agent-header {{
-        display: flex; align-items: baseline; gap: 14px; margin-bottom: 2px;
+    .agent-overline {{
+        font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em;
+        color: {FAINT}; margin-bottom: 6px;
     }}
-    .agent-title {{ font-size: 1.72rem; font-weight: 800; color: {NAVY}; letter-spacing: -0.5px; }}
-    .agent-sub {{ font-size: 0.92rem; color: {GRAY}; }}
+    .agent-title {{
+        font-size: 1.5rem; font-weight: 800; color: {INK};
+        letter-spacing: -0.02em; line-height: 1.2;
+    }}
+    .agent-sub {{ font-size: 0.85rem; color: {MUTED}; margin-top: 5px; }}
 
     /* 지수 스트립 */
-    .idx-strip {{
-        display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 6px 0;
-    }}
+    .idx-strip {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 4px; }}
     .idx-card {{
-        flex: 1; min-width: 150px; background: {NAVY}; border-radius: 12px;
-        padding: 13px 16px; color: white;
+        flex: 1; min-width: 128px; background: {BG_CARD};
+        border: 1px solid {LINE}; border-radius: 10px; padding: 12px 14px;
     }}
-    .idx-name {{ font-size: 0.76rem; opacity: 0.72; margin-bottom: 3px; }}
-    .idx-val {{ font-size: 1.18rem; font-weight: 700; letter-spacing: -0.3px; }}
-    .idx-chg {{ font-size: 0.8rem; font-weight: 600; margin-top: 2px; }}
-    .idx-up {{ color: #FF8A93; }}
-    .idx-down {{ color: #7FB3FF; }}
+    .idx-name {{
+        font-size: 0.66rem; font-weight: 600; letter-spacing: 0.07em;
+        color: {FAINT}; margin-bottom: 6px; text-transform: uppercase;
+    }}
+    .idx-val {{
+        font-size: 1.1rem; font-weight: 700; color: {INK};
+        letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+    }}
+    .idx-chg {{
+        font-size: 0.75rem; font-weight: 600; margin-top: 3px;
+        font-variant-numeric: tabular-nums;
+    }}
+    .idx-up {{ color: {RED}; }}
+    .idx-down {{ color: {COOL}; }}
 
     /* 섹션 헤더 */
     .sec-tag {{
-        display: inline-block; font-size: 0.7rem; font-weight: 700; color: {BLUE};
-        background: rgba(61,90,241,0.09); border-radius: 6px; padding: 3px 9px;
-        letter-spacing: 0.6px; margin-bottom: 6px;
+        font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em;
+        color: {NAVY}; margin-bottom: 8px;
     }}
-    .sec-title {{ font-size: 1.28rem; font-weight: 800; color: #1A1F36; letter-spacing: -0.4px; }}
-    .sec-desc {{ font-size: 0.87rem; color: {GRAY}; margin-top: 2px; }}
+    .sec-title {{ font-size: 1.3rem; font-weight: 800; color: {INK}; letter-spacing: -0.02em; }}
+    .sec-desc {{ font-size: 0.85rem; color: {MUTED}; margin-top: 4px; }}
 
     /* 카드 */
     .card {{
-        background: {BG_CARD}; border: 1px solid #E9ECF3; border-radius: 14px;
+        background: {BG_CARD}; border: 1px solid {LINE}; border-radius: 12px;
         padding: 18px 20px; height: 100%;
     }}
-    .card-title {{ font-size: 0.95rem; font-weight: 700; color: #1A1F36; margin-bottom: 8px; }}
-    .card-body {{ font-size: 0.86rem; color: #4B5468; line-height: 1.55; }}
+    .card-title {{ font-size: 0.92rem; font-weight: 700; color: {INK}; margin-bottom: 10px; }}
+    .card-body {{ font-size: 0.85rem; color: #475467; line-height: 1.6; }}
 
     /* DiD 결과 */
     .did-step {{
-        background: #F7F8FC; border: 1px solid #E9ECF3; border-radius: 12px;
+        background: #FAFBFC; border: 1px solid {LINE}; border-radius: 10px;
         padding: 14px 16px; height: 100%;
     }}
-    .did-step-no {{ font-size: 0.7rem; font-weight: 800; color: {BLUE}; letter-spacing: 0.8px; }}
-    .did-step-name {{ font-size: 0.92rem; font-weight: 700; color: #1A1F36; margin: 3px 0 5px; }}
-    .did-step-val {{ font-size: 1.25rem; font-weight: 800; color: {NAVY}; }}
-    .did-step-desc {{ font-size: 0.76rem; color: {GRAY}; margin-top: 4px; line-height: 1.45; }}
-    .did-result {{
-        background: linear-gradient(135deg, {NAVY} 0%, #2E3E8F 100%);
-        border-radius: 14px; padding: 20px 24px; color: white; margin-top: 4px;
+    .did-step-no {{
+        font-size: 0.64rem; font-weight: 700; letter-spacing: 0.12em; color: {FAINT};
     }}
-    .did-result-label {{ font-size: 0.78rem; opacity: 0.75; letter-spacing: 0.5px; }}
-    .did-result-val {{ font-size: 2.1rem; font-weight: 800; letter-spacing: -0.5px; }}
-    .did-result-note {{ font-size: 0.8rem; opacity: 0.8; margin-top: 4px; line-height: 1.5; }}
+    .did-step-name {{ font-size: 0.88rem; font-weight: 700; color: {INK}; margin: 4px 0 6px; }}
+    .did-step-val {{
+        font-size: 1.3rem; font-weight: 800; color: {NAVY};
+        font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+    }}
+    .did-step-desc {{ font-size: 0.74rem; color: {MUTED}; margin-top: 5px; line-height: 1.5; }}
+    .did-result {{
+        background: {NAVY}; border-radius: 10px; padding: 18px 20px;
+        color: white; margin-top: 4px;
+    }}
+    .did-result-label {{
+        font-size: 0.66rem; font-weight: 600; letter-spacing: 0.1em; opacity: 0.65;
+    }}
+    .did-result-val {{
+        font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+    }}
+    .did-result-note {{ font-size: 0.78rem; opacity: 0.78; margin-top: 5px; line-height: 1.55; }}
 
-    /* 키워드 칩 */
+    /* 키워드 행 */
     .kw-row {{
         display: flex; align-items: center; justify-content: space-between;
-        padding: 9px 4px; border-bottom: 1px solid #F0F2F7; font-size: 0.88rem;
+        padding: 10px 2px; border-bottom: 1px solid #F2F4F7; font-size: 0.86rem;
     }}
-    .kw-name {{ font-weight: 600; color: #1A1F36; }}
+    .kw-row:last-child {{ border-bottom: none; }}
+    .kw-name {{ font-weight: 600; color: {INK}; }}
     .kw-badge {{
-        font-size: 0.72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px;
+        font-size: 0.7rem; font-weight: 700; border-radius: 5px; padding: 3px 8px;
+        font-variant-numeric: tabular-nums;
     }}
-    .kw-rise {{ background: rgba(232,80,91,0.1); color: {RED}; }}
-    .kw-fall {{ background: rgba(74,124,240,0.12); color: {COOL}; }}
-    .kw-flat {{ background: #F0F2F7; color: {GRAY}; }}
+    .kw-rise {{ background: #FEF1F2; color: #D63C48; }}
+    .kw-fall {{ background: #EFF5FF; color: #2A6FDB; }}
+    .kw-flat {{ background: #F2F4F7; color: {MUTED}; }}
 
     /* 인사이트 카드 */
     .ins-card {{
-        background: {BG_CARD}; border: 1px solid #E9ECF3; border-radius: 14px;
-        padding: 18px 20px; height: 100%;
+        background: {BG_CARD}; border: 1px solid {LINE}; border-radius: 12px;
+        padding: 20px 22px; height: 100%;
     }}
-    .ins-icon {{ font-size: 1.5rem; }}
-    .ins-title {{ font-size: 0.98rem; font-weight: 800; color: {NAVY}; margin: 8px 0 6px; }}
-    .ins-body {{ font-size: 0.84rem; color: #4B5468; line-height: 1.6; }}
+    .ins-num {{
+        font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; color: {FAINT};
+    }}
+    .ins-title {{ font-size: 0.98rem; font-weight: 800; color: {NAVY}; margin: 10px 0 7px; }}
+    .ins-body {{ font-size: 0.83rem; color: #475467; line-height: 1.65; }}
 
-    hr.sec-divider {{ border: none; border-top: 1px solid #E9ECF3; margin: 2.2rem 0 1.6rem; }}
+    hr.sec-divider {{ border: none; border-top: 1px solid {LINE}; margin: 2.4rem 0 1.8rem; }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -137,10 +167,10 @@ def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
         margin=dict(l=10, r=10, t=30, b=10),
         plot_bgcolor="white",
         paper_bgcolor="white",
-        font=dict(family="Pretendard, sans-serif", size=13, color="#1A1F36"),
+        font=dict(family="Pretendard, sans-serif", size=12.5, color="#344054"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
         xaxis=dict(showgrid=False, zeroline=False),
-        yaxis=dict(gridcolor="#F0F2F7", zeroline=False),
+        yaxis=dict(gridcolor="#EEF1F5", zeroline=False),
     )
     return fig
 
@@ -167,7 +197,7 @@ def load_theme_returns():
 # 사이드바
 # ──────────────────────────────────────────────
 with st.sidebar:
-    st.markdown(f"### ⚙️ 분석 설정")
+    st.markdown('<div class="sec-tag">ANALYSIS SETTINGS</div><div style="font-size:1.05rem;font-weight:800;margin-bottom:4px;">분석 설정</div>', unsafe_allow_html=True)
     netbuy_df = load_netbuy()
     weeks = list(dict.fromkeys(netbuy_df["주차"]))
     sel_week = st.selectbox("분석 주차", weeks[1:][::-1], index=0)
@@ -202,8 +232,9 @@ with st.sidebar:
 # 헤더 + 실시간 지수 스트립
 # ──────────────────────────────────────────────
 st.markdown(
-    '<div class="agent-header"><span class="agent-title">📊 KODEX 마케팅 AI Agent</span>'
-    '<span class="agent-sub">시장·경쟁사·수급을 하나의 대시보드에서 — 섹션형 통합 모니터링</span></div>',
+    '<div class="agent-overline">MARKETING INTELLIGENCE · WEEKLY MONITOR</div>'
+    '<div class="agent-title">KODEX 마케팅 AI Agent</div>'
+    '<div class="agent-sub">시장·경쟁사·수급을 하나의 대시보드에서 — 섹션형 통합 모니터링</div>',
     unsafe_allow_html=True,
 )
 
@@ -235,7 +266,7 @@ st.write("")
 wk = netbuy_df[netbuy_df["주차"] == sel_week].dropna(subset=["매수강도"])
 top = wk.nlargest(top_n, "매수강도").sort_values("매수강도")
 
-colors = [NAVY if "KODEX" in n else "#C3CBDC" for n in top["종목명"]]
+colors = [NAVY if "KODEX" in n else "#D5DBE7" for n in top["종목명"]]
 fig_top = go.Figure(
     go.Bar(
         x=top["매수강도"],
@@ -259,7 +290,7 @@ fig_top.update_xaxes(ticksuffix="%", range=[min(0, float(top["매수강도"].min
 c1, c2 = st.columns([7, 5], gap="large")
 with c1:
     st.plotly_chart(fig_top, use_container_width=True)
-    st.caption(f"🔵 진한 색 = KODEX 상품 · 분석 대상 {len(wk)}개 ETF")
+    st.caption(f"진한 남색 = KODEX 상품 · 분석 대상 {len(wk)}개 ETF")
 
 with c2:
     # DiD 계산
@@ -320,7 +351,7 @@ with c2:
     trend_names = [treat] + ([control] if has_ctrl else [])
     tr = netbuy_df[netbuy_df["종목명"].isin(trend_names)].dropna(subset=["매수강도"])
     fig_tr = go.Figure()
-    for nm, color in zip(trend_names, [NAVY, "#C3CBDC"]):
+    for nm, color in zip(trend_names, [NAVY, "#A5B1C9"]):
         sub = tr[tr["종목명"] == nm]
         fig_tr.add_trace(
             go.Scatter(x=sub["주차"], y=sub["매수강도"], name=nm, mode="lines+markers",
@@ -401,7 +432,7 @@ with t2:
     fig_sc.update_yaxes(zeroline=True, zerolinecolor="#D9DEE9")
     st.plotly_chart(fig_sc, use_container_width=True)
 
-# 라이징 / 하락 테마 & Gemini's Pick — 수익률과 모멘텀을 함께 반영한 종합 점수로 판별
+# 라이징 / 하락 테마 & AI Pick — 수익률과 모멘텀을 함께 반영한 종합 점수로 판별
 theme_tbl["점수"] = theme_tbl["수익률"] + theme_tbl["모멘텀"]
 rising = theme_tbl.sort_values("점수", ascending=False).head(3)
 falling = theme_tbl.sort_values("점수").head(2)
@@ -409,14 +440,14 @@ falling = theme_tbl.sort_values("점수").head(2)
 p1, p2, p3 = st.columns([4, 4, 4], gap="medium")
 with p1:
     rows = "".join(
-        f'<div class="kw-row"><span class="kw-name">🔥 {r.테마}</span>'
+        f'<div class="kw-row"><span class="kw-name"><span style="color:{RED};">▲</span> {r.테마}</span>'
         f'<span class="kw-badge kw-rise">수익률 {r.수익률:+.1f}% · 모멘텀 {r.모멘텀:+.1f}%p</span></div>'
         for r in rising.itertuples()
     )
     st.markdown(f'<div class="card"><div class="card-title">라이징 테마</div>{rows}</div>', unsafe_allow_html=True)
 with p2:
     rows = "".join(
-        f'<div class="kw-row"><span class="kw-name">🧊 {r.테마}</span>'
+        f'<div class="kw-row"><span class="kw-name"><span style="color:{COOL};">▼</span> {r.테마}</span>'
         f'<span class="kw-badge kw-fall">수익률 {r.수익률:+.1f}% · 모멘텀 {r.모멘텀:+.1f}%p</span></div>'
         for r in falling.itertuples()
     )
@@ -426,8 +457,8 @@ with p3:
     pick_etf = wk[(wk["테마"] == pick_theme["테마"]) & (wk["운용사"] == "KODEX")]
     pick_name = pick_etf.nlargest(1, "매수강도")["종목명"].iloc[0] if len(pick_etf) else f"{pick_theme['테마']} 대표 ETF"
     st.markdown(
-        f'<div class="card" style="background:linear-gradient(135deg,{NAVY},#2E3E8F);border:none;color:white;">'
-        f'<div class="card-title" style="color:white;">✨ Gemini\'s Pick — 차주 주목 ETF</div>'
+        f'<div class="card" style="background:{NAVY};border:none;color:white;">'
+        f'<div class="did-result-label" style="margin-bottom:6px;">AI PICK · 차주 주목 ETF</div>'
         f'<div style="font-size:1.15rem;font-weight:800;margin:4px 0 8px;">{pick_name}</div>'
         f'<div style="font-size:0.83rem;opacity:0.85;line-height:1.6;">'
         f'선정 배경: <b>{pick_theme["테마"]}</b> 테마가 수익률 {pick_theme["수익률"]:+.1f}%, '
@@ -467,7 +498,7 @@ with n1:
             f'<span class="kw-badge {cls}">{kw["증감"]:+d}% {kw["방향"]}</span></div>'
         )
     st.markdown(
-        f'<div class="card"><div class="card-title">📰 ETF 이슈 키워드 (구글 뉴스 · 주간)</div>{rows}</div>',
+        f'<div class="card"><div class="card-title">ETF 이슈 키워드 (구글 뉴스 · 주간)</div>{rows}</div>',
         unsafe_allow_html=True,
     )
 with n2:
@@ -499,9 +530,9 @@ section_header(
 st.write("")
 
 cols = st.columns(3, gap="medium")
-for col, ins in zip(cols, D.AI_INSIGHTS):
+for i, (col, ins) in enumerate(zip(cols, D.AI_INSIGHTS), 1):
     col.markdown(
-        f'<div class="ins-card"><span class="ins-icon">{ins["icon"]}</span>'
+        f'<div class="ins-card"><span class="ins-num">INSIGHT {i:02d}</span>'
         f'<div class="ins-title">{ins["title"]}</div>'
         f'<div class="ins-body">{ins["body"]}</div></div>',
         unsafe_allow_html=True,
