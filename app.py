@@ -4,11 +4,18 @@
 보조 섹션: 시장 트렌드 키워드, 운용사 동향, AI 종합 인사이트.
 """
 
+from urllib.parse import quote
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 import data as D
+
+
+def news_link(query: str) -> str:
+    """네이버 뉴스 검색 링크 (data 모듈 버전과 무관한 자체 폴백)."""
+    return "https://search.naver.com/search.naver?where=news&query=" + quote(query)
 
 # ──────────────────────────────────────────────
 # 페이지 설정 & 스타일
@@ -524,8 +531,9 @@ with n1:
     rows = ""
     for kw in D.NEWS_KEYWORDS:
         cls = {"라이징": "kw-rise", "하락": "kw-fall", "정체": "kw-fall"}.get(kw["방향"], "kw-flat")
+        url = kw.get("url") or news_link(kw["키워드"] + " ETF")
         rows += (
-            f'<a class="kw-link" href="{kw["url"]}" target="_blank">'
+            f'<a class="kw-link" href="{url}" target="_blank">'
             f'<div class="kw-row"><span class="kw-name">{kw["키워드"]} ↗</span>'
             f'<span style="color:{GRAY};font-size:0.8rem;">언급 {kw["언급량"]}건</span>'
             f'<span class="kw-badge {cls}">{kw["증감"]:+d}% {kw["방향"]}</span></div></a>'
@@ -537,15 +545,21 @@ with n1:
     )
 with n2:
     ic1, ic2 = st.columns(2)
-    half = len(D.ISSUERS) // 2
-    for col, issuers in [(ic1, D.ISSUERS[:half]), (ic2, D.ISSUERS[half:])]:
+    issuer_list = getattr(D, "ISSUERS", list(D.ISSUER_NEWS.keys()))
+    half = len(issuer_list) // 2
+    for col, issuers in [(ic1, issuer_list[:half]), (ic2, issuer_list[half:])]:
         with col:
             for issuer in issuers:
+                # 구버전(문자열)·신버전(dict) 데이터 모두 허용 — 모듈 핫리로드 시 크래시 방지
+                entries = [
+                    n if isinstance(n, dict) else {"title": n, "url": news_link(f"{issuer} ETF")}
+                    for n in D.ISSUER_NEWS[issuer]
+                ]
                 items = "".join(
                     f'<a class="news-item" href="{n["url"]}" target="_blank">'
                     f'<div class="news-title">{n["title"]}</div>'
                     f'<div class="news-cta">관련 기사 보기 ↗</div></a>'
-                    for n in D.ISSUER_NEWS[issuer]
+                    for n in entries
                 )
                 accent = NAVY if issuer == "KODEX" else "#5B6478"
                 st.markdown(
