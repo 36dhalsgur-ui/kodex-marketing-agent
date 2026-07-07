@@ -7,6 +7,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
+import os
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 
@@ -269,3 +272,300 @@ def fetch_live_indices() -> list[dict]:
             except Exception:
                 results[label] = fallback[label]
     return [results[label] for label, _, _ in INDEX_SOURCES]
+
+
+# ══════════════════════════════════════════════
+# 유튜브 채널 모니터링 — RSS 기반 (API 키 불필요)
+# API 키(YOUTUBE_API_KEY)가 있으면 좋아요·댓글 수까지 확장 가능
+# ══════════════════════════════════════════════
+YOUTUBE_CHANNELS = {
+    "KODEX": "UCQSlMWKs6L5lf5pz5FTbgKQ",       # 삼성자산운용
+    "TIGER": "UCNcMZz0cIba-4xBLZcoWrBA",
+    "ACE": "UCnuyNitL5SIfBJvTJcdDNLQ",
+    "SOL": "UCZ_aq57IPiAdmNYlxGZ8Pfg",
+    "HANARO": "UCnK3ANYTFZnF8pkEh3_cOgg",
+    "RISE": "UCZ_xAP42i9KMUKZbomB6JSQ",
+    "PLUS": "UChurqZc7g4AB4XPxWnjzDNA",
+    "TIMEFOLIO": "UC9HqkQ6PeK9bNbf_urnn2yA",
+}
+
+_YT_NS = {
+    "a": "http://www.w3.org/2005/Atom",
+    "yt": "http://www.youtube.com/xml/schemas/2015",
+    "media": "http://search.yahoo.com/mrss/",
+}
+
+
+def _fetch_channel_videos(brand: str, channel_id: str, n: int = 3) -> list[dict]:
+    url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
+    root = ET.fromstring(r.content)
+    videos = []
+    for entry in root.findall("a:entry", _YT_NS)[:n]:
+        vid = entry.find("yt:videoId", _YT_NS).text
+        title = entry.find("a:title", _YT_NS).text
+        published = entry.find("a:published", _YT_NS).text[:10]
+        stats = entry.find("media:group/media:community/media:statistics", _YT_NS)
+        views = int(stats.get("views")) if stats is not None else 0
+        videos.append(
+            {
+                "brand": brand,
+                "videoId": vid,
+                "title": title,
+                "published": published,
+                "views": views,
+                "thumbnail": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg",
+                "url": f"https://www.youtube.com/watch?v={vid}",
+            }
+        )
+    return videos
+
+
+def fetch_youtube(n_per_channel: int = 3) -> dict[str, list[dict]]:
+    """8개 브랜드 유튜브 채널의 최신 영상을 병렬 수집. 실패 채널은 빈 리스트."""
+    out: dict[str, list[dict]] = {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {
+            ex.submit(_fetch_channel_videos, b, cid, n_per_channel): b
+            for b, cid in YOUTUBE_CHANNELS.items()
+        }
+        for fut, brand in futures.items():
+            try:
+                out[brand] = fut.result()
+            except Exception:
+                out[brand] = []
+    return out
+
+
+# ══════════════════════════════════════════════
+# 네이버 데이터랩 검색 트렌드
+# NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 설정 시 실데이터, 미설정 시 데모
+# ══════════════════════════════════════════════
+DATALAB_GROUPS = ["KODEX", "TIGER", "ACE", "RISE", "ETF"]
+
+
+def _demo_datalab(n_weeks: int = 12) -> pd.DataFrame:
+    rng = np.random.default_rng(7)
+    today = dt.date.today()
+    rows = []
+    base = {"KODEX": 62, "TIGER": 55, "ACE": 30, "RISE": 24, "ETF": 80}
+    for g in DATALAB_GROUPS:
+        level = base[g]
+        for i in range(n_weeks - 1, -1, -1):
+            d = today - dt.timedelta(weeks=i)
+            level = max(5, level + rng.normal(0.5, 4))
+            rows.append({"date": d.isoformat(), "group": g, "ratio": round(level, 1)})
+    return pd.DataFrame(rows)
+
+
+def fetch_datalab(client_id: str | None = None, client_secret: str | None = None) -> tuple[pd.DataFrame, bool]:
+    """네이버 데이터랩 주간 검색량. 반환: (데이터, 실데이터 여부)."""
+    cid = client_id or os.environ.get("NAVER_CLIENT_ID")
+    csec = client_secret or os.environ.get("NAVER_CLIENT_SECRET")
+    if not (cid and csec):
+        return _demo_datalab(), False
+    try:
+        end = dt.date.today()
+        start = end - dt.timedelta(weeks=12)
+        body = {
+            "startDate": start.isoformat(),
+            "endDate": end.isoformat(),
+            "timeUnit": "week",
+            "keywordGroups": [{"groupName": g, "keywords": [g, f"{g} ETF"]} for g in DATALAB_GROUPS],
+        }
+        r = requests.post(
+            "https://openapi.naver.com/v1/datalab/search",
+            json=body,
+            headers={"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": csec},
+            timeout=6,
+        )
+        r.raise_for_status()
+        rows = []
+        for res in r.json()["results"]:
+            for pt in res["data"]:
+                rows.append({"date": pt["period"], "group": res["title"], "ratio": pt["ratio"]})
+        return pd.DataFrame(rows), True
+    except Exception:
+        return _demo_datalab(), False
+
+
+# ══════════════════════════════════════════════
+# DiD 재설계 — KODEX 처치군 고정 · 경쟁 ETF 평균 대조군
+# 베이스라인 8주 평균 + 라플라스 스무딩 + Z-score → Sigmoid 0~100점
+# ══════════════════════════════════════════════
+LAPLACE_ALPHA = 10.0   # 억원 — 소형 ETF 변화율 폭발 방지
+BASELINE_WEEKS = 8
+ZSCORE_WINDOW = 15     # 권장 15주 (데이터 부족 시 가용 주차 사용)
+
+
+def kodex_etfs() -> list[str]:
+    return sorted(n for n, _, issuer in ETF_UNIVERSE if issuer == "KODEX")
+
+
+def control_group(treat_name: str) -> list[str]:
+    """처치군과 동일 테마의 비(非)KODEX 경쟁 ETF 자동 매핑."""
+    theme = next((t for n, t, _ in ETF_UNIVERSE if n == treat_name), None)
+    return sorted(
+        n for n, t, issuer in ETF_UNIVERSE if t == theme and issuer != "KODEX"
+    )
+
+
+def _smoothed_intensity(df: pd.DataFrame) -> pd.DataFrame:
+    """매수강도(스무딩) = 순매수액 / (전주 순자산 + α) × 100."""
+    d = df.copy()
+    d["전주순자산"] = d.groupby("종목명")["순자산"].shift(1)
+    d["강도"] = d["순매수액"] / (d["전주순자산"] + LAPLACE_ALPHA) * 100
+    return d
+
+
+def did_series(df: pd.DataFrame, treat: str, controls: list[str]) -> pd.DataFrame:
+    """주차별 DiD 시계열: Δ처치(8주 베이스라인 대비) − Δ대조군 평균."""
+    d = _smoothed_intensity(df)
+    weeks = list(dict.fromkeys(d["주차"]))
+
+    def intensity_of(name: str) -> pd.Series:
+        s = d[d["종목명"] == name].set_index("주차")["강도"]
+        return s.reindex(weeks)
+
+    treat_s = intensity_of(treat)
+    ctrl_df = pd.DataFrame({c: intensity_of(c) for c in controls}) if controls else pd.DataFrame(index=weeks)
+
+    rows = []
+    for i, wk in enumerate(weeks):
+        if i < 1:
+            continue
+        lo = max(0, i - BASELINE_WEEKS)
+        base_t = treat_s.iloc[lo:i].mean()
+        delta_t = treat_s.iloc[i] - base_t
+        if len(controls):
+            deltas_c = [
+                ctrl_df[c].iloc[i] - ctrl_df[c].iloc[lo:i].mean() for c in controls
+            ]
+            valid = [v for v in deltas_c if pd.notna(v)]
+            delta_c = float(np.mean(valid)) if valid else np.nan
+        else:
+            delta_c = np.nan
+        did = delta_t - delta_c if not math.isnan(delta_c) else np.nan
+        rows.append(
+            {"주차": wk, "처치강도": treat_s.iloc[i], "Δ처치": delta_t, "Δ대조군": delta_c, "DiD": did}
+        )
+    return pd.DataFrame(rows)
+
+
+def did_score(series: pd.DataFrame, week: str) -> dict:
+    """해당 주차 DiD를 Z-score 표준화 후 Sigmoid로 0~100점 변환."""
+    row = series[series["주차"] == week]
+    if row.empty:
+        return {"available": False}
+    r = row.iloc[0]
+    hist = series[series["주차"] != week]["DiD"].dropna().tail(ZSCORE_WINDOW)
+    result = {
+        "available": True,
+        "delta_treat": float(r["Δ처치"]) if pd.notna(r["Δ처치"]) else None,
+        "delta_ctrl": float(r["Δ대조군"]) if pd.notna(r["Δ대조군"]) else None,
+        "did": float(r["DiD"]) if pd.notna(r["DiD"]) else None,
+        "score": None,
+        "z": None,
+        "fallback": None,
+    }
+    if result["did"] is None:
+        result["fallback"] = "대조군 없음 — Δ처치(시장효과 미제거)만 제공"
+        return result
+    if len(hist) >= 4 and hist.std() > 1e-9:
+        z = (result["did"] - hist.mean()) / hist.std()
+        result["z"] = round(float(z), 2)
+        result["score"] = round(100 / (1 + math.exp(-z)), 1)
+    else:
+        result["fallback"] = f"이력 {len(hist)}주 — Z-score 산출에 부족(최소 4주), DiD 원값만 제공"
+    return result
+
+
+# ══════════════════════════════════════════════
+# 데이터 기반 인사이트 엔진 (규칙 기반 — LLM 연동 시 교체 지점)
+# 특정 전략 프레임 없이 수집 데이터의 신호만으로 도출
+# ══════════════════════════════════════════════
+def build_insights(theme_tbl: pd.DataFrame, keywords: list[dict],
+                   did_board: pd.DataFrame, youtube: dict) -> dict:
+    """수집 데이터를 종합해 요약·시그널·채널평가·액션을 생성."""
+    tt = theme_tbl.copy()
+    tt["점수"] = tt["수익률"] + tt["모멘텀"]
+    rising = tt.sort_values("점수", ascending=False)
+    falling = tt.sort_values("점수")
+    top_theme, low_theme = rising.iloc[0], falling.iloc[0]
+
+    kw_rise = [k for k in keywords if k["증감"] > 10]
+    kw_fall = [k for k in keywords if k["증감"] < -10]
+
+    # 유튜브 채널 활동 요약
+    yt_stats = []
+    for b, vids in youtube.items():
+        if vids:
+            yt_stats.append({"brand": b, "n": len(vids), "views": sum(v["views"] for v in vids),
+                             "top": max(vids, key=lambda v: v["views"])})
+    yt_stats.sort(key=lambda x: -x["views"])
+
+    best = did_board.dropna(subset=["score"]).sort_values("score", ascending=False) if len(did_board) else did_board
+    top_did = best.iloc[0] if len(best) else None
+    low_did = best.iloc[-1] if len(best) > 1 else None
+
+    summary = [
+        f"{top_theme['테마']} 테마가 수익률 {top_theme['수익률']:+.1f}%·모멘텀 {top_theme['모멘텀']:+.1f}%p로 시장을 주도",
+        (f"KODEX 마케팅 효과 최고점은 {top_did['종목명']} — DiD {top_did['score']:.0f}점"
+         if top_did is not None else "금주 DiD 점수 산출 대상 없음 (데이터 확인 필요)"),
+        (f"뉴스 키워드 중 '{kw_rise[0]['키워드']}' 언급 {kw_rise[0]['증감']:+d}% 급증"
+         if kw_rise else "급등 키워드 없음 — 시장 관심 정체 구간"),
+    ]
+
+    signals = [
+        {"type": "라이징", "text": f"{r.테마}: 수익률 {r.수익률:+.1f}% · 모멘텀 {r.모멘텀:+.1f}%p · 순매수 {r.순매수합:+,.0f}억"}
+        for r in rising.head(3).itertuples()
+    ] + [
+        {"type": "하락", "text": f"{low_theme['테마']}: 수익률 {low_theme['수익률']:+.1f}% · 모멘텀 {low_theme['모멘텀']:+.1f}%p — 노출 축소 검토"}
+    ]
+
+    channel_eval = [
+        f"유튜브 최다 조회 채널: {yt_stats[0]['brand']} (최근 영상 {yt_stats[0]['n']}개 합산 {yt_stats[0]['views']:,}회)" if yt_stats else "유튜브 수집 실패 — 네트워크 확인",
+        (f"조회수 1위 영상: [{yt_stats[0]['top']['brand']}] {yt_stats[0]['top']['title'][:40]} ({yt_stats[0]['top']['views']:,}회)"
+         if yt_stats else ""),
+        f"뉴스 키워드 라이징 {len(kw_rise)}건 / 하락 {len(kw_fall)}건",
+    ]
+
+    actions = []
+    # 1) 라이징 테마 × KODEX 보유 → 푸시
+    kodex_in_top = [n for n, t, iss in ETF_UNIVERSE if iss == "KODEX" and t == top_theme["테마"]]
+    if kodex_in_top:
+        actions.append({
+            "priority": "HIGH", "title": f"{top_theme['테마']} 테마 푸시 — {kodex_in_top[0]}",
+            "why": f"테마 수익률 {top_theme['수익률']:+.1f}%·모멘텀 {top_theme['모멘텀']:+.1f}%p 동반 상승, 순매수 유입 확인",
+            "how": "차주 콘텐츠·배너 1순위 배정, 유튜브 신규 영상 소재로 활용",
+        })
+    # 2) DiD 고득점 → 캠페인 강화
+    if top_did is not None and top_did["score"] and top_did["score"] >= 60:
+        actions.append({
+            "priority": "HIGH", "title": f"{top_did['종목명']} 캠페인 연장·확대",
+            "why": f"DiD {top_did['score']:.0f}점 — 시장효과 제거 후에도 순매수 순증 확인",
+            "how": "동일 소재로 집행 기간 연장, 유사 테마 ETF로 소재 확장 테스트",
+        })
+    # 3) DiD 저득점 → 재배분
+    if low_did is not None and low_did["score"] is not None and low_did["score"] < 40:
+        actions.append({
+            "priority": "MID", "title": f"{low_did['종목명']} 마케팅 예산 재배분",
+            "why": f"DiD {low_did['score']:.0f}점 — 마케팅 대비 순매수 반응 미약",
+            "how": "소재·타깃 교체 후 2주 재측정, 무반응 지속 시 라이징 테마로 예산 이동",
+        })
+    # 4) 라이징 키워드 콘텐츠
+    if kw_rise:
+        actions.append({
+            "priority": "MID", "title": f"'{kw_rise[0]['키워드']}' 키워드 콘텐츠 선점",
+            "why": f"언급량 {kw_rise[0]['증감']:+d}% 급증 — 검색 유입 선점 기회",
+            "how": "숏폼 1건 + 블로그 해설 1건 발행, 데이터랩 검색량 반응 추적",
+        })
+    # 5) 경쟁사 활동 대응
+    if yt_stats and yt_stats[0]["brand"] != "KODEX":
+        actions.append({
+            "priority": "LOW", "title": f"{yt_stats[0]['brand']} 콘텐츠 벤치마킹",
+            "why": f"경쟁 채널이 조회수 우위 ({yt_stats[0]['views']:,}회) — 소재·포맷 분석 필요",
+            "how": "상위 영상 포맷 분석 후 KODEX 채널 A/B 테스트",
+        })
+
+    return {"summary": summary, "signals": signals, "channel_eval": [c for c in channel_eval if c], "actions": actions[:5]}
