@@ -27,8 +27,8 @@ if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
 
 
 def news_link(query: str) -> str:
-    """네이버 뉴스 검색 링크 (data 모듈 버전과 무관한 자체 폴백)."""
-    return "https://search.naver.com/search.naver?where=news&query=" + quote(query)
+    """구글 뉴스 검색 링크 (data 모듈 버전과 무관한 자체 폴백)."""
+    return f"https://news.google.com/search?q={quote(query)}&hl=ko&gl=KR&ceid=KR%3Ako"
 
 
 # ──────────────────────────────────────────────

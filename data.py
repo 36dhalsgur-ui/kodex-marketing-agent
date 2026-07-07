@@ -134,8 +134,8 @@ def demo_theme_returns(n_weeks: int = 8) -> pd.DataFrame:
 # 뉴스 키워드 / 운용사 동향 / AI 인사이트 (데모)
 # ──────────────────────────────────────────────
 def news_url(query: str) -> str:
-    """네이버 뉴스 검색 링크. 실운영 시 크롤링한 기사 원문 URL로 대체."""
-    return "https://search.naver.com/search.naver?where=news&query=" + quote(query)
+    """구글 뉴스 검색 링크 (수집원과 동일 소스). 실운영 시 기사 원문 URL로 대체."""
+    return f"https://news.google.com/search?q={quote(query)}&hl=ko&gl=KR&ceid=KR%3Ako"
 
 
 NEWS_KEYWORDS = [
