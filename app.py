@@ -6,6 +6,7 @@ Z-score→Sigmoid 0~100점 설계를 따른다.
 """
 
 import datetime as dt
+import importlib
 from urllib.parse import quote
 
 import pandas as pd
@@ -13,6 +14,16 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import data as D
+
+# 배포 환경 핫리로드 시 data 모듈이 구버전으로 캐시되면 필수 함수가 없어
+# 앱 전체가 죽는다 — 필수 속성 누락 시 강제 재로드로 자가 복구한다.
+_REQUIRED_ATTRS = (
+    "kodex_etfs", "control_group", "did_series", "did_score",
+    "build_insights", "fetch_youtube", "fetch_datalab",
+    "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
+)
+if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
+    D = importlib.reload(D)
 
 
 def news_link(query: str) -> str:
