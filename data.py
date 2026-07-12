@@ -138,15 +138,16 @@ def news_url(query: str) -> str:
     return f"https://news.google.com/search?q={quote(query)}&hl=ko&gl=KR&ceid=KR%3Ako"
 
 
+# 테마 키워드 축 — 검색량(데이터랩)과 뉴스 언급량을 같은 키로 결합한다
 NEWS_KEYWORDS = [
-    {"키워드": "AI 전력 인프라", "언급량": 128, "증감": 41, "방향": "라이징"},
-    {"키워드": "금리 인하 기대", "언급량": 96, "증감": 18, "방향": "라이징"},
-    {"키워드": "K-방산 수출", "언급량": 87, "증감": 25, "방향": "라이징"},
-    {"키워드": "월배당 ETF", "언급량": 74, "증감": 6, "방향": "유지"},
-    {"키워드": "반도체 업황", "언급량": 69, "증감": -12, "방향": "정체"},
-    {"키워드": "2차전지 반등", "언급량": 52, "증감": -21, "방향": "하락"},
-    {"키워드": "금 현물 투자", "언급량": 48, "증감": 15, "방향": "라이징"},
-    {"키워드": "커버드콜 전략", "언급량": 41, "증감": -4, "방향": "유지"},
+    {"키워드": "AI반도체", "언급량": 128, "증감": 41, "방향": "라이징"},
+    {"키워드": "금리 인하", "언급량": 96, "증감": 18, "방향": "라이징"},
+    {"키워드": "K-방산", "언급량": 87, "증감": 25, "방향": "라이징"},
+    {"키워드": "월배당", "언급량": 74, "증감": 6, "방향": "유지"},
+    {"키워드": "조선", "언급량": 44, "증감": 19, "방향": "라이징"},
+    {"키워드": "2차전지", "언급량": 52, "증감": -21, "방향": "하락"},
+    {"키워드": "금 투자", "언급량": 48, "증감": 15, "방향": "라이징"},
+    {"키워드": "커버드콜", "언급량": 41, "증감": -4, "방향": "유지"},
 ]
 for _kw in NEWS_KEYWORDS:
     _kw["url"] = news_url(_kw["키워드"] + " ETF")
@@ -509,7 +510,7 @@ def build_insights(theme_tbl: pd.DataFrame, keywords: list[dict],
     low_did = best.iloc[-1] if len(best) > 1 else None
 
     summary = [
-        f"{top_theme['테마']} 테마가 수익률 {top_theme['수익률']:+.1f}%·모멘텀 {top_theme['모멘텀']:+.1f}%p로 시장을 주도",
+        f"{top_theme['테마']} 테마가 금주 {top_theme['수익률']:+.1f}% (전주 대비 {top_theme['모멘텀']:+.1f}%p 가속)로 시장을 주도",
         (f"KODEX 마케팅 효과 최고점은 {top_did['종목명']} — DiD {top_did['score']:.0f}점"
          if top_did is not None else "금주 DiD 점수 산출 대상 없음 (데이터 확인 필요)"),
         (f"뉴스 키워드 중 '{kw_rise[0]['키워드']}' 언급 {kw_rise[0]['증감']:+d}% 급증"
@@ -517,10 +518,10 @@ def build_insights(theme_tbl: pd.DataFrame, keywords: list[dict],
     ]
 
     signals = [
-        {"type": "라이징", "text": f"{r.테마}: 수익률 {r.수익률:+.1f}% · 모멘텀 {r.모멘텀:+.1f}%p · 순매수 {r.순매수합:+,.0f}억"}
+        {"type": "라이징", "text": f"{r.테마}: 금주 {r.수익률:+.1f}% (전주 대비 {r.모멘텀:+.1f}%p) · 순매수 {r.순매수합:+,.0f}억"}
         for r in rising.head(3).itertuples()
     ] + [
-        {"type": "하락", "text": f"{low_theme['테마']}: 수익률 {low_theme['수익률']:+.1f}% · 모멘텀 {low_theme['모멘텀']:+.1f}%p — 노출 축소 검토"}
+        {"type": "하락", "text": f"{low_theme['테마']}: 금주 {low_theme['수익률']:+.1f}% (전주 대비 {low_theme['모멘텀']:+.1f}%p) — 노출 축소 검토"}
     ]
 
     channel_eval = [
@@ -536,7 +537,7 @@ def build_insights(theme_tbl: pd.DataFrame, keywords: list[dict],
     if kodex_in_top:
         actions.append({
             "priority": "HIGH", "title": f"{top_theme['테마']} 테마 푸시 — {kodex_in_top[0]}",
-            "why": f"테마 수익률 {top_theme['수익률']:+.1f}%·모멘텀 {top_theme['모멘텀']:+.1f}%p 동반 상승, 순매수 유입 확인",
+            "why": f"테마 수익률 금주 {top_theme['수익률']:+.1f}%, 전주 대비 {top_theme['모멘텀']:+.1f}%p 가속, 순매수 유입 확인",
             "how": "차주 콘텐츠·배너 1순위 배정, 유튜브 신규 영상 소재로 활용",
         })
     # 2) DiD 고득점 → 캠페인 강화
@@ -635,3 +636,100 @@ def fetch_weekly_market() -> list[dict]:
             except Exception:
                 results[label] = fallback[label]
     return [results[label] for label, _, _ in WEEKLY_SOURCES]
+
+
+# ══════════════════════════════════════════════
+# 테마 검색량 트렌드 — 네이버 데이터랩 (수요 측 지표)
+# 뉴스 언급량(공급 측)과 결합해 관심의 성격을 판독한다.
+# ══════════════════════════════════════════════
+THEME_SEARCH_GROUPS = [
+    ("AI반도체", ["AI반도체", "반도체 ETF"]),
+    ("금리 인하", ["금리인하", "채권 ETF"]),
+    ("K-방산", ["방산주", "방산 ETF"]),
+    ("월배당", ["월배당 ETF", "배당 ETF"]),
+    ("조선", ["조선주", "조선 ETF"]),
+    ("2차전지", ["2차전지", "2차전지 ETF"]),
+    ("금 투자", ["금투자", "금 ETF"]),
+    ("커버드콜", ["커버드콜", "커버드콜 ETF"]),
+]
+
+# 데모용 주간 검색량 증감률(%) — 실데이터 연동 시 데이터랩 계산값으로 대체
+_DEMO_SEARCH_DELTA = {
+    "AI반도체": 34.2, "금리 인하": 12.7, "K-방산": 27.9, "월배당": 4.1,
+    "조선": 41.5, "2차전지": -18.3, "금 투자": 22.4, "커버드콜": -9.8,
+}
+
+
+def fetch_theme_search(client_id: str | None = None, client_secret: str | None = None) -> tuple[dict, bool]:
+    """테마 키워드별 주간 검색량 증감률(%). 반환: ({키워드: 증감}, 실데이터 여부)."""
+    cid = client_id or os.environ.get("NAVER_CLIENT_ID")
+    csec = client_secret or os.environ.get("NAVER_CLIENT_SECRET")
+    if not (cid and csec):
+        return dict(_DEMO_SEARCH_DELTA), False
+    try:
+        end = dt.date.today()
+        start = end - dt.timedelta(weeks=8)
+        deltas: dict[str, float] = {}
+        # 데이터랩은 요청당 5개 그룹 제한 → 나눠서 호출
+        for chunk_start in range(0, len(THEME_SEARCH_GROUPS), 5):
+            chunk = THEME_SEARCH_GROUPS[chunk_start : chunk_start + 5]
+            body = {
+                "startDate": start.isoformat(),
+                "endDate": end.isoformat(),
+                "timeUnit": "week",
+                "keywordGroups": [{"groupName": g, "keywords": kws} for g, kws in chunk],
+            }
+            r = requests.post(
+                "https://openapi.naver.com/v1/datalab/search",
+                json=body,
+                headers={"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": csec},
+                timeout=6,
+            )
+            r.raise_for_status()
+            for res in r.json()["results"]:
+                pts = res["data"]
+                if len(pts) >= 2 and pts[-2]["ratio"] > 0:
+                    deltas[res["title"]] = round(
+                        (pts[-1]["ratio"] / pts[-2]["ratio"] - 1) * 100, 1
+                    )
+        return deltas, True
+    except Exception:
+        return dict(_DEMO_SEARCH_DELTA), False
+
+
+def _read_signal(search_delta: float, news_delta: int) -> str:
+    """검색량(수요) × 뉴스(공급) 조합 판독."""
+    s_up, n_up = search_delta >= 10, news_delta >= 10
+    s_dn, n_dn = search_delta <= -10, news_delta <= -10
+    if s_up and n_up:
+        return "대중 확산"
+    if s_up and not n_up:
+        return "커뮤니티발 선행"
+    if n_up and not s_up:
+        return "업계 이슈"
+    if s_dn and n_dn:
+        return "관심 냉각"
+    return "유지"
+
+
+def theme_trend_table(client_id: str | None = None, client_secret: str | None = None) -> tuple[pd.DataFrame, bool]:
+    """테마별 검색량 증감 + 뉴스 언급 + 판독 결합 테이블."""
+    search, live = fetch_theme_search(client_id, client_secret)
+    rows = []
+    for kw in NEWS_KEYWORDS:
+        name = kw["키워드"]
+        s_delta = search.get(name)
+        if s_delta is None:
+            continue
+        rows.append(
+            {
+                "키워드": name,
+                "검색증감": s_delta,
+                "뉴스언급": kw["언급량"],
+                "뉴스증감": kw["증감"],
+                "판독": _read_signal(s_delta, kw["증감"]),
+                "url": kw["url"],
+            }
+        )
+    df = pd.DataFrame(rows).sort_values("검색증감", ascending=False)
+    return df, live

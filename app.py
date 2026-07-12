@@ -19,7 +19,7 @@ import data as D
 # 앱 전체가 죽는다 — 필수 속성 누락 시 강제 재로드로 자가 복구한다.
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score",
-    "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market",
+    "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "theme_trend_table",
     "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
 )
 if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
@@ -172,6 +172,7 @@ st.markdown(
     .kw-rise {{ background: #FEF1F2; color: #D63C48; }}
     .kw-fall {{ background: #EFF5FF; color: #2A6FDB; }}
     .kw-flat {{ background: #F2F4F7; color: {MUTED}; }}
+    .kw-warn {{ background: #FFF6E6; color: #B3730A; }}
     a.kw-link, a.kw-link * {{ text-decoration: none !important; color: inherit; }}
     a.kw-link {{ display: block; }}
     a.kw-link:hover .kw-name {{ color: {NAVY}; text-decoration: underline !important; }}
@@ -285,6 +286,17 @@ def load_youtube():
 
 
 @st.cache_data(ttl=3600)
+def load_theme_trend():
+    cid = csec = None
+    try:
+        cid = st.secrets.get("NAVER_CLIENT_ID")
+        csec = st.secrets.get("NAVER_CLIENT_SECRET")
+    except Exception:
+        pass
+    return D.theme_trend_table(cid, csec)
+
+
+@st.cache_data(ttl=3600)
 def load_datalab():
     cid = csec = None
     try:
@@ -337,8 +349,20 @@ theme_flow = (
     .round(2)
 )
 theme_tbl = theme_flow.join(this_ret.rename("수익률")).reset_index()
+theme_tbl["전주수익률"] = theme_tbl["테마"].map(prev_ret).round(2)
 theme_tbl["모멘텀"] = (theme_tbl["테마"].map(this_ret) - theme_tbl["테마"].map(prev_ret)).round(2)
 theme_tbl["점수"] = theme_tbl["수익률"] + theme_tbl["모멘텀"]
+
+
+def flow_state(prev: float, this: float) -> str:
+    """전주→금주 수익률 흐름을 사람이 읽는 상태 라벨로."""
+    if prev < 0 <= this:
+        return "상승 전환"
+    if this < 0 <= prev:
+        return "하락 전환"
+    if this >= 0:
+        return "가속" if this > prev else "상승 둔화"
+    return "낙폭 축소" if this > prev else "낙폭 확대"
 
 
 @st.cache_data
@@ -407,7 +431,7 @@ with tab_home:
     k1.markdown(
         f'<div class="kpi-card"><div class="kpi-label">라이징 테마 · ①</div>'
         f'<div class="kpi-value">{top_theme["테마"]}</div>'
-        f'<div class="kpi-sub">수익률 {top_theme["수익률"]:+.1f}% · 모멘텀 {top_theme["모멘텀"]:+.1f}%p</div></div>',
+        f'<div class="kpi-sub">전주 {top_theme["전주수익률"]:+.1f}% → 금주 {top_theme["수익률"]:+.1f}% · {flow_state(top_theme["전주수익률"], top_theme["수익률"])}</div></div>',
         unsafe_allow_html=True,
     )
     k2.markdown(
@@ -475,22 +499,34 @@ with tab_trend:
     )
     st.write("")
 
-    def kw_row(kw: dict) -> str:
-        cls = {"라이징": "kw-rise", "하락": "kw-fall", "정체": "kw-fall"}.get(kw["방향"], "kw-flat")
-        url = kw.get("url") or news_link(kw["키워드"] + " ETF")
+    trend_tbl, trend_live = load_theme_trend()
+    READ_BADGE = {
+        "대중 확산": "kw-rise", "커뮤니티발 선행": "kw-warn",
+        "업계 이슈": "kw-warn", "관심 냉각": "kw-fall", "유지": "kw-flat",
+    }
+
+    def trend_row(r) -> str:
+        s_cls = "kw-rise" if r.검색증감 >= 0 else "kw-fall"
         return (
-            f'<a class="kw-link" href="{url}" target="_blank">'
-            f'<div class="kw-row"><span class="kw-name">{kw["키워드"]} ↗</span>'
-            f'<span style="color:{GRAY};font-size:0.8rem;">언급 {kw["언급량"]}건</span>'
-            f'<span class="kw-badge {cls}">{kw["증감"]:+d}% {kw["방향"]}</span></div></a>'
+            f'<a class="kw-link" href="{r.url}" target="_blank">'
+            f'<div class="kw-row"><span class="kw-name" style="min-width:5.5em;">{r.키워드} ↗</span>'
+            f'<span class="kw-badge {s_cls}">검색 {r.검색증감:+.1f}%</span>'
+            f'<span style="color:{GRAY};font-size:0.78rem;">뉴스 {r.뉴스언급}건 ({r.뉴스증감:+d}%)</span>'
+            f'<span class="kw-badge {READ_BADGE.get(r.판독, "kw-flat")}">{r.판독}</span></div></a>'
         )
 
-    mid = (len(D.NEWS_KEYWORDS) + 1) // 2
-    col_a = "".join(kw_row(kw) for kw in D.NEWS_KEYWORDS[:mid])
-    col_b = "".join(kw_row(kw) for kw in D.NEWS_KEYWORDS[mid:])
+    rows_list = list(trend_tbl.itertuples(index=False))
+    mid = (len(rows_list) + 1) // 2
+    col_a = "".join(trend_row(r) for r in rows_list[:mid])
+    col_b = "".join(trend_row(r) for r in rows_list[mid:])
+    live_tag = "데이터랩 실데이터" if trend_live else "데모 — NAVER API 키 설정 시 실데이터"
     st.markdown(
-        f'<div class="card"><div class="card-title">ETF 이슈 키워드 (구글 뉴스 · 주간)</div>'
-        f'<div class="kw-cols"><div class="kw-col">{col_a}</div><div class="kw-col">{col_b}</div></div></div>',
+        f'<div class="card"><div class="card-title">테마 검색량 트렌드 '
+        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">검색량(수요) × 뉴스(공급) 교차 판독 · {live_tag}</span></div>'
+        f'<div class="kw-cols"><div class="kw-col">{col_a}</div><div class="kw-col">{col_b}</div></div>'
+        f'<div style="font-size:0.7rem;color:{GRAY};margin-top:10px;">'
+        f'판독 기준 — <b>대중 확산</b>: 검색·뉴스 동반 급증 / <b>커뮤니티발 선행</b>: 뉴스 없이 검색만 급증 (선행 신호) / '
+        f'<b>업계 이슈</b>: 뉴스만 증가, 대중 무반응 / <b>관심 냉각</b>: 둘 다 감소</div></div>',
         unsafe_allow_html=True,
     )
     st.write("")
@@ -528,7 +564,7 @@ with tab_trend:
         )
         fig_sc = base_layout(fig_sc, height=430)
         fig_sc.update_layout(
-            title=dict(text="수익률 × 매수강도 맵  <span style='font-size:12px;color:#98A2B3'>버블 크기 = 순매수 규모 · 붉은색 = 모멘텀 상승</span>", font=dict(size=15)),
+            title=dict(text="수익률 × 매수강도 맵  <span style='font-size:12px;color:#98A2B3'>버블 크기 = 순매수 규모 · 붉은색 = 전주보다 가속</span>", font=dict(size=15)),
             xaxis_title="주간 수익률(%)", yaxis_title="평균 매수강도(%)",
         )
         fig_sc.update_xaxes(showgrid=True, gridcolor="#F0F2F7", zeroline=True, zerolinecolor="#D9DEE9")
@@ -541,14 +577,16 @@ with tab_trend:
     with p1:
         rows = "".join(
             f'<div class="kw-row"><span class="kw-name"><span style="color:{RED};">▲</span> {r.테마}</span>'
-            f'<span class="kw-badge kw-rise">수익률 {r.수익률:+.1f}% · 모멘텀 {r.모멘텀:+.1f}%p</span></div>'
+            f'<span style="color:#475467;font-size:0.82rem;font-variant-numeric:tabular-nums;">전주 {r.전주수익률:+.1f}% → 금주 {r.수익률:+.1f}%</span>'
+            f'<span class="kw-badge kw-rise">{flow_state(r.전주수익률, r.수익률)}</span></div>'
             for r in rising.itertuples()
         )
         st.markdown(f'<div class="card"><div class="card-title">라이징 테마</div>{rows}</div>', unsafe_allow_html=True)
     with p2:
         rows = "".join(
             f'<div class="kw-row"><span class="kw-name"><span style="color:{COOL};">▼</span> {r.테마}</span>'
-            f'<span class="kw-badge kw-fall">수익률 {r.수익률:+.1f}% · 모멘텀 {r.모멘텀:+.1f}%p</span></div>'
+            f'<span style="color:#475467;font-size:0.82rem;font-variant-numeric:tabular-nums;">전주 {r.전주수익률:+.1f}% → 금주 {r.수익률:+.1f}%</span>'
+            f'<span class="kw-badge kw-fall">{flow_state(r.전주수익률, r.수익률)}</span></div>'
             for r in falling.itertuples()
         )
         st.markdown(f'<div class="card"><div class="card-title">하락·정체 테마</div>{rows}</div>', unsafe_allow_html=True)
