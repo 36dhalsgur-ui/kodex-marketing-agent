@@ -569,3 +569,69 @@ def build_insights(theme_tbl: pd.DataFrame, keywords: list[dict],
         })
 
     return {"summary": summary, "signals": signals, "channel_eval": [c for c in channel_eval if c], "actions": actions[:5]}
+
+
+# ══════════════════════════════════════════════
+# 금주 시장 요약 — 주간 등락률 (실시간 호가 스트립 대체)
+# 주간 의사결정 도구에 맞춰 최근 5거래일 등락률을 제공한다.
+# ══════════════════════════════════════════════
+WEEKLY_SOURCES = [
+    ("코스피", "domestic", "KOSPI"),
+    ("코스닥", "domestic", "KOSDAQ"),
+    ("S&P 500", "world", ".INX"),
+    ("나스닥", "world", ".IXIC"),
+    ("USD/KRW", "fx", "FX_USDKRW"),
+]
+
+WEEKLY_FALLBACK = [
+    {"name": "코스피", "level": "7,475.94", "weekly": 1.8},
+    {"name": "코스닥", "level": "831.23", "weekly": -0.6},
+    {"name": "S&P 500", "level": "7,537.43", "weekly": 0.9},
+    {"name": "나스닥", "level": "26,121.16", "weekly": 1.4},
+    {"name": "USD/KRW", "level": "1,522.40", "weekly": 0.3},
+]
+
+
+def _parse_price(s: str) -> float:
+    return float(str(s).replace(",", ""))
+
+
+def _fetch_weekly_one(label: str, kind: str, code: str) -> dict:
+    headers = {"User-Agent": "Mozilla/5.0"}
+    if kind == "domestic":
+        rows = requests.get(
+            f"https://m.stock.naver.com/api/index/{code}/price?pageSize=7&page=1",
+            headers=headers, timeout=4,
+        ).json()
+        closes = [_parse_price(r["closePrice"]) for r in rows]
+    elif kind == "world":
+        rows = requests.get(
+            f"https://api.stock.naver.com/index/{code}/price?pageSize=7&page=1",
+            headers=headers, timeout=4,
+        ).json()
+        closes = [_parse_price(r["closePrice"]) for r in rows]
+    else:  # fx
+        rows = requests.get(
+            "https://m.stock.naver.com/front-api/marketIndex/prices"
+            f"?category=exchange&reutersCode={code}&page=1&pageSize=7",
+            headers=headers, timeout=4,
+        ).json()["result"]
+        closes = [_parse_price(r["closePrice"]) for r in rows]
+    if len(closes) < 6:
+        raise ValueError("이력 부족")
+    weekly = (closes[0] / closes[5] - 1) * 100  # 최근 5거래일 등락률
+    return {"name": label, "level": f"{closes[0]:,.2f}", "weekly": round(weekly, 2)}
+
+
+def fetch_weekly_market() -> list[dict]:
+    """주요 지수·환율의 주간(5거래일) 등락률. 실패 항목은 폴백."""
+    fallback = {f["name"]: f for f in WEEKLY_FALLBACK}
+    results: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=len(WEEKLY_SOURCES)) as ex:
+        futures = {ex.submit(_fetch_weekly_one, *src): src[0] for src in WEEKLY_SOURCES}
+        for fut, label in futures.items():
+            try:
+                results[label] = fut.result()
+            except Exception:
+                results[label] = fallback[label]
+    return [results[label] for label, _, _ in WEEKLY_SOURCES]

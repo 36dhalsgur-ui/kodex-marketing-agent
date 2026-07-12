@@ -19,7 +19,7 @@ import data as D
 # 앱 전체가 죽는다 — 필수 속성 누락 시 강제 재로드로 자가 복구한다.
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score",
-    "build_insights", "fetch_youtube", "fetch_datalab",
+    "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market",
     "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
 )
 if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
@@ -264,9 +264,9 @@ def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
 # ──────────────────────────────────────────────
 # 데이터 로드
 # ──────────────────────────────────────────────
-@st.cache_data(ttl=300)
-def load_indices():
-    return D.fetch_live_indices()
+@st.cache_data(ttl=1800)
+def load_weekly_market():
+    return D.fetch_weekly_market()
 
 
 @st.cache_data
@@ -381,27 +381,6 @@ st.markdown(
 )
 
 
-def idx_card(ix: dict) -> str:
-    cls = "idx-up" if ix["up"] else "idx-down"
-    arrow = "▲" if ix["up"] else "▼"
-    return (
-        f'<div class="idx-card"><div class="idx-name">{ix["name"]}</div>'
-        f'<div class="idx-val">{ix["value"]}</div>'
-        f'<div class="idx-chg {cls}">{arrow} {ix["change"].lstrip("+-")}</div></div>'
-    )
-
-
-indices = load_indices()
-korea_fx = [ix for ix in indices if ix["name"] in ("코스피", "코스닥", "USD/KRW")]
-overseas = [ix for ix in indices if ix not in korea_fx]
-st.markdown(
-    '<div class="idx-group">KOREA MARKET · FX</div>'
-    f'<div class="idx-strip">{"".join(idx_card(ix) for ix in korea_fx)}</div>'
-    '<div class="idx-group">GLOBAL INDICES</div>'
-    f'<div class="idx-strip">{"".join(idx_card(ix) for ix in overseas)}</div>',
-    unsafe_allow_html=True,
-)
-st.caption("실시간 지수·환율 (네이버 증권 기준, 5분 캐시) · 시장 마감 시 종가 표시")
 st.write("")
 
 # ══════════════════════════════════════════════
@@ -476,6 +455,24 @@ with tab_home:
 with tab_trend:
     st.write("")
     section_header("STEP 1 · MONITOR", "시장 트렌드", "뉴스 키워드·테마 수익률·순매수·검색량으로 시장이 어디로 움직이는지 파악합니다.")
+    st.write("")
+
+    # 금주 시장 요약 — 주간(5거래일) 등락률. 아래 테마 수익률을 읽는 기준선.
+    weekly_chips = ""
+    for m in load_weekly_market():
+        up = m["weekly"] >= 0
+        cls = "idx-up" if up else "idx-down"
+        arrow = "▲" if up else "▼"
+        weekly_chips += (
+            f'<div class="idx-card"><div class="idx-name">{m["name"]}</div>'
+            f'<div class="idx-val {cls}">{m["weekly"]:+.1f}%</div>'
+            f'<div class="idx-chg" style="color:{FAINT};">{arrow} 현재 {m["level"]}</div></div>'
+        )
+    st.markdown(
+        f'<div class="idx-group">금주 시장 요약 · 최근 5거래일 등락률 — 테마 수익률의 해석 기준선</div>'
+        f'<div class="idx-strip">{weekly_chips}</div>',
+        unsafe_allow_html=True,
+    )
     st.write("")
 
     def kw_row(kw: dict) -> str:
