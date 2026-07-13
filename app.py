@@ -541,53 +541,40 @@ with tab_trend:
         f'<td style="text-align:center;"><span class="kw-badge {LABEL_BADGE[r.라벨]}">{r.라벨}</span></td></tr>'
         for r in board.itertuples(index=False)
     )
-    # ── 테마 수명주기 다이어그램 (독립 카드) — 4개 지표의 전형적 선행·후행 순서
-    PC_INK, PC_SMART, PC_RETAIL, PC_SEARCH = "#101828", "#0E9F6E", "#F04452", "#F59E0B"
+    # ── 테마 수명주기 배너 — 시그널 보드의 필요성 + 단계별 마케터 행동
     cycle_svg = (
-        '<svg viewBox="0 0 760 230" style="width:100%;max-width:920px;display:block;margin:4px auto 0;">'
-        # 국면 배경 밴드
-        '<rect x="20" y="18" width="180" height="172" fill="#B3730A" opacity="0.05"/>'
-        '<rect x="200" y="18" width="220" height="172" fill="#D63C48" opacity="0.05"/>'
-        '<rect x="420" y="18" width="140" height="172" fill="#2A6FDB" opacity="0.06"/>'
-        '<rect x="560" y="18" width="180" height="172" fill="#98A2B3" opacity="0.07"/>'
-        # 수급 기준선 (0)
-        '<line x1="20" y1="105" x2="740" y2="105" stroke="#E4E7EC" stroke-dasharray="3 4"/>'
-        '<text x="24" y="100" font-size="9" fill="#98A2B3">수급 0</text>'
-        # 주가 (굵은 검정 — 누적 수준)
-        f'<path d="M 20 172 C 90 168, 150 160, 200 148 C 270 128, 360 60, 440 42 C 480 34, 510 45, 560 78 C 620 108, 690 135, 740 150" fill="none" stroke="{PC_INK}" stroke-width="4" stroke-linecap="round"/>'
-        # 외국인·기관 수급 (초록 — 가장 먼저 들어와 가장 먼저 나감)
-        f'<path d="M 20 105 C 80 95, 130 70, 190 62 C 250 56, 300 85, 340 105 C 390 130, 440 148, 500 150 C 570 150, 660 125, 740 112" fill="none" stroke="{PC_SMART}" stroke-width="2.5" stroke-linecap="round"/>'
-        # 개인 수급 (빨강 — 뒤늦게 들어와 고점 물량을 받음)
-        f'<path d="M 20 108 C 90 108, 150 110, 210 106 C 280 100, 350 78, 430 58 C 470 50, 510 48, 550 60 C 610 80, 680 110, 740 128" fill="none" stroke="{PC_RETAIL}" stroke-width="2.5" stroke-linecap="round"/>'
-        # 검색량 (주황 — 가장 늦게 폭발, 고점 이후에도 높음)
-        f'<path d="M 20 178 C 120 177, 220 174, 320 162 C 380 152, 430 125, 500 100 C 540 92, 570 95, 620 108 C 670 118, 710 128, 740 134" fill="none" stroke="{PC_SEARCH}" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6 3"/>'
-        # 순서를 가르치는 마이크로 주석
-        f'<text x="150" y="48" font-size="10.5" font-weight="700" fill="{PC_SMART}">① 큰손이 먼저 매집</text>'
-        f'<text x="445" y="26" font-size="10.5" font-weight="700" fill="{PC_INK}">③ 가격 고점</text>'
-        f'<text x="510" y="66" font-size="10.5" font-weight="700" fill="{PC_RETAIL}">② 개인은 늦게 유입</text>'
-        f'<text x="600" y="94" font-size="10.5" font-weight="700" fill="{PC_SEARCH}">④ 검색은 가장 늦게 정점</text>'
-        # 국면 라벨
-        '<text x="110" y="210" text-anchor="middle" font-size="12" font-weight="700" fill="#B3730A">준비 · 큰손 매집</text>'
-        '<text x="310" y="210" text-anchor="middle" font-size="12" font-weight="700" fill="#D63C48">푸시 · 대중 유입, 가격 상승</text>'
-        '<text x="490" y="210" text-anchor="middle" font-size="12" font-weight="700" fill="#2A6FDB">중단 · 큰손 이탈</text>'
-        '<text x="650" y="210" text-anchor="middle" font-size="12" font-weight="700" fill="#98A2B3">관망 · 관심 냉각</text>'
+        '<svg viewBox="0 0 760 196" style="width:100%;max-width:920px;display:block;margin:6px auto 0;">'
+        '<line x1="210" y1="14" x2="210" y2="120" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        '<line x1="420" y1="14" x2="420" y2="120" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        '<line x1="560" y1="14" x2="560" y2="120" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        # 테마 관심도 곡선 (단일) — 진단 라벨과 같은 4색 구간
+        '<path d="M 20 112 C 90 108, 150 94, 210 72" fill="none" stroke="#B3730A" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 210 72 C 280 46, 350 26, 420 22" fill="none" stroke="#D63C48" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 420 22 C 470 20, 520 36, 560 56" fill="none" stroke="#2A6FDB" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 560 56 C 610 78, 680 100, 740 110" fill="none" stroke="#98A2B3" stroke-width="5" stroke-linecap="round"/>'
+        # 단계 라벨
+        '<text x="115" y="146" text-anchor="middle" font-size="13.5" font-weight="800" fill="#B3730A">① 준비</text>'
+        '<text x="315" y="146" text-anchor="middle" font-size="13.5" font-weight="800" fill="#D63C48">② 푸시</text>'
+        '<text x="490" y="146" text-anchor="middle" font-size="13.5" font-weight="800" fill="#2A6FDB">③ 중단</text>'
+        '<text x="650" y="146" text-anchor="middle" font-size="13.5" font-weight="800" fill="#98A2B3">④ 관망</text>'
+        # 단계 정의
+        '<text x="115" y="164" text-anchor="middle" font-size="10.5" fill="#667085">큰손이 조용히 매집</text>'
+        '<text x="315" y="164" text-anchor="middle" font-size="10.5" fill="#667085">대중 유입 · 가격 상승</text>'
+        '<text x="490" y="164" text-anchor="middle" font-size="10.5" fill="#667085">큰손 이탈 · 상승 둔화</text>'
+        '<text x="650" y="164" text-anchor="middle" font-size="10.5" fill="#667085">관심 냉각</text>'
+        # 마케터 행동
+        '<text x="115" y="184" text-anchor="middle" font-size="11.5" font-weight="700" fill="#101828">→ 콘텐츠 미리 준비</text>'
+        '<text x="315" y="184" text-anchor="middle" font-size="11.5" font-weight="700" fill="#101828">→ 마케팅 집중 집행</text>'
+        '<text x="490" y="184" text-anchor="middle" font-size="11.5" font-weight="700" fill="#101828">→ 푸시 멈추고 리스크 관리</text>'
+        '<text x="650" y="184" text-anchor="middle" font-size="11.5" font-weight="700" fill="#101828">→ 노출 최소화 · 재진입 감시</text>'
         "</svg>"
     )
-    legend_item = '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:16px;font-size:0.74rem;color:#475467;"><span style="width:16px;height:3px;background:{c};display:inline-block;border-radius:2px;{extra}"></span>{n}</span>'
     st.markdown(
-        f'<div class="card"><div class="card-title">테마 수명주기 — 큰손·개인·가격·검색의 전형적 순서</div>'
-        f'<div style="font-size:0.82rem;color:#475467;line-height:1.7;">'
-        f'투자 테마에도 상품처럼 수명주기가 있습니다. 네 지표가 <b style="color:{NAVY};">서로 다른 시점에 움직이기 때문에</b>, '
-        f'그 어긋남을 읽으면 지금이 사이클의 어디쯤인지 진단할 수 있습니다.</div>'
-        f'<div style="margin:10px 0 2px;">'
-        + legend_item.format(c=PC_SMART, n="외국인·기관 수급", extra="")
-        + legend_item.format(c=PC_RETAIL, n="개인 수급", extra="")
-        + legend_item.format(c=PC_INK, n="주가", extra="height:4px;")
-        + legend_item.format(c=PC_SEARCH, n="검색량", extra="opacity:0.85;")
-        + "</div>"
-        f"{cycle_svg}"
-        f'<div style="font-size:0.72rem;color:{FAINT};margin-top:8px;">'
-        f'※ 전형적 패턴의 개념도입니다. 실제 테마는 순서를 건너뛰거나 되돌아가기도 하므로, 아래 보드는 단계 위치가 아니라 현재 상태(수급·가격·검색)로 진단합니다.</div></div>',
+        f'<div class="card"><div class="card-title">왜 테마의 단계를 진단하는가</div>'
+        f'<div style="font-size:0.84rem;color:#475467;line-height:1.7;">'
+        f'테마에는 수명주기가 있고, <b style="color:{NAVY};">단계마다 마케터가 해야 할 행동이 다릅니다.</b> '
+        f'아래 시그널 보드가 각 테마의 현재 단계를 매주 진단합니다.</div>'
+        f"{cycle_svg}</div>",
         unsafe_allow_html=True,
     )
     st.write("")
