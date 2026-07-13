@@ -20,6 +20,7 @@ import data as D
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "theme_trend_table",
+    "theme_signal_board", "demo_theme_flows", "signal_label",
     "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
 )
 if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
@@ -101,6 +102,23 @@ st.markdown(
         font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em;
         color: {FAINT}; margin: 14px 0 6px;
     }}
+
+    /* 시그널 보드 */
+    table.sig-table {{ width: 100%; border-collapse: collapse; }}
+    table.sig-table th {{
+        font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; color: {FAINT};
+        text-transform: uppercase; text-align: right; padding: 6px 10px;
+        border-bottom: 1px solid {LINE};
+    }}
+    table.sig-table th:first-child {{ text-align: left; }}
+    table.sig-table td {{
+        font-size: 0.84rem; padding: 9px 10px; border-bottom: 1px solid #F2F4F7;
+        text-align: right; font-variant-numeric: tabular-nums; color: #344054;
+    }}
+    table.sig-table td:first-child {{ text-align: left; font-weight: 700; color: {INK}; }}
+    table.sig-table tr:last-child td {{ border-bottom: none; }}
+    .sig-pos {{ color: #D63C48; font-weight: 600; }}
+    .sig-neg {{ color: #2A6FDB; font-weight: 600; }}
 
     .sec-tag {{
         font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em;
@@ -283,6 +301,11 @@ def load_theme_returns():
 @st.cache_data(ttl=1800)
 def load_youtube():
     return D.fetch_youtube(n_per_channel=3)
+
+
+@st.cache_data
+def load_theme_flows():
+    return D.demo_theme_flows()
 
 
 @st.cache_data(ttl=3600)
@@ -500,6 +523,39 @@ with tab_trend:
     st.write("")
 
     trend_tbl, trend_live = load_theme_trend()
+
+    # ── 테마 시그널 보드 — 수급·주가·검색 3축 러프 진단 → 액션 라벨
+    search_map = dict(zip(trend_tbl["키워드"], trend_tbl["검색증감"]))
+    board = D.theme_signal_board(load_theme_flows(), theme_ret, sel_week, search_map)
+    LABEL_BADGE = {"푸시": "kw-rise", "준비": "kw-warn", "중단": "kw-fall", "관망": "kw-flat"}
+
+    def sig_num(v: float, suffix: str = "") -> str:
+        cls = "sig-pos" if v > 0 else ("sig-neg" if v < 0 else "")
+        return f'<span class="{cls}">{v:+,.0f}{suffix}</span>' if suffix == "" else f'<span class="{cls}">{v:+.1f}{suffix}</span>'
+
+    body_rows = "".join(
+        f"<tr><td>{r.테마}</td>"
+        f"<td>{sig_num(r.스마트머니4주)}</td>"
+        f"<td>{sig_num(r.개인4주)}</td>"
+        f"<td>{sig_num(r.가격4주, '%')}</td>"
+        f"<td>{sig_num(r.검색증감, '%')}</td>"
+        f'<td><span class="kw-badge {LABEL_BADGE[r.라벨]}">{r.라벨}</span></td></tr>'
+        for r in board.itertuples(index=False)
+    )
+    st.markdown(
+        f'<div class="card"><div class="card-title">테마 시그널 보드 '
+        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">수급 · 주가 · 검색 3축 러프 진단 → 마케팅 액션</span></div>'
+        f'<table class="sig-table"><thead><tr><th>테마</th><th>스마트머니 4주(억)</th><th>개인 4주(억)</th>'
+        f'<th>가격 4주</th><th>검색 주간</th><th style="text-align:center;">액션</th></tr></thead>'
+        f'<tbody>{body_rows}</tbody></table>'
+        f'<div style="font-size:0.7rem;color:{GRAY};margin-top:10px;line-height:1.6;">'
+        f'판정 — <b>푸시</b>: 가격↑ & 개인 유입 / <b>준비</b>: 스마트머니 유입 & 개인 미유입 (선행 신호) / '
+        f'<b>중단</b>: 스마트머니 이탈 & 가격 비상승 / <b>관망</b>: 그 외. '
+        f'스마트머니 = 외국인+기관(금융투자 제외). 수급은 데모 — 실운영 시 테마 대표종목의 KRX 투자자별 순매수로 대체.</div></div>',
+        unsafe_allow_html=True,
+    )
+    st.write("")
+
     READ_BADGE = {
         "대중 확산": "kw-rise", "커뮤니티발 선행": "kw-warn",
         "업계 이슈": "kw-warn", "관심 냉각": "kw-fall", "유지": "kw-flat",

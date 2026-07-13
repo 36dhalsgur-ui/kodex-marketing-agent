@@ -733,3 +733,94 @@ def theme_trend_table(client_id: str | None = None, client_secret: str | None = 
         )
     df = pd.DataFrame(rows).sort_values("검색증감", ascending=False)
     return df, live
+
+
+# ══════════════════════════════════════════════
+# 테마 시그널 보드 — 수급·주가·검색 3축 러프 진단 → 액션 라벨
+# 부호 기반 단순 판정 (정교화는 실데이터 축적 후 백테스트로)
+# ══════════════════════════════════════════════
+def demo_theme_flows(n_weeks: int = 8) -> pd.DataFrame:
+    """테마별 주간 투자자 수급 데모 (억원). 스마트머니 = 외국인+기관(금융투자 제외).
+    실운영 시 테마 대표종목 바스켓의 KRX 투자자별 순매수로 대체."""
+    weeks = week_labels(n_weeks)
+    rng = np.random.default_rng(11)
+    rows = []
+    for theme in THEMES:
+        phase = rng.uniform(0, 2 * np.pi)
+        scale = rng.uniform(80, 400)
+        for i, wk in enumerate(weeks):
+            smart = np.sin(phase + i * 0.8) * scale + rng.normal(0, scale * 0.35)
+            # 개인은 스마트머니에 후행(위상 지연)하는 경향을 데모에 반영
+            retail = np.sin(phase + i * 0.8 - 1.6) * scale * 0.9 + rng.normal(0, scale * 0.35)
+            rows.append(
+                {"주차": wk, "테마": theme, "스마트머니": round(smart, 1), "개인": round(retail, 1)}
+            )
+    return pd.DataFrame(rows)
+
+
+# 테마 ↔ 검색 키워드 매핑 (매핑 없는 테마는 데모 증감 사용)
+THEME_SEARCH_MAP = {
+    "반도체": "AI반도체",
+    "방산": "K-방산",
+    "배당": "월배당",
+    "조선": "조선",
+    "2차전지": "2차전지",
+    "금·원자재": "금 투자",
+    "채권·금리": "금리 인하",
+}
+
+
+def signal_label(smart4: float, retail4: float, price4: float) -> str:
+    """러프 판정: 부호 조합 → 마케팅 액션.
+    푸시 = 가격+ & 개인+ / 준비 = 스마트머니+ & 개인 미유입 / 중단 = 스마트머니− & 가격 비상승."""
+    if price4 > 0 and retail4 > 0:
+        return "푸시"
+    if smart4 > 0 and retail4 <= 0:
+        return "준비"
+    if smart4 < 0 and price4 <= 0:
+        return "중단"
+    return "관망"
+
+
+LABEL_ORDER = {"푸시": 0, "준비": 1, "중단": 2, "관망": 3}
+
+
+def theme_signal_board(
+    flows: pd.DataFrame,
+    theme_returns: pd.DataFrame,
+    sel_week: str,
+    search_deltas: dict[str, float],
+) -> pd.DataFrame:
+    """테마별 [스마트머니·개인 4주 수급, 4주 수익률, 검색 증감] + 액션 라벨."""
+    weeks = list(dict.fromkeys(flows["주차"]))
+    if sel_week not in weeks:
+        return pd.DataFrame()
+    end = weeks.index(sel_week) + 1
+    window = weeks[max(0, end - 4) : end]
+    rng = np.random.default_rng(23)
+
+    rows = []
+    for theme in sorted(flows["테마"].unique()):
+        f4 = flows[(flows["테마"] == theme) & (flows["주차"].isin(window))]
+        r4 = theme_returns[
+            (theme_returns["테마"] == theme) & (theme_returns["주차"].isin(window))
+        ]["수익률"].sum()
+        smart4 = f4["스마트머니"].sum()
+        retail4 = f4["개인"].sum()
+        kw = THEME_SEARCH_MAP.get(theme)
+        search_d = search_deltas.get(kw) if kw else None
+        if search_d is None:
+            search_d = round(float(rng.normal(0, 12)), 1)  # 미매핑 테마 데모값
+        rows.append(
+            {
+                "테마": theme,
+                "스마트머니4주": round(smart4, 0),
+                "개인4주": round(retail4, 0),
+                "가격4주": round(float(r4), 1),
+                "검색증감": search_d,
+                "라벨": signal_label(smart4, retail4, r4),
+            }
+        )
+    df = pd.DataFrame(rows)
+    df["_ord"] = df["라벨"].map(LABEL_ORDER)
+    return df.sort_values(["_ord", "가격4주"], ascending=[True, False]).drop(columns="_ord")
