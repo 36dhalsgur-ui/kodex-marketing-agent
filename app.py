@@ -192,6 +192,7 @@ st.markdown(
     .kw-flat {{ background: #F2F4F7; color: {MUTED}; }}
     .kw-warn {{ background: #FFF6E6; color: #B3730A; }}
     .kw-none {{ background: transparent; border: 1px dashed #CBD5E1; color: {FAINT}; }}
+    .kw-shift {{ background: #F5F0FF; color: #7C3AED; }}
     a.kw-link, a.kw-link * {{ text-decoration: none !important; color: inherit; }}
     a.kw-link {{ display: block; }}
     a.kw-link:hover .kw-name {{ color: {NAVY}; text-decoration: underline !important; }}
@@ -527,7 +528,7 @@ with tab_trend:
     # ── 테마 시그널 보드 — 수급·주가·검색 3축 러프 진단 → 액션 라벨
     search_map = dict(zip(trend_tbl["키워드"], trend_tbl["검색증감"]))
     board = D.theme_signal_board(load_theme_flows(), theme_ret, sel_week, search_map)
-    LABEL_BADGE = {"확산기": "kw-rise", "태동기": "kw-warn", "과열기": "kw-fall", "쇠퇴기": "kw-flat", "관망": "kw-none"}
+    LABEL_BADGE = {"확산기": "kw-rise", "태동기": "kw-warn", "확산→과열": "kw-shift", "과열기": "kw-fall", "쇠퇴기": "kw-flat", "관망": "kw-none"}
 
     def sig_num(v: float, suffix: str = "") -> str:
         cls = "sig-pos" if v > 0 else ("sig-neg" if v < 0 else "")
@@ -613,12 +614,14 @@ with tab_trend:
         f'<th style="text-align:center;">진단</th></tr></thead>'
         f'<tbody>{body_rows}</tbody></table>'
         f'<div style="font-size:0.72rem;color:{GRAY};margin-top:12px;line-height:1.9;">'
-        f'<b style="color:#344054;">진단 기준</b> — 위에서부터 순서대로 검사해 먼저 맞는 단계로 판정:<br>'
+        f'<b style="color:#344054;">진단 기준</b> — 네 단계 조건을 <b>병행 검사</b>한 뒤 판정합니다:<br>'
         f'<span class="kw-badge kw-warn">태동기</span> 외국인·기관 4주 순매수 &gt; 0 <b>그리고</b> 개인 4주 순매수 ≤ 0 &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-fall">과열기</span> 외국인·기관 4주 순매수 &lt; 0 <b>그리고</b> 개인 4주 순매수 &gt; 0 (교대 구조 — 가격과 무관하게 우선)<br>'
-        f'<span class="kw-badge kw-rise">확산기</span> 가격 4주 수익률 &gt; +1% <b>그리고</b> 개인 4주 순매수 &gt; 0 (±1% 이내는 보합 취급) &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-flat">쇠퇴기</span> 외국인·기관 &lt; 0 <b>그리고</b> 개인 ≤ 0 <b>그리고</b> 가격 ≤ 0 &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-none">관망</span> 위 어디에도 해당 없음 — 판정 유보 (흐리게 표시)<br>'
+        f'<span class="kw-badge kw-rise">확산기</span> 가격 4주 수익률 &gt; +1% <b>그리고</b> 개인 4주 순매수 &gt; 0 (±1% 이내 보합 취급)<br>'
+        f'<span class="kw-badge kw-fall">과열기</span> 외국인·기관 4주 순매수 &lt; 0 <b>그리고</b> 개인 4주 순매수 &gt; 0 (교대 구조) &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-flat">쇠퇴기</span> 외국인·기관 &lt; 0 <b>그리고</b> 개인 ≤ 0 <b>그리고</b> 가격 ≤ 0<br>'
+        f'정확히 하나만 참이면 그 단계로. <span class="kw-badge kw-shift">확산→과열</span> 확산기·과열기 조건이 동시에 참 '
+        f'(가격 상승 + 개인 유입 + 외국인·기관 이탈) — 확산 후반에서 과열로 넘어가는 전환 구간. '
+        f'<span class="kw-badge kw-none">관망</span> 모두 거짓 — 판정 유보 (흐리게 표시)<br>'
         f'검색량은 판정 조건에 쓰이지 않는 참고 지표입니다. 수치의 수집 출처·범위는 아래 "수치 근거"에서 확인하세요.</div></div>',
         unsafe_allow_html=True,
     )

@@ -774,25 +774,32 @@ PRICE_FLAT = 1.0  # 4주 수익률 ±1% 이내는 보합으로 취급 (확산기
 
 
 def signal_label(smart4: float, retail4: float, price4: float) -> str:
-    """러프 판정: 부호 조합 → 수명주기 단계.
+    """러프 판정: 네 단계 조건을 병행 검사한 뒤 판단한다 (순차 우선순위 없음).
 
-    검사 순서가 중요하다 — 교대 구조(과열기)를 확산기보다 먼저 확인해,
-    외인·기관 이탈 중에 가격이 소폭 양(+)이라는 이유로 확산기로 오판하는 것을 막는다.
-    태동기 = 외인·기관+ & 개인 미유입 / 과열기 = 외인·기관− & 개인+ (교대 구조) /
-    확산기 = 가격 +1% 초과 상승 & 개인+ (외인·기관 이탈 아님) /
-    쇠퇴기 = 모두 이탈 & 가격 비상승 / 관망 = 신호 불명확."""
+    조건 정의 —
+      태동기 = 외인·기관+ & 개인 미유입 / 확산기 = 가격 +1% 초과 상승 & 개인+ /
+      과열기 = 외인·기관− & 개인+ (교대 구조) / 쇠퇴기 = 모두 이탈 & 가격 비상승
+    판정 —
+      정확히 1개 참 → 해당 단계 / 확산기·과열기 동시 참 → '확산→과열' 전환 구간
+      (논리상 동시 성립 가능한 조합은 이 둘뿐) / 모두 거짓 → 관망(판정 유보)."""
+    matches = []
     if smart4 > 0 and retail4 <= 0:
-        return "태동기"
-    if smart4 < 0 and retail4 > 0:
-        return "과열기"
+        matches.append("태동기")
     if price4 > PRICE_FLAT and retail4 > 0:
-        return "확산기"
+        matches.append("확산기")
+    if smart4 < 0 and retail4 > 0:
+        matches.append("과열기")
     if smart4 < 0 and retail4 <= 0 and price4 <= 0:
-        return "쇠퇴기"
+        matches.append("쇠퇴기")
+
+    if len(matches) == 1:
+        return matches[0]
+    if set(matches) == {"확산기", "과열기"}:
+        return "확산→과열"
     return "관망"
 
 
-LABEL_ORDER = {"확산기": 0, "태동기": 1, "과열기": 2, "쇠퇴기": 3, "관망": 4}
+LABEL_ORDER = {"확산기": 0, "태동기": 1, "확산→과열": 2, "과열기": 3, "쇠퇴기": 4, "관망": 5}
 
 
 def theme_signal_board(
