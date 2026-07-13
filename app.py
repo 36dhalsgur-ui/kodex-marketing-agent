@@ -549,7 +549,7 @@ with tab_trend:
         '<path d="M 30 10 l -4 8 l 8 0 z" fill="#98A2B3"/>'
         '<line x1="30" y1="118" x2="744" y2="118" stroke="#98A2B3" stroke-width="1.2"/>'
         '<path d="M 746 118 l -8 -4 l 0 8 z" fill="#98A2B3"/>'
-        '<text x="16" y="66" font-size="10" fill="#667085" transform="rotate(-90 16 66)" text-anchor="middle">테마 관심도 · 주가</text>'
+        '<text x="16" y="66" font-size="10" fill="#667085" transform="rotate(-90 16 66)" text-anchor="middle">테마 관심도</text>'
         '<text x="742" y="132" font-size="10" fill="#667085" text-anchor="end">시간</text>'
         # 단계 구분선
         '<line x1="210" y1="14" x2="210" y2="118" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
@@ -586,7 +586,7 @@ with tab_trend:
         "</svg>"
     )
     st.markdown(
-        f'<div class="card"><div class="card-title">테마 단계 진단</div>'
+        f'<div class="card"><div class="card-title">ETF 테마 단계 진단</div>'
         f'<div style="font-size:0.84rem;color:#475467;line-height:1.7;">'
         f'테마에는 수명주기가 있고, <b style="color:{NAVY};">단계마다 마케터가 해야 할 행동이 다릅니다.</b> '
         f'아래 시그널 보드가 각 테마의 현재 단계를 매주 진단합니다.</div>'
