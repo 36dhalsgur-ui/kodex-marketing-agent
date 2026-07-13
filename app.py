@@ -534,24 +534,36 @@ with tab_trend:
         return f'<span class="{cls}">{v:+,.0f}{suffix}</span>' if suffix == "" else f'<span class="{cls}">{v:+.1f}{suffix}</span>'
 
     body_rows = "".join(
-        f"<tr><td>{r.테마}</td>"
+        f'<tr{" style=\'opacity:0.5;\'" if r.라벨 == "관망" else ""}><td>{r.테마}</td>'
         f"<td>{sig_num(r.스마트머니4주)}</td>"
         f"<td>{sig_num(r.개인4주)}</td>"
         f"<td>{sig_num(r.가격4주, '%')}</td>"
         f"<td>{sig_num(r.검색증감, '%')}</td>"
-        f'<td><span class="kw-badge {LABEL_BADGE[r.라벨]}">{r.라벨}</span></td></tr>'
+        f'<td style="text-align:center;"><span class="kw-badge {LABEL_BADGE[r.라벨]}">{r.라벨}</span></td></tr>'
         for r in board.itertuples(index=False)
     )
     st.markdown(
-        f'<div class="card"><div class="card-title">테마 시그널 보드 '
-        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">수급 · 주가 · 검색 3축 러프 진단 → 마케팅 액션</span></div>'
-        f'<table class="sig-table"><thead><tr><th>테마</th><th>스마트머니 4주(억)</th><th>개인 4주(억)</th>'
-        f'<th>가격 4주</th><th>검색 주간</th><th style="text-align:center;">액션</th></tr></thead>'
+        f'<div class="card"><div class="card-title">테마 시그널 보드</div>'
+        # 읽는 법 — 처음 보는 사람을 위한 3개의 질문
+        f'<div style="font-size:0.82rem;color:#475467;line-height:1.7;margin-bottom:14px;">'
+        f'테마마다 세 가지 질문을 던집니다 — '
+        f'<b style="color:{NAVY};">① 큰손이 사고 있나?</b> (외국인·기관 순매수) &nbsp;'
+        f'<b style="color:{NAVY};">② 가격이 오르고 있나?</b> (최근 4주 수익률) &nbsp;'
+        f'<b style="color:{NAVY};">③ 대중이 올라탔나?</b> (개인 순매수·검색량) — '
+        f'세 답의 조합이 오른쪽 <b>진단</b>입니다.</div>'
+        f'<table class="sig-table"><thead><tr>'
+        f'<th>테마</th><th>외국인·기관<br><span style="font-weight:500;">4주 순매수(억)</span></th>'
+        f'<th>개인<br><span style="font-weight:500;">4주 순매수(억)</span></th>'
+        f'<th>가격<br><span style="font-weight:500;">4주 수익률</span></th>'
+        f'<th>검색량<br><span style="font-weight:500;">전주 대비</span></th>'
+        f'<th style="text-align:center;">진단</th></tr></thead>'
         f'<tbody>{body_rows}</tbody></table>'
-        f'<div style="font-size:0.7rem;color:{GRAY};margin-top:10px;line-height:1.6;">'
-        f'판정 — <b>푸시</b>: 가격↑ & 개인 유입 / <b>준비</b>: 스마트머니 유입 & 개인 미유입 (선행 신호) / '
-        f'<b>중단</b>: 스마트머니 이탈 & 가격 비상승 / <b>관망</b>: 그 외. '
-        f'스마트머니 = 외국인+기관(금융투자 제외). 수급은 데모 — 실운영 시 테마 대표종목의 KRX 투자자별 순매수로 대체.</div></div>',
+        f'<div style="font-size:0.72rem;color:{GRAY};margin-top:12px;line-height:1.7;">'
+        f'<span class="kw-badge kw-rise">푸시</span> 가격이 오르고 개인 자금도 들어오는 중 → 마케팅 확대 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-warn">준비</span> 큰손만 먼저 매집, 대중은 아직 → 콘텐츠 미리 준비 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-fall">중단</span> 큰손이 빠지고 가격도 힘 없음 → 마케팅 보류 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-flat">관망</span> 신호 불명확 (흐리게 표시)<br>'
+        f'외국인·기관 집계에서 증권사 유동성공급(LP) 물량은 제외. 수급 수치는 데모 — 실운영 시 테마 대표종목의 KRX 투자자별 순매수로 대체.</div></div>',
         unsafe_allow_html=True,
     )
     st.write("")
