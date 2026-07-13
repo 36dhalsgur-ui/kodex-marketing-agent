@@ -185,12 +185,13 @@ st.markdown(
     .kw-name {{ font-weight: 600; color: {INK}; }}
     .kw-badge {{
         font-size: 0.7rem; font-weight: 700; border-radius: 5px; padding: 3px 8px;
-        font-variant-numeric: tabular-nums;
+        font-variant-numeric: tabular-nums; white-space: nowrap;
     }}
     .kw-rise {{ background: #FEF1F2; color: #D63C48; }}
     .kw-fall {{ background: #EFF5FF; color: #2A6FDB; }}
     .kw-flat {{ background: #F2F4F7; color: {MUTED}; }}
     .kw-warn {{ background: #FFF6E6; color: #B3730A; }}
+    .kw-none {{ background: transparent; border: 1px dashed #CBD5E1; color: {FAINT}; }}
     a.kw-link, a.kw-link * {{ text-decoration: none !important; color: inherit; }}
     a.kw-link {{ display: block; }}
     a.kw-link:hover .kw-name {{ color: {NAVY}; text-decoration: underline !important; }}
@@ -526,7 +527,7 @@ with tab_trend:
     # ── 테마 시그널 보드 — 수급·주가·검색 3축 러프 진단 → 액션 라벨
     search_map = dict(zip(trend_tbl["키워드"], trend_tbl["검색증감"]))
     board = D.theme_signal_board(load_theme_flows(), theme_ret, sel_week, search_map)
-    LABEL_BADGE = {"푸시": "kw-rise", "준비": "kw-warn", "중단": "kw-fall", "관망": "kw-flat"}
+    LABEL_BADGE = {"확산기": "kw-rise", "태동기": "kw-warn", "과열기": "kw-fall", "쇠퇴기": "kw-flat", "관망": "kw-none"}
 
     def sig_num(v: float, suffix: str = "") -> str:
         cls = "sig-pos" if v > 0 else ("sig-neg" if v < 0 else "")
@@ -538,7 +539,7 @@ with tab_trend:
         f"<td>{sig_num(r.개인4주)}</td>"
         f"<td>{sig_num(r.가격4주, '%')}</td>"
         f"<td>{sig_num(r.검색증감, '%')}</td>"
-        f'<td style="text-align:center;"><span class="kw-badge {LABEL_BADGE[r.라벨]}">{r.라벨}</span></td></tr>'
+        f'<td style="text-align:center;"><span class="kw-badge {LABEL_BADGE.get(r.라벨, "kw-flat")}">{r.라벨}</span></td></tr>'
         for r in board.itertuples(index=False)
     )
     # ── 테마 단계 진단 배너 — 단계 정의(수급·주가·검색량) + 단계별 마케터 행동
@@ -612,10 +613,11 @@ with tab_trend:
         f'<th style="text-align:center;">진단</th></tr></thead>'
         f'<tbody>{body_rows}</tbody></table>'
         f'<div style="font-size:0.72rem;color:{GRAY};margin-top:12px;line-height:1.7;">'
-        f'<span class="kw-badge kw-rise">푸시</span> 가격이 오르고 개인 자금도 들어오는 중 → 마케팅 확대 &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-warn">준비</span> 큰손만 먼저 매집, 대중은 아직 → 콘텐츠 미리 준비 &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-fall">중단</span> 큰손이 빠지고 가격도 힘 없음 → 마케팅 보류 &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-flat">관망</span> 신호 불명확 (흐리게 표시)<br>'
+        f'<span class="kw-badge kw-warn">태동기</span> 외국인·기관 유입, 개인 미유입 → 콘텐츠 기획·소재 선점 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-rise">확산기</span> 가격 상승 + 개인 유입 → 광고·콘텐츠 집중 집행 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-fall">과열기</span> 외국인·기관 이탈을 개인이 받는 구조 → 신규 광고 중단·리스크 고지 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-flat">쇠퇴기</span> 매수 주체 소멸 → 노출 최소화 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-none">관망</span> 신호 불명확 (흐리게 표시)<br>'
         f'외국인·기관 집계에서 증권사 유동성공급(LP) 물량은 제외. 수급 수치는 데모 — 실운영 시 테마 대표종목의 KRX 투자자별 순매수로 대체.</div></div>',
         unsafe_allow_html=True,
     )

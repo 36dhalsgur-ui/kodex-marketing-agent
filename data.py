@@ -771,18 +771,21 @@ THEME_SEARCH_MAP = {
 
 
 def signal_label(smart4: float, retail4: float, price4: float) -> str:
-    """러프 판정: 부호 조합 → 마케팅 액션.
-    푸시 = 가격+ & 개인+ / 준비 = 스마트머니+ & 개인 미유입 / 중단 = 스마트머니− & 가격 비상승."""
+    """러프 판정: 부호 조합 → 수명주기 단계.
+    확산기 = 가격+ & 개인+ / 태동기 = 외인·기관+ & 개인 미유입 /
+    과열기 = 외인·기관− & 개인+ (교대 구조) / 쇠퇴기 = 모두 이탈 & 가격 비상승 / 관망 = 신호 불명확."""
     if price4 > 0 and retail4 > 0:
-        return "푸시"
+        return "확산기"
     if smart4 > 0 and retail4 <= 0:
-        return "준비"
-    if smart4 < 0 and price4 <= 0:
-        return "중단"
+        return "태동기"
+    if smart4 < 0 and retail4 > 0:
+        return "과열기"
+    if smart4 < 0 and retail4 <= 0 and price4 <= 0:
+        return "쇠퇴기"
     return "관망"
 
 
-LABEL_ORDER = {"푸시": 0, "준비": 1, "중단": 2, "관망": 3}
+LABEL_ORDER = {"확산기": 0, "태동기": 1, "과열기": 2, "쇠퇴기": 3, "관망": 4}
 
 
 def theme_signal_board(
