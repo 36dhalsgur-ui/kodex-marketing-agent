@@ -443,6 +443,23 @@ tab_home, tab_trend, tab_channel, tab_did, tab_report = st.tabs(
 with tab_home:
     st.write("")
     section_header("HOME", f"{sel_week} 요약", "각 탭의 핵심 지표를 한눈에 — 상세 분석은 ①~④ 탭에서.")
+
+    # 금주 시장 요약 — 주간(5거래일) 등락률
+    weekly_chips = ""
+    for m in load_weekly_market():
+        up = m["weekly"] >= 0
+        cls = "idx-up" if up else "idx-down"
+        arrow = "▲" if up else "▼"
+        weekly_chips += (
+            f'<div class="idx-card"><div class="idx-name">{m["name"]}</div>'
+            f'<div class="idx-val {cls}">{m["weekly"]:+.1f}%</div>'
+            f'<div class="idx-chg" style="color:{FAINT};">{arrow} 현재 {m["level"]}</div></div>'
+        )
+    st.markdown(
+        f'<div class="idx-group">금주 시장 요약 · 최근 5거래일 등락률</div>'
+        f'<div class="idx-strip">{weekly_chips}</div>',
+        unsafe_allow_html=True,
+    )
     st.write("")
 
     top_theme = theme_tbl.sort_values("점수", ascending=False).iloc[0]
@@ -504,24 +521,6 @@ with tab_trend:
     section_header("STEP 1 · MONITOR", "시장 트렌드", "뉴스 키워드·테마 수익률·순매수·검색량으로 시장이 어디로 움직이는지 파악합니다.")
     st.write("")
 
-    # 금주 시장 요약 — 주간(5거래일) 등락률. 아래 테마 수익률을 읽는 기준선.
-    weekly_chips = ""
-    for m in load_weekly_market():
-        up = m["weekly"] >= 0
-        cls = "idx-up" if up else "idx-down"
-        arrow = "▲" if up else "▼"
-        weekly_chips += (
-            f'<div class="idx-card"><div class="idx-name">{m["name"]}</div>'
-            f'<div class="idx-val {cls}">{m["weekly"]:+.1f}%</div>'
-            f'<div class="idx-chg" style="color:{FAINT};">{arrow} 현재 {m["level"]}</div></div>'
-        )
-    st.markdown(
-        f'<div class="idx-group">금주 시장 요약 · 최근 5거래일 등락률 — 테마 수익률의 해석 기준선</div>'
-        f'<div class="idx-strip">{weekly_chips}</div>',
-        unsafe_allow_html=True,
-    )
-    st.write("")
-
     trend_tbl, trend_live = load_theme_trend()
 
     # ── 테마 시그널 보드 — 수급·주가·검색 3축 러프 진단 → 액션 라벨
@@ -542,8 +541,29 @@ with tab_trend:
         f'<td style="text-align:center;"><span class="kw-badge {LABEL_BADGE[r.라벨]}">{r.라벨}</span></td></tr>'
         for r in board.itertuples(index=False)
     )
+    # 테마 수명주기 곡선 — 보드의 존재 이유를 시각화
+    cycle_svg = (
+        '<svg viewBox="0 0 720 168" style="width:100%;max-width:860px;display:block;margin:2px auto 6px;">'
+        '<line x1="220" y1="16" x2="220" y2="136" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        '<line x1="430" y1="16" x2="430" y2="136" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        '<line x1="560" y1="16" x2="560" y2="136" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        '<path d="M 20 128 C 90 124, 160 108, 220 84" fill="none" stroke="#B3730A" stroke-width="4" stroke-linecap="round"/>'
+        '<path d="M 220 84 C 280 56, 350 32, 430 28" fill="none" stroke="#D63C48" stroke-width="4" stroke-linecap="round"/>'
+        '<path d="M 430 28 C 480 26, 520 44, 560 66" fill="none" stroke="#2A6FDB" stroke-width="4" stroke-linecap="round"/>'
+        '<path d="M 560 66 C 610 88, 660 110, 700 122" fill="none" stroke="#98A2B3" stroke-width="4" stroke-linecap="round"/>'
+        '<text x="120" y="156" text-anchor="middle" font-size="12" font-weight="700" fill="#B3730A">준비 · 큰손 매집</text>'
+        '<text x="325" y="156" text-anchor="middle" font-size="12" font-weight="700" fill="#D63C48">푸시 · 대중 유입, 가격 상승</text>'
+        '<text x="495" y="156" text-anchor="middle" font-size="12" font-weight="700" fill="#2A6FDB">중단 · 큰손 이탈</text>'
+        '<text x="630" y="156" text-anchor="middle" font-size="12" font-weight="700" fill="#98A2B3">관망 · 관심 냉각</text>'
+        "</svg>"
+    )
     st.markdown(
         f'<div class="card"><div class="card-title">테마 시그널 보드</div>'
+        f'<div style="font-size:0.82rem;color:#475467;line-height:1.7;margin-bottom:6px;">'
+        f'투자 테마에도 상품처럼 수명주기가 있습니다. 이 보드는 <b style="color:{NAVY};">각 테마가 지금 이 곡선의 어디쯤인지</b>를 매주 진단해 마케팅 타이밍을 잡습니다.</div>'
+        f"{cycle_svg}"
+        f'<div style="font-size:0.72rem;color:{FAINT};margin-bottom:14px;">'
+        f'※ 실제 테마는 이 순서를 건너뛰거나 되돌아가기도 합니다 — 그래서 단계 위치가 아니라 현재 상태(수급·가격·검색)로 진단합니다.</div>'
         # 읽는 법 — 처음 보는 사람을 위한 3개의 질문
         f'<div style="font-size:0.82rem;color:#475467;line-height:1.7;margin-bottom:14px;">'
         f'테마마다 세 가지 질문을 던집니다 — '
@@ -616,6 +636,9 @@ with tab_trend:
             range=[float(srt["수익률"].min()) * 1.35 - 0.3, float(srt["수익률"].max()) * 1.3 + 0.3],
         )
         st.plotly_chart(fig_th, use_container_width=True)
+        kospi_w = next((m["weekly"] for m in load_weekly_market() if m["name"] == "코스피"), None)
+        if kospi_w is not None:
+            st.caption(f"해석 기준선 — 같은 기간 코스피 {kospi_w:+.1f}% (홈 탭 시장 요약 참조)")
     with t2:
         fig_sc = go.Figure(
             go.Scatter(
