@@ -614,9 +614,9 @@ with tab_trend:
         f'<tbody>{body_rows}</tbody></table>'
         f'<div style="font-size:0.72rem;color:{GRAY};margin-top:12px;line-height:1.9;">'
         f'<b style="color:#344054;">진단 기준</b> — 위에서부터 순서대로 검사해 먼저 맞는 단계로 판정:<br>'
-        f'<span class="kw-badge kw-rise">확산기</span> 가격 4주 수익률 &gt; 0 <b>그리고</b> 개인 4주 순매수 &gt; 0 &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-warn">태동기</span> 외국인·기관 4주 순매수 &gt; 0 <b>그리고</b> 개인 4주 순매수 ≤ 0<br>'
-        f'<span class="kw-badge kw-fall">과열기</span> 외국인·기관 4주 순매수 &lt; 0 <b>그리고</b> 개인 4주 순매수 &gt; 0 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-warn">태동기</span> 외국인·기관 4주 순매수 &gt; 0 <b>그리고</b> 개인 4주 순매수 ≤ 0 &nbsp;&nbsp;'
+        f'<span class="kw-badge kw-fall">과열기</span> 외국인·기관 4주 순매수 &lt; 0 <b>그리고</b> 개인 4주 순매수 &gt; 0 (교대 구조 — 가격과 무관하게 우선)<br>'
+        f'<span class="kw-badge kw-rise">확산기</span> 가격 4주 수익률 &gt; +1% <b>그리고</b> 개인 4주 순매수 &gt; 0 (±1% 이내는 보합 취급) &nbsp;&nbsp;'
         f'<span class="kw-badge kw-flat">쇠퇴기</span> 외국인·기관 &lt; 0 <b>그리고</b> 개인 ≤ 0 <b>그리고</b> 가격 ≤ 0 &nbsp;&nbsp;'
         f'<span class="kw-badge kw-none">관망</span> 위 어디에도 해당 없음 — 판정 유보 (흐리게 표시)<br>'
         f'검색량은 판정 조건에 쓰이지 않는 참고 지표입니다. 수치의 수집 출처·범위는 아래 "수치 근거"에서 확인하세요.</div></div>',

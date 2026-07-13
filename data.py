@@ -770,16 +770,23 @@ THEME_SEARCH_MAP = {
 }
 
 
+PRICE_FLAT = 1.0  # 4주 수익률 ±1% 이내는 보합으로 취급 (확산기 오판 방지)
+
+
 def signal_label(smart4: float, retail4: float, price4: float) -> str:
     """러프 판정: 부호 조합 → 수명주기 단계.
-    확산기 = 가격+ & 개인+ / 태동기 = 외인·기관+ & 개인 미유입 /
-    과열기 = 외인·기관− & 개인+ (교대 구조) / 쇠퇴기 = 모두 이탈 & 가격 비상승 / 관망 = 신호 불명확."""
-    if price4 > 0 and retail4 > 0:
-        return "확산기"
+
+    검사 순서가 중요하다 — 교대 구조(과열기)를 확산기보다 먼저 확인해,
+    외인·기관 이탈 중에 가격이 소폭 양(+)이라는 이유로 확산기로 오판하는 것을 막는다.
+    태동기 = 외인·기관+ & 개인 미유입 / 과열기 = 외인·기관− & 개인+ (교대 구조) /
+    확산기 = 가격 +1% 초과 상승 & 개인+ (외인·기관 이탈 아님) /
+    쇠퇴기 = 모두 이탈 & 가격 비상승 / 관망 = 신호 불명확."""
     if smart4 > 0 and retail4 <= 0:
         return "태동기"
     if smart4 < 0 and retail4 > 0:
         return "과열기"
+    if price4 > PRICE_FLAT and retail4 > 0:
+        return "확산기"
     if smart4 < 0 and retail4 <= 0 and price4 <= 0:
         return "쇠퇴기"
     return "관망"
