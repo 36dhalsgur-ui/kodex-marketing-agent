@@ -541,36 +541,52 @@ with tab_trend:
         f'<td style="text-align:center;"><span class="kw-badge {LABEL_BADGE[r.라벨]}">{r.라벨}</span></td></tr>'
         for r in board.itertuples(index=False)
     )
-    # ── 테마 수명주기 배너 — 시그널 보드의 필요성 + 단계별 마케터 행동
+    # ── 테마 단계 진단 배너 — 단계 정의(수급·주가·검색량) + 단계별 마케터 행동
     cycle_svg = (
-        '<svg viewBox="0 0 760 196" style="width:100%;max-width:920px;display:block;margin:6px auto 0;">'
-        '<line x1="210" y1="14" x2="210" y2="120" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
-        '<line x1="420" y1="14" x2="420" y2="120" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
-        '<line x1="560" y1="14" x2="560" y2="120" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
-        # 테마 관심도 곡선 (단일) — 진단 라벨과 같은 4색 구간
-        '<path d="M 20 112 C 90 108, 150 94, 210 72" fill="none" stroke="#B3730A" stroke-width="5" stroke-linecap="round"/>'
-        '<path d="M 210 72 C 280 46, 350 26, 420 22" fill="none" stroke="#D63C48" stroke-width="5" stroke-linecap="round"/>'
-        '<path d="M 420 22 C 470 20, 520 36, 560 56" fill="none" stroke="#2A6FDB" stroke-width="5" stroke-linecap="round"/>'
-        '<path d="M 560 56 C 610 78, 680 100, 740 110" fill="none" stroke="#98A2B3" stroke-width="5" stroke-linecap="round"/>'
-        # 단계 라벨
-        '<text x="115" y="146" text-anchor="middle" font-size="13.5" font-weight="800" fill="#B3730A">① 준비</text>'
-        '<text x="315" y="146" text-anchor="middle" font-size="13.5" font-weight="800" fill="#D63C48">② 푸시</text>'
-        '<text x="490" y="146" text-anchor="middle" font-size="13.5" font-weight="800" fill="#2A6FDB">③ 중단</text>'
-        '<text x="650" y="146" text-anchor="middle" font-size="13.5" font-weight="800" fill="#98A2B3">④ 관망</text>'
-        # 단계 정의
-        '<text x="115" y="164" text-anchor="middle" font-size="10.5" fill="#667085">큰손이 조용히 매집</text>'
-        '<text x="315" y="164" text-anchor="middle" font-size="10.5" fill="#667085">대중 유입 · 가격 상승</text>'
-        '<text x="490" y="164" text-anchor="middle" font-size="10.5" fill="#667085">큰손 이탈 · 상승 둔화</text>'
-        '<text x="650" y="164" text-anchor="middle" font-size="10.5" fill="#667085">관심 냉각</text>'
-        # 마케터 행동
-        '<text x="115" y="184" text-anchor="middle" font-size="11.5" font-weight="700" fill="#101828">→ 콘텐츠 미리 준비</text>'
-        '<text x="315" y="184" text-anchor="middle" font-size="11.5" font-weight="700" fill="#101828">→ 마케팅 집중 집행</text>'
-        '<text x="490" y="184" text-anchor="middle" font-size="11.5" font-weight="700" fill="#101828">→ 푸시 멈추고 리스크 관리</text>'
-        '<text x="650" y="184" text-anchor="middle" font-size="11.5" font-weight="700" fill="#101828">→ 노출 최소화 · 재진입 감시</text>'
+        '<svg viewBox="0 0 760 224" style="width:100%;max-width:920px;display:block;margin:6px auto 0;">'
+        # 축 (세로 = 테마 관심도·주가)
+        '<line x1="30" y1="12" x2="30" y2="118" stroke="#98A2B3" stroke-width="1.2"/>'
+        '<path d="M 30 10 l -4 8 l 8 0 z" fill="#98A2B3"/>'
+        '<line x1="30" y1="118" x2="744" y2="118" stroke="#98A2B3" stroke-width="1.2"/>'
+        '<path d="M 746 118 l -8 -4 l 0 8 z" fill="#98A2B3"/>'
+        '<text x="16" y="66" font-size="10" fill="#667085" transform="rotate(-90 16 66)" text-anchor="middle">테마 관심도 · 주가</text>'
+        '<text x="742" y="132" font-size="10" fill="#667085" text-anchor="end">시간</text>'
+        # 단계 구분선
+        '<line x1="210" y1="14" x2="210" y2="118" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        '<line x1="420" y1="14" x2="420" y2="118" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        '<line x1="560" y1="14" x2="560" y2="118" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
+        # 관심도·주가 곡선 — 4색 구간 (시그널 보드 진단 색과 동일)
+        '<path d="M 40 108 C 100 104, 155 90, 210 70" fill="none" stroke="#B3730A" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 210 70 C 280 44, 350 24, 420 20" fill="none" stroke="#D63C48" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 420 20 C 470 18, 520 34, 560 54" fill="none" stroke="#2A6FDB" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 560 54 C 610 76, 680 98, 740 108" fill="none" stroke="#98A2B3" stroke-width="5" stroke-linecap="round"/>'
+        # 단계명
+        '<text x="120" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#B3730A">① 태동기</text>'
+        '<text x="315" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#D63C48">② 확산기</text>'
+        '<text x="490" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#2A6FDB">③ 과열기</text>'
+        '<text x="650" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#98A2B3">④ 쇠퇴기</text>'
+        # 단계 정의 — 수급 / 주가·검색량
+        '<text x="120" y="160" text-anchor="middle" font-size="10" fill="#667085">외국인·기관 유입 · 개인 잠잠</text>'
+        '<text x="120" y="174" text-anchor="middle" font-size="10" fill="#667085">주가 바닥권 · 검색량 낮음</text>'
+        '<text x="315" y="160" text-anchor="middle" font-size="10" fill="#667085">개인 매수 본격 유입</text>'
+        '<text x="315" y="174" text-anchor="middle" font-size="10" fill="#667085">주가 상승 · 검색량 급증</text>'
+        '<text x="490" y="160" text-anchor="middle" font-size="10" fill="#667085">외국인·기관 매도 전환</text>'
+        '<text x="490" y="174" text-anchor="middle" font-size="10" fill="#667085">주가 고점권 · 검색량 정점</text>'
+        '<text x="650" y="160" text-anchor="middle" font-size="10" fill="#667085">매수 주체 소멸</text>'
+        '<text x="650" y="174" text-anchor="middle" font-size="10" fill="#667085">주가 하락 · 검색량 감소</text>'
+        # 마케터 행동 (볼드)
+        '<text x="120" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">콘텐츠 기획 착수 · 소재 선점</text>'
+        '<text x="120" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">관련 ETF 라인업 점검</text>'
+        '<text x="315" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">광고 · 콘텐츠 집중 집행</text>'
+        '<text x="315" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">푸시 상품 전면 배치</text>'
+        '<text x="490" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">신규 유입 광고 중단</text>'
+        '<text x="490" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">분산 · 리스크 고지 콘텐츠 전환</text>'
+        '<text x="650" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">노출 최소화</text>'
+        '<text x="650" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">수급 재유입 모니터링</text>'
         "</svg>"
     )
     st.markdown(
-        f'<div class="card"><div class="card-title">왜 테마의 단계를 진단하는가</div>'
+        f'<div class="card"><div class="card-title">테마 단계 진단</div>'
         f'<div style="font-size:0.84rem;color:#475467;line-height:1.7;">'
         f'테마에는 수명주기가 있고, <b style="color:{NAVY};">단계마다 마케터가 해야 할 행동이 다릅니다.</b> '
         f'아래 시그널 보드가 각 테마의 현재 단계를 매주 진단합니다.</div>'
