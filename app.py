@@ -7,6 +7,8 @@ Z-score→Sigmoid 0~100점 설계를 따른다.
 
 import datetime as dt
 import importlib
+import json
+from pathlib import Path
 from urllib.parse import quote
 
 import pandas as pd
@@ -525,24 +527,6 @@ with tab_trend:
 
     trend_tbl, trend_live = load_theme_trend()
 
-    # ── 테마 시그널 보드 — 수급·주가·검색 3축 러프 진단 → 액션 라벨
-    search_map = dict(zip(trend_tbl["키워드"], trend_tbl["검색증감"]))
-    board = D.theme_signal_board(load_theme_flows(), theme_ret, sel_week, search_map)
-    LABEL_BADGE = {"확산기": "kw-rise", "태동기": "kw-warn", "확산→과열": "kw-shift", "과열기": "kw-fall", "쇠퇴기": "kw-flat", "관망": "kw-none"}
-
-    def sig_num(v: float, suffix: str = "") -> str:
-        cls = "sig-pos" if v > 0 else ("sig-neg" if v < 0 else "")
-        return f'<span class="{cls}">{v:+,.0f}{suffix}</span>' if suffix == "" else f'<span class="{cls}">{v:+.1f}{suffix}</span>'
-
-    body_rows = "".join(
-        f'<tr{" style=\'opacity:0.5;\'" if r.라벨 == "관망" else ""}><td>{r.테마}</td>'
-        f"<td>{sig_num(r.스마트머니4주)}</td>"
-        f"<td>{sig_num(r.개인4주)}</td>"
-        f"<td>{sig_num(r.가격4주, '%')}</td>"
-        f"<td>{sig_num(r.검색증감, '%')}</td>"
-        f'<td style="text-align:center;"><span class="kw-badge {LABEL_BADGE.get(r.라벨, "kw-flat")}">{r.라벨}</span></td></tr>'
-        for r in board.itertuples(index=False)
-    )
     # ── 테마 단계 진단 배너 — 단계 정의(수급·주가·검색량) + 단계별 마케터 행동
     cycle_svg = (
         '<svg viewBox="0 0 760 224" style="width:100%;max-width:920px;display:block;margin:6px auto 0;">'
@@ -581,8 +565,8 @@ with tab_trend:
         '<text x="120" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">관련 ETF 라인업 점검</text>'
         '<text x="315" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">광고 · 콘텐츠 집중 집행</text>'
         '<text x="315" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">푸시 상품 전면 배치</text>'
-        '<text x="490" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">신규 유입 광고 중단</text>'
-        '<text x="490" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">분산 · 리스크 고지 콘텐츠 전환</text>'
+        '<text x="490" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">마케팅 수확 지속 (수요 정점)</text>'
+        '<text x="490" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">적립식 · 분산 소구 병행</text>'
         '<text x="650" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">노출 최소화</text>'
         '<text x="650" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">수급 재유입 모니터링</text>'
         "</svg>"
@@ -597,65 +581,161 @@ with tab_trend:
     )
     st.write("")
 
-    st.markdown(
-        f'<div class="card"><div class="card-title">테마 시그널 보드</div>'
-        # 읽는 법 — 처음 보는 사람을 위한 3개의 질문
-        f'<div style="font-size:0.82rem;color:#475467;line-height:1.7;margin-bottom:14px;">'
-        f'테마마다 세 가지 질문을 던집니다 — '
-        f'<b style="color:{NAVY};">① 큰손이 사고 있나?</b> (외국인·기관 순매수) &nbsp;'
-        f'<b style="color:{NAVY};">② 가격이 오르고 있나?</b> (최근 4주 수익률) &nbsp;'
-        f'<b style="color:{NAVY};">③ 대중이 올라탔나?</b> (개인 순매수·검색량) — '
-        f'세 답의 조합이 오른쪽 <b>진단</b>입니다.</div>'
-        f'<table class="sig-table"><thead><tr>'
-        f'<th>테마</th><th>외국인·기관<br><span style="font-weight:500;">4주 순매수(억)</span></th>'
-        f'<th>개인<br><span style="font-weight:500;">4주 순매수(억)</span></th>'
-        f'<th>가격<br><span style="font-weight:500;">4주 수익률</span></th>'
-        f'<th>검색량<br><span style="font-weight:500;">전주 대비</span></th>'
-        f'<th style="text-align:center;">진단</th></tr></thead>'
-        f'<tbody>{body_rows}</tbody></table>'
-        f'<div style="font-size:0.72rem;color:{GRAY};margin-top:12px;line-height:1.9;">'
-        f'<b style="color:#344054;">진단 기준</b> — 네 단계 조건을 <b>병행 검사</b>한 뒤 판정합니다:<br>'
-        f'<span class="kw-badge kw-warn">태동기</span> 외국인·기관 4주 순매수 &gt; 0 <b>그리고</b> 개인 4주 순매수 ≤ 0 &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-rise">확산기</span> 가격 4주 수익률 &gt; +1% <b>그리고</b> 개인 4주 순매수 &gt; 0 (±1% 이내 보합 취급)<br>'
-        f'<span class="kw-badge kw-fall">과열기</span> 외국인·기관 4주 순매수 &lt; 0 <b>그리고</b> 개인 4주 순매수 &gt; 0 (교대 구조) &nbsp;&nbsp;'
-        f'<span class="kw-badge kw-flat">쇠퇴기</span> 외국인·기관 &lt; 0 <b>그리고</b> 개인 ≤ 0 <b>그리고</b> 가격 ≤ 0<br>'
-        f'정확히 하나만 참이면 그 단계로. <span class="kw-badge kw-shift">확산→과열</span> 확산기·과열기 조건이 동시에 참 '
-        f'(가격 상승 + 개인 유입 + 외국인·기관 이탈) — 확산 후반에서 과열로 넘어가는 전환 구간. '
-        f'<span class="kw-badge kw-none">관망</span> 모두 거짓 — 판정 유보 (흐리게 표시)<br>'
-        f'검색량은 판정 조건에 쓰이지 않는 참고 지표입니다. 수치의 수집 출처·범위는 아래 "수치 근거"에서 확인하세요.</div></div>',
-        unsafe_allow_html=True,
-    )
-
-    with st.expander("수치 근거 — 수집 출처·범위 자세히 보기"):
-        st.markdown(
-            f"""
-##### 지표별 수집 명세
-
-| 지표 | 정의 | 수집 출처·방법 | 주기 | 상태 |
-|------|------|--------------|------|------|
-| **외국인·기관 4주 순매수** | 최근 4주(분석 주차 포함) 테마 소속 종목의 외국인+기관 순매수 합계(억원). 증권사 유동성공급(LP·금융투자) 물량 제외 | KRX 정보데이터시스템 · 투자자별 거래실적 | 주간 | 데모 |
-| **개인 4주 순매수** | 같은 기간·같은 대상의 개인 순매수 합계(억원) | KRX 정보데이터시스템 · 투자자별 거래실적 | 주간 | 데모 |
-| **가격 4주 수익률** | 테마 소속 ETF들의 주간 수익률 평균을 4주 누적(%) | 시세 데이터 (KRX/네이버 금융) | 주간 | 데모 |
-| **검색량 전주 대비** | 네이버 데이터랩 통합검색어 트렌드의 주간 검색량 지수, 전주 대비 증감률(%) | 데이터랩 Open API · 아래 표의 키워드 그룹 | 주간 | API 키 설정 시 실데이터 |
-
-##### 테마별 수집 대상 — 무엇이 집계에 들어가는가
-"""
+    # ── 섹터 시그널 보드 — 주간 배치 실데이터 (data/signal_board.json)
+    board_file = Path(__file__).parent / "data" / "signal_board.json"
+    if not board_file.exists():
+        st.info("시그널 보드 데이터가 없습니다 — 로컬에서 `python scripts/weekly_batch.py` 실행 후 커밋하면 표시됩니다.")
+    else:
+        sb = json.loads(board_file.read_text())
+        rows_all = sb.get("board", [])
+        by_stage: dict = {}
+        for r in rows_all:
+            by_stage.setdefault(r.get("단계", "관망"), []).append(r)
+        summary = " · ".join(
+            f"{s} {len(by_stage.get(s, []))}" for s in ("태동기", "확산기", "과열기", "쇠퇴기")
         )
-        theme_map_rows = ["| 테마 | 검색량 수집 키워드 | 수급·가격 집계 대상 ETF |", "|------|------|------|"]
-        search_kw_map = {g: ", ".join(kws) for g, kws in D.THEME_SEARCH_GROUPS}
-        for theme in sorted({t for _, t, _ in D.ETF_UNIVERSE}):
-            mapped = D.THEME_SEARCH_MAP.get(theme)
-            kw_text = search_kw_map.get(mapped, "미매핑 — 데모값 사용")
-            etfs = ", ".join(n for n, t, _ in D.ETF_UNIVERSE if t == theme)
-            theme_map_rows.append(f"| **{theme}** | {kw_text} | {etfs} |")
-        st.markdown("\n".join(theme_map_rows))
+        if by_stage.get("관망"):
+            summary += f" · 관망 {len(by_stage['관망'])}"
+
+        def lvl_word(v):
+            return f'<span style="font-size:0.7rem;color:{MUTED};">{"강세" if v >= 0 else "약세"}</span>'
+
+        def mom_word(v):
+            return f'<span style="font-size:0.7rem;color:{MUTED};">{"강해지는 중" if v >= 0 else "약해지는 중"}</span>'
+
+        def signed(v, suffix=""):
+            cls = "sig-pos" if v > 0 else ("sig-neg" if v < 0 else "")
+            return f'<span class="{cls}">{v:+.1f}{suffix}</span>'
+
+        def dots(traj):
+            c = {2: "#F04452", 1: "#F8AEB6", 0: "#D9DEE9"}
+            return "".join(
+                f'<span style="color:{c.get(int(x), "#D9DEE9")};font-size:0.9rem;letter-spacing:1px;">●</span>'
+                for x in (traj or [])
+            )
+
+        def gauge(n):
+            n = int(n)
+            return (
+                f'<span style="color:{NAVY};">{"▮" * n}</span>'
+                f'<span style="color:#D9DEE9;">{"▮" * (4 - n)}</span> '
+                f'<span style="font-size:0.7rem;color:{MUTED};">{n}/4</span>'
+            )
+
+        def row_flags(r):
+            f = []
+            if r.get("단계") in ("확산기", "태동기") and r.get("개인주간점수") == 0 and r.get("큰손월점수") == 0:
+                f.append('<span class="kw-badge kw-fall">⚠️ 수급 이탈</span>')
+            if r.get("단계") in ("쇠퇴기", "관망") and (r.get("큰손월점수") or 0) >= 3:
+                f.append('<span class="kw-badge kw-warn">👀 큰손 매집</span>')
+            if r.get("비고"):
+                f.append(f'<span style="font-size:0.7rem;color:{FAINT};">{r["비고"]}</span>')
+            return " ".join(f)
+
+        def stage_rows(rows):
+            out = ""
+            for r in sorted(rows, key=lambda x: -(x.get("RS모멘텀") or -99)):
+                has_rrg = r.get("RS수준") is not None
+                out += (
+                    f'<tr><td>{r["섹터"]}<br><span style="font-size:0.68rem;color:{FAINT};font-weight:500;">{r.get("KODEX", "")}</span></td>'
+                    + (
+                        f'<td>{signed(r["RS수준"])}<br>{lvl_word(r["RS수준"])}</td>'
+                        f'<td>{signed(r["RS모멘텀"])}<br>{mom_word(r["RS모멘텀"])}</td>'
+                        if has_rrg else '<td>—</td><td>—</td>'
+                    )
+                    + f'<td>{dots(r.get("개인궤적6주"))}</td>'
+                    + f'<td>{gauge(r.get("큰손월점수", 0)) if r.get("큰손월점수") is not None else "—"}</td>'
+                    + f'<td style="text-align:left;">{row_flags(r)}</td></tr>'
+                )
+            return out
+
+        TABLE_HEAD = (
+            f'<table class="sig-table"><thead><tr>'
+            f'<th>섹터<br><span style="font-weight:500;">관련 KODEX 상품</span></th>'
+            f'<th>RS수준<br><span style="font-weight:500;">시장 대비 강도 (반년 평균=0)</span></th>'
+            f'<th>RS모멘텀<br><span style="font-weight:500;">강도의 방향 (+ 강해짐)</span></th>'
+            f'<th>개인 최근 6주<br><span style="font-weight:500;">주간 순매수 지속성</span></th>'
+            f'<th>큰손 (연기금+외국인)<br><span style="font-weight:500;">월간 매수 연속성 0~4</span></th>'
+            f'<th style="text-align:left;">참고</th></tr></thead><tbody>'
+        )
+
+        STAGES = [
+            ("태동기", "kw-warn", "콘텐츠 기획 착수 · 소재 선점"),
+            ("확산기", "kw-rise", "광고·콘텐츠 집중 집행"),
+            ("과열기", "kw-fall", "마케팅 수확 지속 + 적립식·분산 소구 병행"),
+        ]
+        groups_html = ""
+        for stage, badge, action in STAGES:
+            rows = by_stage.get(stage, [])
+            groups_html += (
+                f'<div style="margin:16px 0 6px;">'
+                f'<span class="kw-badge {badge}">{stage}</span> '
+                f'<span style="font-size:0.78rem;color:#475467;font-weight:600;">({len(rows)}) → {action}</span></div>'
+            )
+            if rows:
+                groups_html += TABLE_HEAD + stage_rows(rows) + "</tbody></table>"
+            else:
+                groups_html += f'<div style="font-size:0.76rem;color:{FAINT};padding:4px 2px;">해당 섹터 없음</div>'
+
         st.markdown(
-            """
+            f'<div class="card"><div class="card-title">섹터 시그널 보드 '
+            f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">'
+            f'{sb.get("asof", "")} 기준 · 벤치마크 {sb.get("benchmark", "KRX 300")} · 주 1회 갱신</span></div>'
+            f'<div style="font-size:0.9rem;font-weight:700;color:{INK};margin-bottom:4px;">{summary}</div>'
+            f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:6px;">'
+            f'단계는 가격(시장 대비 상대강도)이 정하고, 수급 점수는 그 판정을 확인하거나 반박합니다.</div>'
+            f"{groups_html}</div>",
+            unsafe_allow_html=True,
+        )
+
+        decline = by_stage.get("쇠퇴기", []) + by_stage.get("관망", [])
+        with st.expander(f"⚪ 쇠퇴기·관망 ({len(decline)}) — 노출 최소화 · 큰손 재유입 감시"):
+            st.markdown(
+                TABLE_HEAD + stage_rows(decline) + "</tbody></table>",
+                unsafe_allow_html=True,
+            )
+
+        with st.expander("지표 설명 · 수치 근거"):
+            st.markdown(
+                f"""
+##### 단계 판정 — RRG (Relative Rotation, 섹터 로테이션 표준 방법론)
+
+- **상대강도(RS)** = 섹터 가격 ÷ KRX 300 — 시장을 이기면 오르는 값
+- **RS수준** = 상대강도가 자기 26주(반년) 평균보다 몇 % 위/아래인가 → **강세/약세의 현재 위치**
+- **RS모멘텀** = 상대강도의 4주 평균이 12주 평균 대비 몇 %인가 → **강해지는 중/약해지는 중의 방향**
+
+| RS수준 | RS모멘텀 | 단계 | 뜻 |
+|--------|---------|------|-----|
+| − 약세 | + 강해짐 | 🟡 태동기 | 소외됐다가 돌아서는 중 |
+| + 강세 | + 강해짐 | 🔴 확산기 | 주도하며 더 강해짐 |
+| + 강세 | − 약해짐 | 🔵 과열기 | 아직 강자지만 꺾이기 시작 |
+| − 약세 | − 약해짐 | ⚪ 쇠퇴기 | 소외가 깊어짐 |
+
+관망 = 이력 26주 미만이거나 수집 실패로 판정 유보.
+
+##### 수급 점수 — 순매수의 부호·지속성 (금액 크기 미사용)
+
+- **개인 최근 6주** (도트 6개): 구성종목 개인 순매수 합계가 그 주에 순매수면 옅은 빨강(1), 2주 연속이면 진한 빨강(2), 순매도면 회색(0)
+- **큰손 0~4점**: 연기금·외국인 각각 월간 순매수 1점, 두 달 연속 2점 — 합산. 4점 = 두 주체 모두 두 달 연속 매수
+- 산식은 증권사 리서치 관행과 동일 (2026-07 한화리서치 표와 재현 대조: 반도체 개인 5주·방산 개인 6주 일치 확인)
+
+##### 데이터 출처·수집
+
+| 항목 | 출처 | 비고 |
+|------|------|------|
+| 가격 (1군 17개 섹터) | KRX 공식 섹터지수 | 코스피+코스닥 통합 |
+| 가격 (2군 5개 테마) | KODEX 테마 ETF 종가 | 방산·2차전지·조선·AI전력·원자력 |
+| 수급 구성종목 명부 | 1군 = KRX 섹터지수 구성종목 / 2군 = ETF PDF | 공식 공시 명부 — 자의적 선별 없음 |
+| 투자자별 순매수 | KRX 정보데이터시스템 (투자자별 거래실적) | 주 1회 로컬 배치 수집 |
+| 벤치마크 | KRX 300 | 코스닥 쏠림 왜곡 방지 |
+
 ##### 알아둘 점
-- 수급·가격은 현재 데모 데이터로 동작합니다. 실운영 시 위 명세의 출처에서 자동 수집으로 교체되며, 표의 집계 대상도 ETF가 아닌 테마 대표종목 바스켓으로 확장할 수 있습니다.
-- 부호(+/−)만 보는 러프 판정이라 라벨이 주 단위로 바뀔 수 있습니다. 라벨보다 원값 4개를 먼저 확인하는 습관을 권장합니다.
+
+- RRG 파라미터(26/12/4주)와 점수 규칙은 관행적 초기값이며, 과거 사이클 백테스트로 조정 예정입니다.
+- 경계값 부근(RS모멘텀 ±0.5 이내 등)에서는 라벨이 주 단위로 바뀔 수 있습니다 — 라벨보다 원값을 먼저 확인하세요.
+- 과열기의 대응(수확 지속 vs 소구 전환의 비중)은 데이터가 아니라 경영 판단의 영역입니다. 보드는 국면 정보와 근거까지만 제공합니다.
 """
-        )
+            )
     st.write("")
 
     READ_BADGE = {
