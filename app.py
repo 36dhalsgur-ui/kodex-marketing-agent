@@ -617,36 +617,26 @@ with tab_trend:
                 return f'<span style="color:#D63C48;font-weight:700;">{amt}</span> <span style="font-size:0.72rem;color:#475467;">유입</span>'
             return f'<span style="color:#2A6FDB;font-weight:600;">{amt}</span> <span style="font-size:0.72rem;color:#475467;">매도</span>'
 
-        SIG_OF_STAGE = {"태동기": "태동형", "확산기": "확산형", "과열기": "과열형", "쇠퇴기": "쇠퇴형"}
-
-        def flow_verdict(r):
-            """13주 수급 시그니처(2×2 부호)와 가격 판정을 비교 — 다르면 어느 단계형인지 서술."""
-            sig = r.get("수급시그니처")
-            if not sig:
-                return f'<span style="font-size:0.7rem;color:{FAINT};">{r.get("비고", r.get("수급비고", ""))}</span>'
-            if sig == SIG_OF_STAGE.get(r.get("단계")):
-                return '<span class="kw-badge kw-ok">✓ 수급 일치</span>'
-            return f'<span class="kw-badge kw-warn">수급은 {sig}</span>'
-
         def stage_rows(rows, decline_order=False):
-            # 기본: RS모멘텀 내림차순 / 쇠퇴기: 다음 태동 후보(수급 태동형) 우선 + 모멘텀 순
+            # 기본: RS모멘텀 내림차순 / 쇠퇴기: 큰손 유입 중(재매집 후보) 우선 + 모멘텀 순
             if decline_order:
-                rows = sorted(rows, key=lambda x: (x.get("수급시그니처") != "태동형", -(x.get("RS모멘텀") or -99)))
+                rows = sorted(rows, key=lambda x: (not ((x.get("큰손13주억") or 0) > 0), -(x.get("RS모멘텀") or -99)))
             else:
                 rows = sorted(rows, key=lambda x: -(x.get("RS모멘텀") or -99))
             out = ""
             for r in rows:
                 has_rrg = r.get("RS수준") is not None
+                note = r.get("비고") or r.get("수급비고") or ""
+                note_html = f'<br><span style="font-size:0.66rem;color:{FAINT};">{note}</span>' if note else ""
                 out += (
-                    f'<tr><td>{r["섹터"]}<br><span style="font-size:0.68rem;color:{FAINT};font-weight:500;">{r.get("KODEX", "")}</span></td>'
+                    f'<tr><td>{r["섹터"]}<br><span style="font-size:0.68rem;color:{FAINT};font-weight:500;">{r.get("KODEX", "")}</span>{note_html}</td>'
                     + (
                         f'<td>{signed(r["RS수준"])}<br>{lvl_word(r["RS수준"])}</td>'
                         f'<td>{signed(r["RS모멘텀"])}<br>{mom_word(r["RS모멘텀"])}</td>'
                         if has_rrg else '<td>—</td><td>—</td>'
                     )
                     + f'<td>{krw_word(r.get("큰손13주억"))}</td>'
-                    + f'<td>{krw_word(r.get("개인13주억"))}</td>'
-                    + f'<td style="text-align:center;">{flow_verdict(r)}</td></tr>'
+                    + f'<td>{krw_word(r.get("개인13주억"))}</td></tr>'
                 )
             return out
 
@@ -655,13 +645,12 @@ with tab_trend:
             # 위계를 보여주는 그룹 헤더 — 단계는 가격이 정하고, 수급은 확인용
             f'<tr><th style="border-bottom:none;"></th>'
             f'<th colspan="2" style="text-align:center;background:#F8F5FF;color:{NAVY};">단계 판정 근거 — 가격 (상대강도)</th>'
-            f'<th colspan="3" style="text-align:center;background:#FAFBFC;">확인 신호 — 수급 (판정에 쓰이지 않음)</th></tr>'
+            f'<th colspan="2" style="text-align:center;background:#FAFBFC;">참고 — 수급 (판정에 쓰이지 않음)</th></tr>'
             f'<tr><th>섹터<br><span style="font-weight:500;">관련 KODEX 상품</span></th>'
             f'<th>RS수준<br><span style="font-weight:500;">시장 대비 강도 (반년 평균=0)</span></th>'
             f'<th>RS모멘텀<br><span style="font-weight:500;">강도의 방향 (+ 강해짐)</span></th>'
             f'<th>큰손 (외국인+기관)<br><span style="font-weight:500;">최근 13주(분기) 순매수</span></th>'
-            f'<th>개인<br><span style="font-weight:500;">최근 13주(분기) 순매수</span></th>'
-            f'<th style="text-align:center;">수급 확인<br><span style="font-weight:500;">판정과 일치하나</span></th></tr></thead><tbody>'
+            f'<th>개인<br><span style="font-weight:500;">최근 13주(분기) 순매수</span></th></tr></thead><tbody>'
         )
 
         STAGES = [
@@ -688,16 +677,16 @@ with tab_trend:
             f'{sb.get("asof", "")} 기준 · 벤치마크 {sb.get("benchmark", "KRX 300")} · 주 1회 갱신</span></div>'
             f'<div style="font-size:0.9rem;font-weight:700;color:{INK};margin-bottom:4px;">{summary}</div>'
             f'<div style="font-size:0.78rem;color:#475467;margin-bottom:6px;line-height:1.6;">'
-            f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다. 수급은 판정에 쓰이지 않는 확인 신호이며, '
-            f'맨 오른쪽 <b>수급 확인</b>은 최근 13주(분기) 순매수의 방향이 가리키는 단계와 가격 판정을 비교합니다 — '
-            f'<b>✓ 일치면 신뢰도가 높고, "수급은 ○○형"이면 수급이 다른 단계를 가리키고 있다는 뜻입니다.</b></div>'
+            f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다. '
+            f'수급(최근 13주 순매수)은 판정에 쓰이지 않는 <b>참고 정보</b>이며, '
+            f'쇠퇴기 표에서만 <b>큰손이 유입 중인 섹터(재매집 후보)를 상단에 배치</b>하는 데 쓰입니다.</div>'
             f"{groups_html}</div>",
             unsafe_allow_html=True,
         )
 
         decline = by_stage.get("쇠퇴기", []) + by_stage.get("관망", [])
-        n_watch = sum(1 for r in decline if r.get("수급시그니처") == "태동형")
-        with st.expander(f"⚪ 쇠퇴기·관망 ({len(decline)}) — 큰손이 매집 중인 다음 태동 후보 {n_watch}개를 상단 배치"):
+        n_watch = sum(1 for r in decline if (r.get("큰손13주억") or 0) > 0)
+        with st.expander(f"⚪ 쇠퇴기·관망 ({len(decline)}) — 큰손이 유입 중인 재매집 후보 {n_watch}개를 상단 배치"):
             st.markdown(
                 TABLE_HEAD + stage_rows(decline, decline_order=True) + "</tbody></table>",
                 unsafe_allow_html=True,
@@ -721,21 +710,13 @@ with tab_trend:
 
 관망 = 이력 26주 미만이거나 수집 실패로 판정 유보.
 
-##### 수급 확인 배지 — 수급이 가리키는 단계와 가격 판정의 비교
+##### 수급 열 — 참고 정보이며, 판정·채점에 쓰지 않습니다
 
-구성종목의 **최근 13주(약 1분기) 순매수 합의 방향**을 2×2로 조합해 수급 시그니처를 만들고, 가격 판정과 비교합니다:
+구성종목의 **최근 13주(약 1분기) 순매수 합**을 큰손(외국인+기관)·개인으로 나눠 원액 그대로 보여줍니다.
 
-| 큰손 (외국인+기관) | 개인 | 수급 시그니처 | 수급 서사 |
-|:---:|:---:|:---:|:---|
-| 유입 (+) | 매도 (−) | 태동형 | 큰손 유입, 개인 관심 없음 |
-| 유입 (+) | 유입 (+) | 확산형 | 큰손 유입 지속, 개인 유입 시작 |
-| 매도 (−) | 유입 (+) | 과열형 | 큰손 매도 전환, 개인 유입 지속 (교대) |
-| 매도 (−) | 매도 (−) | 쇠퇴형 | 큰손 매도, 개인도 매도 전환 |
-
-- 시그니처 = 가격 단계 → **✓ 수급 일치** (판정 신뢰↑)
-- 시그니처 ≠ 가격 단계 → **"수급은 ○○형"** 으로 서술 — 예: 가격은 확산기인데 수급이 과열형이면, 수급이 가격보다 한 단계 앞서 있을 수 있다는 신호
-- **13주(분기) 창을 쓰는 근거 (실측)**: 2주·4주 창은 부호가 연 10~18회 뒤집혀 판독 불가, 13주는 연 ~4회로 안정적이며, 반도체의 구조적 매도 전환도 단기 창보다 먼저·한 번에 포착했습니다. 짧은 창의 "민첩함"은 실데이터에서 잦은 오탐이었습니다.
-- 쇠퇴기 표에서는 **수급 태동형(큰손이 매집 중인 다음 태동 후보)을 상단에 배치**합니다.
+- **판정에 쓰지 않는 이유 (실측)**: 매매는 제로섬이라 큰손과 개인의 순매수는 거의 정확히 반대 부호입니다 — 즉 수급이 주는 실질 정보는 "큰손이 사느냐 파느냐" 하나뿐이라, 4단계 판정을 지지·반박하는 용도로는 정보량이 부족합니다. 가격 판정과의 "일치 배지"를 붙여봤으나 일치율이 3/22에 그쳤고, 시장 상대화로 보정해도 2/22로 오히려 악화되어 폐기했습니다.
+- **수급의 고유 가치**: 가격이 아직 움직이지 않은 "조용한 매집"은 가격 지표에 존재하지 않는 정보입니다. 그래서 쇠퇴기 표에서만 **큰손이 유입 중인 섹터(재매집 후보)를 상단에 배치**하는 데 사용합니다.
+- **13주(분기) 창을 쓰는 근거 (실측)**: 2주·4주 창은 부호가 연 10~18회 뒤집혀 판독 불가, 13주는 연 ~4회로 안정적이며, 반도체의 구조적 매도 전환도 단기 창보다 먼저·한 번에 포착했습니다.
 
 ##### 데이터 출처·수집
 
