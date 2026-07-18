@@ -121,6 +121,10 @@ st.markdown(
     table.sig-table tr:last-child td {{ border-bottom: none; }}
     .sig-pos {{ color: #D63C48; font-weight: 600; }}
     .sig-neg {{ color: #2A6FDB; font-weight: 600; }}
+    table.sig-table td.flow-cell {{
+        font-size: 0.74rem; color: {MUTED}; line-height: 1.7;
+        font-weight: 500; text-align: right;
+    }}
 
     .sec-tag {{
         font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em;
@@ -608,14 +612,20 @@ with tab_trend:
             cls = "sig-pos" if v > 0 else ("sig-neg" if v < 0 else "")
             return f'<span class="{cls}">{v:+.1f}{suffix}</span>'
 
-        def krw_word(v):
-            """13주 순매수 원액 → '금액 + 방향' 셀. 1조 이상은 조 단위."""
+        def krw_amt(v):
+            """13주 순매수 원액 — 참고 지표이므로 무채색·작게 (판정 근거인 RS와 층위 구분)."""
             if v is None:
                 return "—"
             amt = f"{v / 1e4:+,.1f}조" if abs(v) >= 1e4 else f"{v:+,}억"
-            if v > 0:
-                return f'<span style="color:#D63C48;font-weight:700;">{amt}</span> <span style="font-size:0.72rem;color:#475467;">유입</span>'
-            return f'<span style="color:#2A6FDB;font-weight:600;">{amt}</span> <span style="font-size:0.72rem;color:#475467;">매도</span>'
+            return f"{amt} {'유입' if v > 0 else '매도'}"
+
+        def flow_cell(r):
+            if r.get("큰손13주억") is None:
+                return "—"
+            return (
+                f'큰손 {krw_amt(r.get("큰손13주억"))}<br>'
+                f'개인 {krw_amt(r.get("개인13주억"))}'
+            )
 
         def stage_rows(rows, decline_order=False):
             # 기본: RS모멘텀 내림차순 / 쇠퇴기: 큰손 유입 중(재매집 후보) 우선 + 모멘텀 순
@@ -631,12 +641,11 @@ with tab_trend:
                 out += (
                     f'<tr><td>{r["섹터"]}<br><span style="font-size:0.68rem;color:{FAINT};font-weight:500;">{r.get("KODEX", "")}</span>{note_html}</td>'
                     + (
-                        f'<td>{signed(r["RS수준"])}<br>{lvl_word(r["RS수준"])}</td>'
-                        f'<td>{signed(r["RS모멘텀"])}<br>{mom_word(r["RS모멘텀"])}</td>'
+                        f'<td><span style="font-size:1rem;font-weight:800;">{signed(r["RS수준"])}</span><br>{lvl_word(r["RS수준"])}</td>'
+                        f'<td><span style="font-size:1rem;font-weight:800;">{signed(r["RS모멘텀"])}</span><br>{mom_word(r["RS모멘텀"])}</td>'
                         if has_rrg else '<td>—</td><td>—</td>'
                     )
-                    + f'<td>{krw_word(r.get("큰손13주억"))}</td>'
-                    + f'<td>{krw_word(r.get("개인13주억"))}</td></tr>'
+                    + f'<td class="flow-cell">{flow_cell(r)}</td></tr>'
                 )
             return out
 
@@ -645,12 +654,11 @@ with tab_trend:
             # 위계를 보여주는 그룹 헤더 — 단계는 가격이 정하고, 수급은 확인용
             f'<tr><th style="border-bottom:none;"></th>'
             f'<th colspan="2" style="text-align:center;background:#F8F5FF;color:{NAVY};">단계 판정 근거 — 가격 (상대강도)</th>'
-            f'<th colspan="2" style="text-align:center;background:#FAFBFC;">참고 — 수급 (판정에 쓰이지 않음)</th></tr>'
+            f'<th style="border-bottom:none;"></th></tr>'
             f'<tr><th>섹터<br><span style="font-weight:500;">관련 KODEX 상품</span></th>'
             f'<th>RS수준<br><span style="font-weight:500;">시장 대비 강도 (반년 평균=0)</span></th>'
             f'<th>RS모멘텀<br><span style="font-weight:500;">강도의 방향 (+ 강해짐)</span></th>'
-            f'<th>큰손 (외국인+기관)<br><span style="font-weight:500;">최근 13주(분기) 순매수</span></th>'
-            f'<th>개인<br><span style="font-weight:500;">최근 13주(분기) 순매수</span></th></tr></thead><tbody>'
+            f'<th style="color:{FAINT};">수급 참고<br><span style="font-weight:500;">13주 순매수 · 판정에 쓰이지 않음</span></th></tr></thead><tbody>'
         )
 
         STAGES = [
