@@ -108,14 +108,14 @@ st.markdown(
     /* 시그널 보드 */
     table.sig-table {{ width: 100%; border-collapse: collapse; }}
     table.sig-table th {{
-        font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; color: {FAINT};
+        font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; color: #475467;
         text-transform: uppercase; text-align: right; padding: 6px 10px;
         border-bottom: 1px solid {LINE};
     }}
     table.sig-table th:first-child {{ text-align: left; }}
     table.sig-table td {{
-        font-size: 0.84rem; padding: 9px 10px; border-bottom: 1px solid #F2F4F7;
-        text-align: right; font-variant-numeric: tabular-nums; color: #344054;
+        font-size: 0.87rem; padding: 10px; border-bottom: 1px solid #F2F4F7;
+        text-align: right; font-variant-numeric: tabular-nums; color: #1F2937;
     }}
     table.sig-table td:first-child {{ text-align: left; font-weight: 700; color: {INK}; }}
     table.sig-table tr:last-child td {{ border-bottom: none; }}
@@ -598,28 +598,51 @@ with tab_trend:
             summary += f" · 관망 {len(by_stage['관망'])}"
 
         def lvl_word(v):
-            return f'<span style="font-size:0.7rem;color:{MUTED};">{"강세" if v >= 0 else "약세"}</span>'
+            return f'<span style="font-size:0.72rem;color:#475467;font-weight:600;">{"강세" if v >= 0 else "약세"}</span>'
 
         def mom_word(v):
-            return f'<span style="font-size:0.7rem;color:{MUTED};">{"강해지는 중" if v >= 0 else "약해지는 중"}</span>'
+            return f'<span style="font-size:0.72rem;color:#475467;font-weight:600;">{"강해지는 중" if v >= 0 else "약해지는 중"}</span>'
 
         def signed(v, suffix=""):
             cls = "sig-pos" if v > 0 else ("sig-neg" if v < 0 else "")
             return f'<span class="{cls}">{v:+.1f}{suffix}</span>'
 
-        def dots(traj):
-            c = {2: "#F04452", 1: "#F8AEB6", 0: "#D9DEE9"}
-            return "".join(
-                f'<span style="color:{c.get(int(x), "#D9DEE9")};font-size:0.9rem;letter-spacing:1px;">●</span>'
-                for x in (traj or [])
-            )
+        def indiv_word(traj):
+            """개인 주간 궤적 → 자연어 상태 (기호 대신 말로)."""
+            if not traj:
+                return "—"
+            t = [int(x) for x in traj]
+            if t[-1] > 0:
+                n = 0
+                for x in reversed(t):
+                    if x > 0:
+                        n += 1
+                    else:
+                        break
+                text = f"{n}주 연속 순매수" if n > 1 else "이번 주 순매수 전환"
+                return f'<span style="color:#D63C48;font-weight:700;">{text}</span>'
+            n = 0
+            for x in reversed(t):
+                if x == 0:
+                    n += 1
+                else:
+                    break
+            return f'<span style="color:#2A6FDB;font-weight:600;">{n}주째 순매도</span>'
 
-        def gauge(n):
-            n = int(n)
+        def big_word(score):
+            s = int(score or 0)
+            if s == 2:
+                return '<span style="color:#D63C48;font-weight:700;">2개월 연속 매수</span>'
+            if s == 1:
+                return '<span style="color:#D63C48;font-weight:600;">이번 달 매수</span>'
+            return '<span style="color:#2A6FDB;font-weight:600;">매도</span>'
+
+        def bigmoney_cell(r):
+            if r.get("연기금월점수") is None:
+                return "—"
             return (
-                f'<span style="color:{NAVY};">{"▮" * n}</span>'
-                f'<span style="color:#D9DEE9;">{"▮" * (4 - n)}</span> '
-                f'<span style="font-size:0.7rem;color:{MUTED};">{n}/4</span>'
+                f'<span style="font-size:0.76rem;color:#475467;">연기금</span> {big_word(r.get("연기금월점수"))}<br>'
+                f'<span style="font-size:0.76rem;color:#475467;">외국인</span> {big_word(r.get("외국인월점수"))}'
             )
 
         def row_flags(r):
@@ -643,8 +666,8 @@ with tab_trend:
                         f'<td>{signed(r["RS모멘텀"])}<br>{mom_word(r["RS모멘텀"])}</td>'
                         if has_rrg else '<td>—</td><td>—</td>'
                     )
-                    + f'<td>{dots(r.get("개인궤적6주"))}</td>'
-                    + f'<td>{gauge(r.get("큰손월점수", 0)) if r.get("큰손월점수") is not None else "—"}</td>'
+                    + f'<td>{indiv_word(r.get("개인궤적6주"))}</td>'
+                    + f'<td style="line-height:1.5;">{bigmoney_cell(r)}</td>'
                     + f'<td style="text-align:left;">{row_flags(r)}</td></tr>'
                 )
             return out
@@ -654,8 +677,8 @@ with tab_trend:
             f'<th>섹터<br><span style="font-weight:500;">관련 KODEX 상품</span></th>'
             f'<th>RS수준<br><span style="font-weight:500;">시장 대비 강도 (반년 평균=0)</span></th>'
             f'<th>RS모멘텀<br><span style="font-weight:500;">강도의 방향 (+ 강해짐)</span></th>'
-            f'<th>개인 최근 6주<br><span style="font-weight:500;">주간 순매수 지속성</span></th>'
-            f'<th>큰손 (연기금+외국인)<br><span style="font-weight:500;">월간 매수 연속성 0~4</span></th>'
+            f'<th>개인 수급<br><span style="font-weight:500;">주간 순매수 흐름 (최근 6주)</span></th>'
+            f'<th>큰손 수급<br><span style="font-weight:500;">연기금·외국인 월간 흐름</span></th>'
             f'<th style="text-align:left;">참고</th></tr></thead><tbody>'
         )
 
