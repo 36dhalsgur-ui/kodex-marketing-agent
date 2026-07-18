@@ -190,6 +190,7 @@ st.markdown(
         font-variant-numeric: tabular-nums; white-space: nowrap;
     }}
     .kw-rise {{ background: #FEF1F2; color: #D63C48; }}
+    .kw-ok {{ background: #ECFDF5; color: #0E9F6E; }}
     .kw-fall {{ background: #EFF5FF; color: #2A6FDB; }}
     .kw-flat {{ background: #F2F4F7; color: {MUTED}; }}
     .kw-warn {{ background: #FFF6E6; color: #B3730A; }}
@@ -645,15 +646,26 @@ with tab_trend:
                 f'<span style="font-size:0.76rem;color:#475467;">외국인</span> {big_word(r.get("외국인월점수"))}'
             )
 
-        def row_flags(r):
-            f = []
-            if r.get("단계") in ("확산기", "태동기") and r.get("개인주간점수") == 0 and r.get("큰손월점수") == 0:
-                f.append('<span class="kw-badge kw-fall">⚠️ 수급 이탈</span>')
-            if r.get("단계") in ("쇠퇴기", "관망") and (r.get("큰손월점수") or 0) >= 3:
-                f.append('<span class="kw-badge kw-warn">👀 큰손 매집</span>')
-            if r.get("비고"):
-                f.append(f'<span style="font-size:0.7rem;color:{FAINT};">{r["비고"]}</span>')
-            return " ".join(f)
+        def flow_verdict(r):
+            """가격 판정(단계)에 대해 수급이 동의하는지 판독 — 같은 단계라도 신뢰도가 다름을 표시."""
+            if r.get("개인주간점수") is None:
+                return f'<span style="font-size:0.7rem;color:{FAINT};">{r.get("비고", "")}</span>'
+            stage = r.get("단계")
+            indiv_buying = (r.get("개인궤적6주") or [0])[-1] > 0
+            big = int(r.get("큰손월점수") or 0)
+            if stage == "태동기":
+                ok, bad = (big >= 1 and not indiv_buying), (big == 0)
+            elif stage == "확산기":
+                ok, bad = (indiv_buying or big >= 2), (not indiv_buying and big == 0)
+            elif stage == "과열기":
+                ok, bad = (indiv_buying and big <= 1), (big >= 3)
+            else:  # 쇠퇴기·관망
+                ok, bad = (not indiv_buying and big <= 1), (big >= 3)
+            if bad:
+                return '<span class="kw-badge kw-warn">⚠ 수급 상반</span>'
+            if ok:
+                return '<span class="kw-badge kw-ok">✓ 수급 일치</span>'
+            return '<span class="kw-badge kw-flat">혼조</span>'
 
         def stage_rows(rows):
             out = ""
@@ -668,18 +680,22 @@ with tab_trend:
                     )
                     + f'<td>{indiv_word(r.get("개인궤적6주"))}</td>'
                     + f'<td style="line-height:1.5;">{bigmoney_cell(r)}</td>'
-                    + f'<td style="text-align:left;">{row_flags(r)}</td></tr>'
+                    + f'<td style="text-align:center;">{flow_verdict(r)}</td></tr>'
                 )
             return out
 
         TABLE_HEAD = (
-            f'<table class="sig-table"><thead><tr>'
-            f'<th>섹터<br><span style="font-weight:500;">관련 KODEX 상품</span></th>'
+            f'<table class="sig-table"><thead>'
+            # 위계를 보여주는 그룹 헤더 — 단계는 가격이 정하고, 수급은 확인용
+            f'<tr><th style="border-bottom:none;"></th>'
+            f'<th colspan="2" style="text-align:center;background:#F8F5FF;color:{NAVY};">단계 판정 근거 — 가격 (상대강도)</th>'
+            f'<th colspan="3" style="text-align:center;background:#FAFBFC;">확인 신호 — 수급 (판정에 쓰이지 않음)</th></tr>'
+            f'<tr><th>섹터<br><span style="font-weight:500;">관련 KODEX 상품</span></th>'
             f'<th>RS수준<br><span style="font-weight:500;">시장 대비 강도 (반년 평균=0)</span></th>'
             f'<th>RS모멘텀<br><span style="font-weight:500;">강도의 방향 (+ 강해짐)</span></th>'
             f'<th>개인 수급<br><span style="font-weight:500;">주간 순매수 흐름 (최근 6주)</span></th>'
             f'<th>큰손 수급<br><span style="font-weight:500;">연기금·외국인 월간 흐름</span></th>'
-            f'<th style="text-align:left;">참고</th></tr></thead><tbody>'
+            f'<th style="text-align:center;">수급 확인<br><span style="font-weight:500;">판정과 일치하나</span></th></tr></thead><tbody>'
         )
 
         STAGES = [
@@ -705,8 +721,9 @@ with tab_trend:
             f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">'
             f'{sb.get("asof", "")} 기준 · 벤치마크 {sb.get("benchmark", "KRX 300")} · 주 1회 갱신</span></div>'
             f'<div style="font-size:0.9rem;font-weight:700;color:{INK};margin-bottom:4px;">{summary}</div>'
-            f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:6px;">'
-            f'단계는 가격(시장 대비 상대강도)이 정하고, 수급 점수는 그 판정을 확인하거나 반박합니다.</div>'
+            f'<div style="font-size:0.78rem;color:#475467;margin-bottom:6px;line-height:1.6;">'
+            f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다. 수급은 판정에 쓰이지 않는 확인 신호이며, '
+            f'맨 오른쪽 <b>수급 확인</b>이 일치 여부를 요약합니다 — <b>같은 단계라도 ✓ 일치는 신뢰도가 높고, ⚠ 상반은 가격만 움직이는 중이라는 경고입니다.</b></div>'
             f"{groups_html}</div>",
             unsafe_allow_html=True,
         )
@@ -735,6 +752,19 @@ with tab_trend:
 | − 약세 | − 약해짐 | ⚪ 쇠퇴기 | 소외가 깊어짐 |
 
 관망 = 이력 26주 미만이거나 수집 실패로 판정 유보.
+
+##### 수급 확인 배지 — 가격 판정에 수급이 동의하는가
+
+같은 단계라도 수급 상태에 따라 신뢰도가 다릅니다. 단계별 "정상적인 수급 모습"과 비교해 자동 판독합니다:
+
+| 단계 | ✓ 수급 일치 (판정 신뢰↑) | ⚠ 수급 상반 (경고) |
+|------|------------------------|-------------------|
+| 태동기 | 큰손 매수 & 개인 미유입 | 큰손도 매도 |
+| 확산기 | 개인 매수 (또는 큰손 동반) | 개인·큰손 모두 매도 — 가격만 상승 |
+| 과열기 | 개인 매수 지속 & 큰손 이탈 (교대) | 큰손이 강하게 매수 중 (아직 과열 아닐 수도) |
+| 쇠퇴기 | 모두 이탈 | 큰손이 강하게 매수 (재매집 가능성) |
+
+어느 쪽도 아니면 "혼조". 예: 확산기의 경기소비재(연기금·외국인 매수)는 ✓, 정보기술(둘 다 매도)은 ⚠ — 둘 다 가격 기준으론 확산기지만 신뢰도가 다릅니다.
 
 ##### 수급 점수 — 순매수의 부호·지속성 (금액 크기 미사용)
 
