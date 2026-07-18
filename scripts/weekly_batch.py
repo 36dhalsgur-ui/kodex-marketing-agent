@@ -13,8 +13,9 @@
 방법론:
 - 단계: RRG — 상대강도(가격/KRX300)의 26주 평균 대비 수준 × 4주/12주 평균 모멘텀
   (수준−·모멘텀+ = 태동기 / +·+ = 확산기 / +·− = 과열기 / −·− = 쇠퇴기)
-- 수급 점수: 구성종목 순매수 합의 부호 + 지속성 (한화리서치 산식 — 재현 검증 완료)
-  개인 주간 0/1/2 · 연기금/외국인 월간 각 0/2 합산 0~4
+- 수급 확인: 구성종목의 최근 13주(분기) 순매수 합의 부호 — 큰손(외국인+기관) × 개인 2×2
+  (태동형 큰손+/개인− · 확산형 +/+ · 과열형 −/+ · 쇠퇴형 −/−)
+  ※ 13주 창 선택 근거: 2·4주는 부호가 연 10~18회 뒤집혀 판독 불가, 13주는 연 ~4회로 안정 (실측)
 """
 
 import json
@@ -63,8 +64,11 @@ SECTORS = [
 
 TODAY = date.today()
 FR_53W = (TODAY - timedelta(weeks=53)).strftime("%Y%m%d")
-FR_14M = (TODAY - timedelta(days=430)).strftime("%Y%m%d")
+FR_13W = (TODAY - timedelta(weeks=13)).strftime("%Y%m%d")
 TO = TODAY.strftime("%Y%m%d")
+
+# 수급 집계에 쓰는 기관 세부 분류 (합산 = 기관 전체)
+INST_COLS = ["금융투자", "보험", "투신", "사모", "은행", "기타금융", "연기금"]
 
 
 def get_price(kind: str, code: str) -> pd.Series:
@@ -82,15 +86,12 @@ def get_roster(kind: str, code: str) -> list[str]:
     return [t for t in items if isinstance(t, str) and len(t) == 6 and t.isdigit()]
 
 
-def persistence(series: pd.Series, freq: str) -> list[int]:
-    """순매수 부호 + 지속성: 이번 기간 순매수 1, 연속 2, 순매도 0."""
-    agg = series.resample(freq).sum()
-    out, prev = [], None
-    for v in agg.values:
-        pos = v > 0
-        out.append(2 if (pos and prev) else (1 if pos else 0))
-        prev = pos
-    return out
+def flow_signature(big: float, indiv: float) -> str:
+    """13주 순매수 부호 2×2 → 수급 시그니처.
+    태동형: 큰손+ 개인− / 확산형: +/+ / 과열형: −/+ / 쇠퇴형: −/−"""
+    if big > 0:
+        return "확산형" if indiv > 0 else "태동형"
+    return "과열형" if indiv > 0 else "쇠퇴형"
 
 
 def quad(ratio: float, mom: float) -> str:
@@ -113,13 +114,18 @@ def main():
         .resample("W-FRI").last().dropna()
     )
 
-    flow_cache: dict[str, pd.DataFrame | None] = {}
+    flow_cache: dict[str, tuple[float, float] | None] = {}
 
     def flows(tk: str):
+        """종목의 13주 순매수 합계: (큰손 = 외국인+기관, 개인). 실패 시 None."""
         if tk not in flow_cache:
             try:
-                d = stock.get_market_trading_value_by_date(FR_14M, TO, tk, detail=True, on="순매수")
-                flow_cache[tk] = d[["개인", "연기금", "외국인"]] if ("개인" in d.columns and len(d)) else None
+                d = stock.get_market_trading_value_by_date(FR_13W, TO, tk, detail=True, on="순매수")
+                if len(d) and all(c in d.columns for c in ["개인", "외국인"] + INST_COLS):
+                    big = float(d[INST_COLS].sum(axis=1).sum() + d["외국인"].sum())
+                    flow_cache[tk] = (big, float(d["개인"].sum()))
+                else:
+                    flow_cache[tk] = None
                 time.sleep(0.1)
             except Exception:
                 flow_cache[tk] = None
@@ -155,26 +161,23 @@ def main():
         except Exception as e:
             row.update({"단계": "관망", "비고": f"시세 실패: {type(e).__name__}"})
 
-        # ── 수급 점수
+        # ── 수급 — 13주(분기) 순매수 합의 부호
         try:
             stks = get_roster(*cfg["roster"])
-            I = P = F = None
+            big = indiv = 0.0
             used = 0
             for tk in stks:
-                d = flows(tk)
-                if d is None:
+                f = flows(tk)
+                if f is None:
                     continue
-                I = d["개인"] if I is None else I.add(d["개인"], fill_value=0)
-                P = d["연기금"] if P is None else P.add(d["연기금"], fill_value=0)
-                F = d["외국인"] if F is None else F.add(d["외국인"], fill_value=0)
+                big += f[0]
+                indiv += f[1]
                 used += 1
             if used:
-                wi = persistence(I.last("120D"), "W-FRI")
-                mp, mf = persistence(P, "ME"), persistence(F, "ME")
                 row.update({
-                    "개인주간점수": wi[-1], "개인궤적6주": wi[-6:],
-                    "연기금월점수": mp[-1], "외국인월점수": mf[-1], "큰손월점수": mp[-1] + mf[-1],
-                    "개인4주억": round(float(I.last("28D").sum()) / 1e8),
+                    "큰손13주억": round(big / 1e8),
+                    "개인13주억": round(indiv / 1e8),
+                    "수급시그니처": flow_signature(big, indiv),
                     "구성종목수": used,
                 })
         except Exception as e:
@@ -186,7 +189,7 @@ def main():
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(
         {"asof": TODAY.isoformat(), "benchmark": "KRX 300",
-         "지표버전": "RRG 26/12/4주 · 수급 지속성점수", "board": board},
+         "지표버전": "RRG 26/12/4주 · 수급 13주 부호(2×2)", "board": board},
         ensure_ascii=False, indent=2))
     n = sum(1 for r in board if r.get("단계") != "쇠퇴기")
     print(f"[완료] {OUT} — {len(board)}개 (비쇠퇴 {n}개) · 종목 캐시 {len(flow_cache)}건")
