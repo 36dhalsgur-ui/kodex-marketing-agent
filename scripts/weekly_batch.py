@@ -117,13 +117,17 @@ def main():
     flow_cache: dict[str, tuple[float, float] | None] = {}
 
     def flows(tk: str):
-        """종목의 13주 순매수 합계: (큰손 = 외국인+기관, 개인). 실패 시 None."""
+        """종목의 13주 순매수 합계: (외국인, 연기금, 기관전체, 개인). 실패 시 None."""
         if tk not in flow_cache:
             try:
                 d = stock.get_market_trading_value_by_date(FR_13W, TO, tk, detail=True, on="순매수")
                 if len(d) and all(c in d.columns for c in ["개인", "외국인"] + INST_COLS):
-                    big = float(d[INST_COLS].sum(axis=1).sum() + d["외국인"].sum())
-                    flow_cache[tk] = (big, float(d["개인"].sum()))
+                    flow_cache[tk] = (
+                        float(d["외국인"].sum()),
+                        float(d["연기금"].sum()),
+                        float(d[INST_COLS].sum(axis=1).sum()),
+                        float(d["개인"].sum()),
+                    )
                 else:
                     flow_cache[tk] = None
                 time.sleep(0.1)
@@ -161,23 +165,27 @@ def main():
         except Exception as e:
             row.update({"단계": "관망", "비고": f"시세 실패: {type(e).__name__}"})
 
-        # ── 수급 — 13주(분기) 순매수 합의 부호
+        # ── 수급 — 13주(분기) 순매수 합 (주체별 분리 표시용)
         try:
             stks = get_roster(*cfg["roster"])
-            big = indiv = 0.0
+            frn = pen = inst = indiv = 0.0
             used = 0
             for tk in stks:
                 f = flows(tk)
                 if f is None:
                     continue
-                big += f[0]
-                indiv += f[1]
+                frn += f[0]
+                pen += f[1]
+                inst += f[2]
+                indiv += f[3]
                 used += 1
             if used:
+                big = frn + inst  # 외국인+기관 전체 (쇠퇴기 재매집 정렬 기준)
                 row.update({
-                    "큰손13주억": round(big / 1e8),
+                    "외국인13주억": round(frn / 1e8),
+                    "연기금13주억": round(pen / 1e8),
                     "개인13주억": round(indiv / 1e8),
-                    "수급시그니처": flow_signature(big, indiv),
+                    "큰손13주억": round(big / 1e8),
                     "구성종목수": used,
                 })
         except Exception as e:

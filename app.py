@@ -612,20 +612,26 @@ with tab_trend:
             cls = "sig-pos" if v > 0 else ("sig-neg" if v < 0 else "")
             return f'<span class="{cls}">{v:+.1f}{suffix}</span>'
 
-        def krw_amt(v):
-            """13주 순매수 원액 — 참고 지표이므로 무채색·작게 (판정 근거인 RS와 층위 구분)."""
+        def krw_line(label, v):
+            """주체별 13주 순매수 한 줄 — 매수 빨강 / 매도 파랑."""
             if v is None:
-                return "—"
+                return ""
             amt = f"{v / 1e4:+,.1f}조" if abs(v) >= 1e4 else f"{v:+,}억"
-            return f"{amt} {'유입' if v > 0 else '매도'}"
+            color, word = ("#D63C48", "매수") if v > 0 else ("#2A6FDB", "매도")
+            return (
+                f'<span style="color:{FAINT};">{label}</span> '
+                f'<span style="color:{color};font-weight:600;">{amt} {word}</span>'
+            )
 
         def flow_cell(r):
-            if r.get("큰손13주억") is None:
+            if r.get("외국인13주억") is None and r.get("큰손13주억") is None:
                 return "—"
-            return (
-                f'큰손 {krw_amt(r.get("큰손13주억"))}<br>'
-                f'개인 {krw_amt(r.get("개인13주억"))}'
-            )
+            lines = [
+                krw_line("외국인", r.get("외국인13주억")),
+                krw_line("연기금", r.get("연기금13주억")),
+                krw_line("개인", r.get("개인13주억")),
+            ]
+            return "<br>".join(l for l in lines if l) or "—"
 
         def stage_rows(rows, decline_order=False):
             # 기본: RS모멘텀 내림차순 / 쇠퇴기: 큰손 유입 중(재매집 후보) 우선 + 모멘텀 순
@@ -658,7 +664,7 @@ with tab_trend:
             f'<tr><th>섹터<br><span style="font-weight:500;">관련 KODEX 상품</span></th>'
             f'<th>RS수준<br><span style="font-weight:500;">시장 대비 강도 (반년 평균=0)</span></th>'
             f'<th>RS모멘텀<br><span style="font-weight:500;">강도의 방향 (+ 강해짐)</span></th>'
-            f'<th style="color:{FAINT};">수급 참고<br><span style="font-weight:500;">13주 순매수 · 판정에 쓰이지 않음</span></th></tr></thead><tbody>'
+            f'<th style="color:{FAINT};">수급 참고<br><span style="font-weight:500;">13주(분기) 순매수</span></th></tr></thead><tbody>'
         )
 
         STAGES = [
@@ -720,7 +726,7 @@ with tab_trend:
 
 ##### 수급 열 — 참고 정보이며, 판정·채점에 쓰지 않습니다
 
-구성종목의 **최근 13주(약 1분기) 순매수 합**을 큰손(외국인+기관)·개인으로 나눠 원액 그대로 보여줍니다.
+구성종목의 **최근 13주(약 1분기) 순매수 합**을 외국인·연기금·개인으로 나눠 원액 그대로 보여줍니다 (쇠퇴기 정렬 기준인 '큰손'은 외국인+기관 전체 합).
 
 - **판정에 쓰지 않는 이유 (실측)**: 매매는 제로섬이라 큰손과 개인의 순매수는 거의 정확히 반대 부호입니다 — 즉 수급이 주는 실질 정보는 "큰손이 사느냐 파느냐" 하나뿐이라, 4단계 판정을 지지·반박하는 용도로는 정보량이 부족합니다. 가격 판정과의 "일치 배지"를 붙여봤으나 일치율이 3/22에 그쳤고, 시장 상대화로 보정해도 2/22로 오히려 악화되어 폐기했습니다.
 - **수급의 고유 가치**: 가격이 아직 움직이지 않은 "조용한 매집"은 가격 지표에 존재하지 않는 정보입니다. 그래서 쇠퇴기 표에서만 **큰손이 유입 중인 섹터(재매집 후보)를 상단에 배치**하는 데 사용합니다.
