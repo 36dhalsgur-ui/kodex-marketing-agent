@@ -318,14 +318,15 @@ def load_theme_flows():
 
 
 @st.cache_data(ttl=3600)
-def load_theme_trend():
+def load_theme_search():
+    """테마 키워드별 주간 검색량 증감 (네이버 데이터랩, 키 미설정 시 데모)."""
     cid = csec = None
     try:
         cid = st.secrets.get("NAVER_CLIENT_ID")
         csec = st.secrets.get("NAVER_CLIENT_SECRET")
     except Exception:
         pass
-    return D.theme_trend_table(cid, csec)
+    return D.fetch_theme_search(cid, csec)
 
 
 @st.cache_data(ttl=3600)
@@ -527,10 +528,8 @@ with tab_home:
 # ──────────────────────────────────────────────
 with tab_trend:
     st.write("")
-    section_header("STEP 1 · MONITOR", "시장 트렌드", "뉴스 키워드·테마 수익률·순매수·검색량으로 시장이 어디로 움직이는지 파악합니다.")
+    section_header("STEP 1 · MONITOR", "시장 트렌드", "섹터 단계 진단·테마 수익률·검색량으로 시장이 어디로 움직이는지 파악합니다.")
     st.write("")
-
-    trend_tbl, trend_live = load_theme_trend()
 
     # ── 테마 단계 진단 배너 — 단계 정의(수급·주가·검색량) + 단계별 마케터 행동
     cycle_svg = (
@@ -755,33 +754,35 @@ with tab_trend:
             )
     st.write("")
 
-    READ_BADGE = {
-        "대중 확산": "kw-rise", "커뮤니티발 선행": "kw-warn",
-        "업계 이슈": "kw-warn", "관심 냉각": "kw-fall", "유지": "kw-flat",
-    }
+    # ── 테마 검색량 — 네이버 데이터랩 주간 검색량의 전주 대비 증감
+    search_deltas, search_live = load_theme_search()
 
-    def trend_row(r) -> str:
-        s_cls = "kw-rise" if r.검색증감 >= 0 else "kw-fall"
+    def naver_news_link(query: str) -> str:
+        return "https://search.naver.com/search.naver?where=news&query=" + quote(query)
+
+    def search_row(name: str) -> str:
+        v = search_deltas.get(name)
+        if v is None:
+            return ""
+        s_cls = "kw-rise" if v >= 0 else "kw-fall"
         return (
-            f'<a class="kw-link" href="{r.url}" target="_blank">'
-            f'<div class="kw-row"><span class="kw-name" style="min-width:5.5em;">{r.키워드} ↗</span>'
-            f'<span class="kw-badge {s_cls}">검색 {r.검색증감:+.1f}%</span>'
-            f'<span style="color:{GRAY};font-size:0.78rem;">뉴스 {r.뉴스언급}건 ({r.뉴스증감:+d}%)</span>'
-            f'<span class="kw-badge {READ_BADGE.get(r.판독, "kw-flat")}">{r.판독}</span></div></a>'
+            f'<a class="kw-link" href="{naver_news_link(name + " ETF")}" target="_blank">'
+            f'<div class="kw-row"><span class="kw-name">{name} ↗</span>'
+            f'<span class="kw-badge {s_cls}">검색 {v:+.1f}%</span></div></a>'
         )
 
-    rows_list = list(trend_tbl.itertuples(index=False))
-    mid = (len(rows_list) + 1) // 2
-    col_a = "".join(trend_row(r) for r in rows_list[:mid])
-    col_b = "".join(trend_row(r) for r in rows_list[mid:])
-    live_tag = "데이터랩 실데이터" if trend_live else "데모 — NAVER API 키 설정 시 실데이터"
+    names = [g for g, _ in D.THEME_SEARCH_GROUPS]
+    names.sort(key=lambda n: -(search_deltas.get(n) or 0))
+    mid = (len(names) + 1) // 2
+    col_a = "".join(search_row(n) for n in names[:mid])
+    col_b = "".join(search_row(n) for n in names[mid:])
+    live_tag = "데이터랩 실데이터" if search_live else "데모 — NAVER API 키 설정 시 실데이터"
     st.markdown(
-        f'<div class="card"><div class="card-title">테마 검색량 트렌드 '
-        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">검색량(수요) × 뉴스(공급) 교차 판독 · {live_tag}</span></div>'
+        f'<div class="card"><div class="card-title">테마 검색량 '
+        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">네이버 데이터랩 주간 검색량 · 전주 대비 증감 · {live_tag}</span></div>'
         f'<div class="kw-cols"><div class="kw-col">{col_a}</div><div class="kw-col">{col_b}</div></div>'
         f'<div style="font-size:0.7rem;color:{GRAY};margin-top:10px;">'
-        f'판독 기준 — <b>대중 확산</b>: 검색·뉴스 동반 급증 / <b>커뮤니티발 선행</b>: 뉴스 없이 검색만 급증 (선행 신호) / '
-        f'<b>업계 이슈</b>: 뉴스만 증가, 대중 무반응 / <b>관심 냉각</b>: 둘 다 감소</div></div>',
+        f'키워드를 클릭하면 네이버 뉴스 검색으로 이동합니다</div></div>',
         unsafe_allow_html=True,
     )
     st.write("")
