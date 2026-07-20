@@ -761,33 +761,39 @@ with tab_trend:
 
     # ── 실시간 뉴스 키워드 언급량 + 시장 트렌드 브리핑 (구글 뉴스 RSS · 실데이터)
     kw_counts, articles, news_live = load_news_mentions()
+    search_deltas, search_live = load_theme_search()
+
     nc1, nc2 = st.columns([6, 6], gap="large")
     with nc1:
-        if kw_counts:
-            mx = max(k["언급량"] for k in kw_counts)
-            rows_html = ""
-            for k in kw_counts:
-                w = max(6, round(k["언급량"] / mx * 100))
-                rows_html += (
-                    f'<a class="kw-link" href="{k["url"]}" target="_blank">'
-                    f'<div style="display:flex;align-items:center;gap:10px;padding:5px 2px;">'
-                    f'<span class="kw-name" style="min-width:5.2em;font-size:0.84rem;">{k["키워드"]} ↗</span>'
-                    f'<span style="flex:1;"><span style="display:block;height:9px;width:{w}%;'
-                    f'background:{NAVY};opacity:{0.35 + 0.65 * k["언급량"] / mx:.2f};border-radius:3px;"></span></span>'
-                    f'<span style="font-size:0.78rem;color:#475467;font-variant-numeric:tabular-nums;min-width:2.8em;text-align:right;">{k["언급량"]}건</span>'
-                    f"</div></a>"
-                )
-            st.markdown(
-                f'<div class="card"><div class="card-title">실시간 뉴스 키워드 언급량 '
-                f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">구글 뉴스 ETF 기사 {len(articles)}건+ 헤드라인 사전 매칭 · 실데이터</span></div>'
-                f"{rows_html}"
-                f'<div style="font-size:0.7rem;color:{GRAY};margin-top:8px;">키워드를 클릭하면 해당 키워드의 실제 기사 목록으로 이동합니다</div></div>',
-                unsafe_allow_html=True,
+        # 테마 검색량 — 대중 관심(수요)의 측정. 네이버 데이터랩 주간 검색량.
+        def naver_news_link(query: str) -> str:
+            return "https://search.naver.com/search.naver?where=news&query=" + quote(query)
+
+        names = [g for g, _ in D.THEME_SEARCH_GROUPS if g in search_deltas]
+        names.sort(key=lambda n: -search_deltas[n])
+        rows_html = ""
+        for n in names:
+            v = search_deltas[n]
+            s_cls = "kw-rise" if v >= 0 else "kw-fall"
+            rows_html += (
+                f'<a class="kw-link" href="{naver_news_link(n)}" target="_blank">'
+                f'<div class="kw-row"><span class="kw-name">{n} ↗</span>'
+                f'<span class="kw-badge {s_cls}">검색 {v:+.1f}%</span></div></a>'
             )
-            with st.expander(f"최근 헤드라인 보기 ({len(articles)}건)"):
+        live_tag = "데이터랩 실데이터" if search_live else "데모 — NAVER API 키 설정 시 실데이터"
+        st.markdown(
+            f'<div class="card"><div class="card-title">테마 검색량 (주간) '
+            f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">네이버 데이터랩 · 전주 대비 증감 · {live_tag}</span></div>'
+            f"{rows_html}"
+            f'<div style="font-size:0.7rem;color:{GRAY};margin-top:8px;">'
+            f'대중이 실제로 검색한 양의 변화 — 관심(수요)의 측정치입니다. 클릭 시 관련 기사로 이동</div></div>',
+            unsafe_allow_html=True,
+        )
+        if articles:
+            with st.expander(f"금주 언론 이슈 — 콘텐츠 소재함 ({len(articles)}건, 구글 뉴스 실시간)"):
+                if kw_counts:
+                    st.caption("헤드라인 빈출 키워드: " + " · ".join(f"{k['키워드']}({k['언급량']})" for k in kw_counts[:8]))
                 st.markdown("\n".join(f"- [{a['title']}]({a['link']})" for a in articles))
-        else:
-            st.info("뉴스 수집 실패 — 네트워크 확인 후 새로고침해주세요.")
     with nc2:
         brief_boxes = ""
         try:
@@ -831,39 +837,6 @@ with tab_trend:
             f"{brief_boxes}</div>",
             unsafe_allow_html=True,
         )
-    st.write("")
-
-    # ── 테마 검색량 — 네이버 데이터랩 주간 검색량의 전주 대비 증감
-    search_deltas, search_live = load_theme_search()
-
-    def naver_news_link(query: str) -> str:
-        return "https://search.naver.com/search.naver?where=news&query=" + quote(query)
-
-    def search_row(name: str) -> str:
-        v = search_deltas.get(name)
-        if v is None:
-            return ""
-        s_cls = "kw-rise" if v >= 0 else "kw-fall"
-        return (
-            f'<a class="kw-link" href="{naver_news_link(name + " ETF")}" target="_blank">'
-            f'<div class="kw-row"><span class="kw-name">{name} ↗</span>'
-            f'<span class="kw-badge {s_cls}">검색 {v:+.1f}%</span></div></a>'
-        )
-
-    names = [g for g, _ in D.THEME_SEARCH_GROUPS]
-    names.sort(key=lambda n: -(search_deltas.get(n) or 0))
-    mid = (len(names) + 1) // 2
-    col_a = "".join(search_row(n) for n in names[:mid])
-    col_b = "".join(search_row(n) for n in names[mid:])
-    live_tag = "데이터랩 실데이터" if search_live else "데모 — NAVER API 키 설정 시 실데이터"
-    st.markdown(
-        f'<div class="card"><div class="card-title">테마 검색량 '
-        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">네이버 데이터랩 주간 검색량 · 전주 대비 증감 · {live_tag}</span></div>'
-        f'<div class="kw-cols"><div class="kw-col">{col_a}</div><div class="kw-col">{col_b}</div></div>'
-        f'<div style="font-size:0.7rem;color:{GRAY};margin-top:10px;">'
-        f'키워드를 클릭하면 네이버 뉴스 검색으로 이동합니다</div></div>',
-        unsafe_allow_html=True,
-    )
     st.write("")
 
     t1, t2 = st.columns([6, 6], gap="large")
