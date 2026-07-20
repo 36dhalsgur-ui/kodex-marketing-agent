@@ -832,48 +832,61 @@ with tab_trend:
                 st.markdown("\n".join(f"- [{a['title']}]({a['link']})" for a in articles))
     st.write("")
 
+    # 섹터별 실제 주간 수익률 · 주간 수급 — 주간 배치 실데이터 (data/signal_board.json)
+    try:
+        _sb_wk = json.loads(board_file.read_text()) if board_file.exists() else {}
+    except Exception:
+        _sb_wk = {}
+    wk_rows = [r for r in _sb_wk.get("board", []) if r.get("주간수익률") is not None]
+    wk_range = _sb_wk.get("주간구간", "")
+    wk_bench = _sb_wk.get("벤치주간수익률")
+
     t1, t2 = st.columns([6, 6], gap="large")
     with t1:
-        srt = theme_tbl.sort_values("수익률")
-        bar_colors = [RED if v >= 0 else COOL for v in srt["수익률"]]
-        fig_th = go.Figure(
-            go.Bar(x=srt["수익률"], y=srt["테마"], orientation="h", marker_color=bar_colors,
-                   text=[f"{v:+.1f}%" for v in srt["수익률"]], textposition="outside",
-                   cliponaxis=False,
-                   hovertemplate="%{y}<br>주간 수익률 %{x:.2f}%<extra></extra>")
-        )
-        fig_th = base_layout(fig_th, height=430)
-        fig_th.update_layout(title=dict(text=f"{sel_week} 테마별 주간 수익률", font=dict(size=15)))
-        fig_th.update_xaxes(
-            ticksuffix="%",
-            range=[float(srt["수익률"].min()) * 1.35 - 0.3, float(srt["수익률"].max()) * 1.3 + 0.3],
-        )
-        st.plotly_chart(fig_th, use_container_width=True)
-        kospi_w = next((m["weekly"] for m in load_weekly_market() if m["name"] == "코스피"), None)
-        if kospi_w is not None:
-            st.caption(f"해석 기준선 — 같은 기간 코스피 {kospi_w:+.1f}% (홈 탭 시장 요약 참조)")
-    with t2:
-        fig_sc = go.Figure(
-            go.Scatter(
-                x=theme_tbl["수익률"], y=theme_tbl["평균강도"],
-                mode="markers+text", text=theme_tbl["테마"], textposition="top center",
-                textfont=dict(size=11, color="#4B5468"),
-                marker=dict(
-                    size=(theme_tbl["순매수합"].abs() / theme_tbl["순매수합"].abs().max() * 34 + 10),
-                    color=[RED if m > 0 else COOL for m in theme_tbl["모멘텀"]],
-                    opacity=0.75, line=dict(width=1, color="white"),
-                ),
-                hovertemplate="<b>%{text}</b><br>수익률 %{x:.2f}% · 평균 매수강도 %{y:.2f}%<extra></extra>",
+        if wk_rows:
+            srt = sorted(wk_rows, key=lambda r: r["주간수익률"])
+            vals = [r["주간수익률"] for r in srt]
+            fig_th = go.Figure(
+                go.Bar(x=vals, y=[r["섹터"] for r in srt], orientation="h",
+                       marker_color=[RED if v >= 0 else COOL for v in vals],
+                       text=[f"{v:+.1f}%" for v in vals], textposition="outside",
+                       cliponaxis=False,
+                       hovertemplate="%{y}<br>주간 수익률 %{x:.2f}%<extra></extra>")
             )
-        )
-        fig_sc = base_layout(fig_sc, height=430)
-        fig_sc.update_layout(
-            title=dict(text="수익률 × 매수강도 맵  <span style='font-size:12px;color:#98A2B3'>버블 크기 = 순매수 규모 · 붉은색 = 전주보다 가속</span>", font=dict(size=15)),
-            xaxis_title="주간 수익률(%)", yaxis_title="평균 매수강도(%)",
-        )
-        fig_sc.update_xaxes(showgrid=True, gridcolor="#F0F2F7", zeroline=True, zerolinecolor="#D9DEE9")
-        fig_sc.update_yaxes(zeroline=True, zerolinecolor="#D9DEE9")
-        st.plotly_chart(fig_sc, use_container_width=True)
+            fig_th = base_layout(fig_th, height=560)
+            fig_th.update_layout(title=dict(
+                text=f"섹터별 주간 수익률  <span style='font-size:12px;color:#98A2B3'>KRX 실데이터 · {wk_range}</span>",
+                font=dict(size=15)))
+            fig_th.update_xaxes(ticksuffix="%", range=[min(vals) * 1.35 - 0.3, max(vals) * 1.3 + 0.3])
+            st.plotly_chart(fig_th, use_container_width=True)
+            if wk_bench is not None:
+                st.caption(f"해석 기준선 — 같은 주간 KRX 300 {wk_bench:+.1f}% (시그널 보드와 동일 벤치마크)")
+        else:
+            st.info("주간 수익률 데이터가 없습니다 — `python scripts/weekly_batch.py` 재실행 후 커밋하면 표시됩니다.")
+    with t2:
+        f_rows = [r for r in wk_rows if r.get("외국인1주억") is not None]
+        if f_rows:
+            xs = [r["주간수익률"] for r in f_rows]
+            ys = [(r.get("외국인1주억") or 0) + (r.get("연기금1주억") or 0) for r in f_rows]
+            fig_sc = go.Figure(
+                go.Scatter(
+                    x=xs, y=ys, mode="markers+text", text=[r["섹터"] for r in f_rows],
+                    textposition="top center", textfont=dict(size=11, color="#4B5468"),
+                    marker=dict(size=13, color=[RED if v > 0 else COOL for v in ys],
+                                opacity=0.8, line=dict(width=1, color="white")),
+                    hovertemplate="<b>%{text}</b><br>주간 수익률 %{x:.2f}%<br>외국인+연기금 주간 순매수 %{y:,.0f}억<extra></extra>",
+                )
+            )
+            fig_sc = base_layout(fig_sc, height=560)
+            fig_sc.update_layout(
+                title=dict(text="주간 수익률 × 수급 맵  <span style='font-size:12px;color:#98A2B3'>붉은색 = 외국인·연기금 순매수, 파란색 = 순매도</span>", font=dict(size=15)),
+                xaxis_title="주간 수익률(%)", yaxis_title="외국인+연기금 주간 순매수(억원)",
+            )
+            fig_sc.update_xaxes(showgrid=True, gridcolor="#F0F2F7", zeroline=True, zerolinecolor="#D9DEE9")
+            fig_sc.update_yaxes(zeroline=True, zerolinecolor="#D9DEE9")
+            st.plotly_chart(fig_sc, use_container_width=True)
+        elif wk_rows:
+            st.info("주간 수급 데이터가 없습니다 — 배치 재실행 후 표시됩니다.")
 
     st.write("")
     live_badge = "실데이터" if datalab_live else "데모 — NAVER_CLIENT_ID/SECRET 설정 시 실데이터"
@@ -1174,6 +1187,6 @@ with tab_report:
 
 st.write("")
 st.caption(
-    "ⓘ 데모 모드: 순매수·테마·뉴스 데이터는 샘플이며 유튜브·지수·환율은 실시간 수집입니다. "
-    "실운영 시 KRX·뉴스 크롤링·LLM 연동부로 교체됩니다."
+    "ⓘ 시그널 보드·주간 수익률·수급(KRX)·검색량(네이버 데이터랩)·뉴스(구글)·유튜브·지수·환율은 실데이터입니다. "
+    "마케팅 효과 측정 탭의 순매수 데이터는 샘플이며, 엑셀 업로드 또는 실운영 연동 시 교체됩니다."
 )

@@ -122,20 +122,29 @@ def main():
         stock.get_index_ohlcv_by_date(FR_53W, TO, BENCH)["종가"]
         .resample("W-FRI").last().dropna()
     )
+    # 미완결 주 제거 — 금요일 아닌 요일에 실행해도 '마지막 완결 주(금요일 마감)' 기준으로 고정
+    bench_w = bench_w[[d <= TODAY for d in bench_w.index.date]]
+    week_end = bench_w.index[-1].date()
+    week_start = week_end - timedelta(days=4)
 
-    flow_cache: dict[str, tuple[float, float] | None] = {}
+    flow_cache: dict[str, tuple[float, ...] | None] = {}
 
     def flows(tk: str):
-        """종목의 13주 순매수 합계: (외국인, 연기금, 기관전체, 개인). 실패 시 None."""
+        """종목의 순매수 합계: (외국인13주, 연기금13주, 기관13주, 개인13주, 외국인1주, 연기금1주, 개인1주).
+        1주 = 가격과 동일한 마지막 완결 주(week_start~week_end). 실패 시 None."""
         if tk not in flow_cache:
             try:
                 d = stock.get_market_trading_value_by_date(FR_13W, TO, tk, detail=True, on="순매수")
                 if len(d) and all(c in d.columns for c in ["개인", "외국인"] + INST_COLS):
+                    w1 = d[[week_start <= x <= week_end for x in d.index.date]]
                     flow_cache[tk] = (
                         float(d["외국인"].sum()),
                         float(d["연기금"].sum()),
                         float(d[INST_COLS].sum(axis=1).sum()),
                         float(d["개인"].sum()),
+                        float(w1["외국인"].sum()),
+                        float(w1["연기금"].sum()),
+                        float(w1["개인"].sum()),
                     )
                 else:
                     flow_cache[tk] = None
@@ -152,6 +161,9 @@ def main():
         try:
             px = get_price(*cfg["price"])
             w = px.resample("W-FRI").last().dropna()
+            w = w[[d <= TODAY for d in w.index.date]]  # 미완결 주 제거 (bench와 동일 기준)
+            if len(w) >= 2:
+                row["주간수익률"] = round(float((w.iloc[-1] / w.iloc[-2] - 1) * 100), 2)
             rs = (w / bench_w).dropna()
             if len(rs) < 27:
                 row.update({"단계": "관망", "비고": f"이력 {len(rs)}주 — 26주 미달"})
@@ -178,6 +190,7 @@ def main():
         try:
             stks = get_roster(*cfg["roster"])
             frn = pen = inst = indiv = 0.0
+            frn1 = pen1 = indiv1 = 0.0
             used = 0
             for tk in stks:
                 f = flows(tk)
@@ -187,6 +200,9 @@ def main():
                 pen += f[1]
                 inst += f[2]
                 indiv += f[3]
+                frn1 += f[4]
+                pen1 += f[5]
+                indiv1 += f[6]
                 used += 1
             if used:
                 big = frn + inst  # 외국인+기관 전체 (쇠퇴기 재매집 정렬 기준)
@@ -195,6 +211,9 @@ def main():
                     "연기금13주억": round(pen / 1e8),
                     "개인13주억": round(indiv / 1e8),
                     "큰손13주억": round(big / 1e8),
+                    "외국인1주억": round(frn1 / 1e8),
+                    "연기금1주억": round(pen1 / 1e8),
+                    "개인1주억": round(indiv1 / 1e8),
                     "구성종목수": used,
                 })
         except Exception as e:
@@ -206,8 +225,11 @@ def main():
         board.append(row)
 
     OUT.parent.mkdir(exist_ok=True)
+    bench_wk_ret = round(float((bench_w.iloc[-1] / bench_w.iloc[-2] - 1) * 100), 2)
     OUT.write_text(json.dumps(
         {"asof": TODAY.isoformat(), "benchmark": "KRX 300",
+         "주간구간": f"{week_start.isoformat()} ~ {week_end.isoformat()}",
+         "벤치주간수익률": bench_wk_ret,
          "지표버전": "RRG 26/12/4주 · 수급 13주 부호(2×2)", "board": board},
         ensure_ascii=False, indent=2))
     n = sum(1 for r in board if r.get("단계") != "쇠퇴기")

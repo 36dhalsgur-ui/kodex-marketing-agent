@@ -342,14 +342,14 @@ def fetch_youtube(n_per_channel: int = 3) -> dict[str, list[dict]]:
 # 네이버 데이터랩 검색 트렌드
 # NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 설정 시 실데이터, 미설정 시 데모
 # ══════════════════════════════════════════════
-DATALAB_GROUPS = ["KODEX", "TIGER", "ACE", "RISE", "ETF"]
+DATALAB_GROUPS = ["KODEX", "TIGER", "ACE", "RISE"]  # 일반 키워드 "ETF"는 상대지수 최대값을 독점해 브랜드 비교를 뭉개므로 제외
 
 
 def _demo_datalab(n_weeks: int = 12) -> pd.DataFrame:
     rng = np.random.default_rng(7)
     today = dt.date.today()
     rows = []
-    base = {"KODEX": 62, "TIGER": 55, "ACE": 30, "RISE": 24, "ETF": 80}
+    base = {"KODEX": 62, "TIGER": 55, "ACE": 30, "RISE": 24}
     for g in DATALAB_GROUPS:
         level = base[g]
         for i in range(n_weeks - 1, -1, -1):
