@@ -802,32 +802,58 @@ with tab_trend:
             sb_b = None
         if sb_b:
             b_rows = sb_b.get("board", [])
-            up = [r for r in b_rows if r.get("단계") in ("태동기", "확산기")]
-            up.sort(key=lambda x: -(x.get("RS모멘텀") or 0))
-            down = [r for r in b_rows if r.get("단계") == "쇠퇴기"]
-            down.sort(key=lambda x: (x.get("RS모멘텀") or 0))
-            watch = sorted(
-                down, key=lambda x: -((x.get("외국인13주억") or 0) + (x.get("연기금13주억") or 0))
-            )[:3]
-            rising_txt = (
-                " · ".join(f"{r['섹터']}({r.get('RS모멘텀', 0):+.1f})" for r in up[:4]) or "해당 없음"
-            )
-            down_txt = " · ".join(f"{r['섹터']}({r.get('RS모멘텀', 0):+.1f})" for r in down[:4])
-            watch_txt = " · ".join(r["섹터"] for r in watch)
-            kw_txt = " · ".join(k["키워드"] for k in kw_counts[:4]) if kw_counts else "—"
             box = (
                 '<div style="border:1px solid {bd};background:{bg};border-radius:10px;'
                 'padding:12px 14px;margin-bottom:9px;">'
                 '<div style="font-size:0.78rem;font-weight:800;color:{tc};margin-bottom:4px;">{title}</div>'
                 '<div style="font-size:0.8rem;color:#374151;line-height:1.6;">{body}</div></div>'
             )
+
+            # ① 이번 주 달라진 것 — 전주 대비 단계 전환 (표에는 없는 정보)
+            moves = [
+                f'<b>{r["섹터"]}</b> {r["전주단계"]} → <b>{r["단계"]}</b>'
+                for r in b_rows
+                if r.get("전주단계") and r.get("단계") and r["전주단계"] != r["단계"]
+            ]
+            body1 = (
+                " · ".join(moves) + " — 전환 직후는 판정이 갓 바뀐 구간이라 다음 주 유지 여부 확인이 필요합니다."
+                if moves else
+                f"단계가 전환된 섹터 없음 — {len(b_rows)}개 섹터 모두 지난주 국면을 유지 중입니다."
+            )
+
+            # ② 신호가 모이는 곳 / 어긋나는 곳 — 가격 단계 × 수급 방향의 교차 (종합)
+            def smart13(r):
+                return (r.get("외국인13주억") or 0) + (r.get("연기금13주억") or 0)
+
+            up_rows = [r for r in b_rows if r.get("단계") in ("태동기", "확산기")]
+            aligned = [r["섹터"] for r in up_rows if smart13(r) > 0]
+            diverge = [r["섹터"] for r in up_rows if smart13(r) <= 0]
+            parts2 = []
+            if aligned:
+                parts2.append(f"가격 강세에 외국인·연기금 매수가 동반: <b>{' · '.join(aligned)}</b> — 신호가 겹치는 우선 후보")
+            if diverge:
+                parts2.append(f"가격만 강세, 기관·외국인 수급 미동반: <b>{' · '.join(diverge)}</b> — 지속력 확인 필요")
+            body2 = ". ".join(parts2) if parts2 else "태동·확산 구간 섹터가 없습니다."
+
+            # ③ 관심의 방향 — 검색량 분포의 요약 (나열이 아니라 방향 판독)
+            if search_deltas:
+                ups = {k: v for k, v in search_deltas.items() if v > 0}
+                n_dn = len(search_deltas) - len(ups)
+                if ups and len(ups) <= 3:
+                    up_txt = " · ".join(f"{k}(+{v:.1f}%)" for k, v in sorted(ups.items(), key=lambda x: -x[1]))
+                    body3 = (f"테마 검색 {len(search_deltas)}종 중 {n_dn}종 하락 — 관심 전반이 식는 가운데 "
+                             f"<b>{up_txt}</b>만 상승. 소수 키워드로의 관심 집중 국면입니다.")
+                elif len(ups) > len(search_deltas) / 2:
+                    body3 = f"테마 검색 {len(search_deltas)}종 중 {len(ups)}종 상승 — 대중 관심이 전반적으로 확대되는 국면입니다."
+                else:
+                    body3 = f"테마 검색 {len(search_deltas)}종 중 상승 {len(ups)} / 하락 {n_dn} — 뚜렷한 방향 없이 혼조입니다."
+            else:
+                body3 = "검색량 데이터 없음."
+
             brief_boxes = (
-                box.format(bd="#FBD5D9", bg="#FEF6F7", tc="#C2333F", title="라이징 — 시장 대비 강세 섹터",
-                           body=f"상대강도 모멘텀 상위: <b>{rising_txt}</b>. 단계 기준 태동·확산 구간의 시장 주도군입니다.")
-                + box.format(bd="#CBDDF5", bg="#F3F7FD", tc="#2A6FDB", title="하락·정체 — 상대약세 심화 섹터",
-                             body=f"쇠퇴기 {len(down)}개 중 약세 심화: <b>{down_txt}</b>. 노출 축소 검토 대상입니다.")
-                + box.format(bd="#E4E7EC", bg="#FAFBFC", tc=NAVY, title="시장 관심 변화",
-                             body=f"뉴스 관심 집중 키워드: <b>{kw_txt}</b>. 쇠퇴 구간에서 외국인·연기금 매수 상위(재매집 후보): <b>{watch_txt}</b>.")
+                box.format(bd="#E9D8FD", bg="#FBF7FF", tc=NAVY, title="이번 주 달라진 것 — 단계 전환", body=body1)
+                + box.format(bd="#FBD5D9", bg="#FEF6F7", tc="#C2333F", title="신호가 모이는 곳 — 가격 × 수급 교차", body=body2)
+                + box.format(bd="#E4E7EC", bg="#FAFBFC", tc="#475467", title="관심의 방향 — 검색 수요", body=body3)
             )
         else:
             brief_boxes = f'<div style="font-size:0.8rem;color:{GRAY};">시그널 보드 데이터가 없어 브리핑을 생성할 수 없습니다.</div>'
@@ -881,26 +907,6 @@ with tab_trend:
         fig_sc.update_xaxes(showgrid=True, gridcolor="#F0F2F7", zeroline=True, zerolinecolor="#D9DEE9")
         fig_sc.update_yaxes(zeroline=True, zerolinecolor="#D9DEE9")
         st.plotly_chart(fig_sc, use_container_width=True)
-
-    rising = theme_tbl.sort_values("점수", ascending=False).head(3)
-    falling = theme_tbl.sort_values("점수").head(2)
-    p1, p2 = st.columns(2, gap="medium")
-    with p1:
-        rows = "".join(
-            f'<div class="kw-row"><span class="kw-name"><span style="color:{RED};">▲</span> {r.테마}</span>'
-            f'<span style="color:#475467;font-size:0.82rem;font-variant-numeric:tabular-nums;">전주 {r.전주수익률:+.1f}% → 금주 {r.수익률:+.1f}%</span>'
-            f'<span class="kw-badge kw-rise">{flow_state(r.전주수익률, r.수익률)}</span></div>'
-            for r in rising.itertuples()
-        )
-        st.markdown(f'<div class="card"><div class="card-title">라이징 테마</div>{rows}</div>', unsafe_allow_html=True)
-    with p2:
-        rows = "".join(
-            f'<div class="kw-row"><span class="kw-name"><span style="color:{COOL};">▼</span> {r.테마}</span>'
-            f'<span style="color:#475467;font-size:0.82rem;font-variant-numeric:tabular-nums;">전주 {r.전주수익률:+.1f}% → 금주 {r.수익률:+.1f}%</span>'
-            f'<span class="kw-badge kw-fall">{flow_state(r.전주수익률, r.수익률)}</span></div>'
-            for r in falling.itertuples()
-        )
-        st.markdown(f'<div class="card"><div class="card-title">하락·정체 테마</div>{rows}</div>', unsafe_allow_html=True)
 
     st.write("")
     live_badge = "실데이터" if datalab_live else "데모 — NAVER_CLIENT_ID/SECRET 설정 시 실데이터"

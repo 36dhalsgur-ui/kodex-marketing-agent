@@ -109,6 +109,15 @@ def main():
         sys.exit("KRX_ID/KRX_PW 환경변수가 필요합니다.")
 
     print(f"[배치 시작] {TODAY.isoformat()} · {len(SECTORS)}개 섹터")
+
+    # 전주 단계 (직전 산출물에서) — 브리핑의 '단계 전환' 감지용
+    prev_stages: dict[str, str] = {}
+    if OUT.exists():
+        try:
+            prev = json.loads(OUT.read_text())
+            prev_stages = {r["섹터"]: r.get("단계", "") for r in prev.get("board", [])}
+        except Exception:
+            pass
     bench_w = (
         stock.get_index_ohlcv_by_date(FR_53W, TO, BENCH)["종가"]
         .resample("W-FRI").last().dropna()
@@ -191,6 +200,8 @@ def main():
         except Exception as e:
             row["수급비고"] = f"수급 실패: {type(e).__name__}"
 
+        if prev_stages.get(name):
+            row["전주단계"] = prev_stages[name]
         print(f"  - {name}: {row.get('단계','?')} (수급 {row.get('구성종목수','–')}종목)")
         board.append(row)
 
