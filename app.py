@@ -8,6 +8,7 @@ Z-score→Sigmoid 0~100점 설계를 따른다.
 import datetime as dt
 import importlib
 import json
+import re
 from pathlib import Path
 from urllib.parse import quote
 
@@ -22,6 +23,7 @@ import data as D
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
+    "NEWS_KW_PATTERNS",
     "theme_signal_board", "demo_theme_flows", "signal_label",
     "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
 )
@@ -789,80 +791,45 @@ with tab_trend:
             f'대중이 실제로 검색한 양의 변화 — 관심(수요)의 측정치입니다. 클릭 시 관련 기사로 이동</div></div>',
             unsafe_allow_html=True,
         )
-        if articles:
-            with st.expander(f"금주 언론 이슈 — 콘텐츠 소재함 ({len(articles)}건, 구글 뉴스 실시간)"):
-                if kw_counts:
-                    st.caption("헤드라인 빈출 키워드: " + " · ".join(f"{k['키워드']}({k['언급량']})" for k in kw_counts[:8]))
-                st.markdown("\n".join(f"- [{a['title']}]({a['link']})" for a in articles))
     with nc2:
-        brief_boxes = ""
-        try:
-            sb_b = json.loads(board_file.read_text()) if board_file.exists() else None
-        except Exception:
-            sb_b = None
-        if sb_b:
-            b_rows = sb_b.get("board", [])
-            box = (
-                '<div style="border:1px solid {bd};background:{bg};border-radius:10px;'
-                'padding:12px 14px;margin-bottom:9px;">'
-                '<div style="font-size:0.78rem;font-weight:800;color:{tc};margin-bottom:4px;">{title}</div>'
-                '<div style="font-size:0.8rem;color:#374151;line-height:1.6;">{body}</div></div>'
+        # 금주 언론 이슈 — 헤드라인에서 많이 다뤄진 주제 순 (화제성 기준)
+        pat_map = dict(getattr(D, "NEWS_KW_PATTERNS", []))
+        issue_blocks = ""
+        shown = set()  # 여러 키워드에 걸치는 기사는 첫 블록에만 노출
+        for k in kw_counts[:4]:
+            pat = pat_map.get(k["키워드"])
+            matched = [a for a in articles if pat and re.search(pat, a["title"])]
+            hits = [a for a in matched if a["title"] not in shown][:2]
+            if not hits:  # 전부 앞 블록에 노출된 경우 대표 기사 1건은 유지
+                hits = matched[:1]
+            shown.update(a["title"] for a in hits)
+            links = "".join(
+                f'<a href="{a["link"]}" target="_blank" style="display:block;font-size:0.79rem;'
+                f'color:#374151;text-decoration:none;padding:2px 0;white-space:nowrap;'
+                f'overflow:hidden;text-overflow:ellipsis;">– {a["title"]}</a>'
+                for a in hits
             )
-
-            # ① 이번 주 달라진 것 — 전주 대비 단계 전환 (표에는 없는 정보)
-            moves = [
-                f'<b>{r["섹터"]}</b> {r["전주단계"]} → <b>{r["단계"]}</b>'
-                for r in b_rows
-                if r.get("전주단계") and r.get("단계") and r["전주단계"] != r["단계"]
-            ]
-            body1 = (
-                " · ".join(moves) + " — 전환 직후는 판정이 갓 바뀐 구간이라 다음 주 유지 여부 확인이 필요합니다."
-                if moves else
-                f"단계가 전환된 섹터 없음 — {len(b_rows)}개 섹터 모두 지난주 국면을 유지 중입니다."
+            issue_blocks += (
+                f'<div style="padding:9px 0;border-bottom:1px solid #F0F2F7;">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">'
+                f'<span style="font-size:0.86rem;font-weight:800;color:{INK};">{k["키워드"]}</span>'
+                f'<span class="kw-badge" style="background:#F2F4F7;color:#475467;">기사 {k["언급량"]}건</span></div>'
+                f"{links}</div>"
             )
-
-            # ② 신호가 모이는 곳 / 어긋나는 곳 — 가격 단계 × 수급 방향의 교차 (종합)
-            def smart13(r):
-                return (r.get("외국인13주억") or 0) + (r.get("연기금13주억") or 0)
-
-            up_rows = [r for r in b_rows if r.get("단계") in ("태동기", "확산기")]
-            aligned = [r["섹터"] for r in up_rows if smart13(r) > 0]
-            diverge = [r["섹터"] for r in up_rows if smart13(r) <= 0]
-            parts2 = []
-            if aligned:
-                parts2.append(f"가격 강세에 외국인·연기금 매수가 동반: <b>{' · '.join(aligned)}</b> — 신호가 겹치는 우선 후보")
-            if diverge:
-                parts2.append(f"가격만 강세, 기관·외국인 수급 미동반: <b>{' · '.join(diverge)}</b> — 지속력 확인 필요")
-            body2 = ". ".join(parts2) if parts2 else "태동·확산 구간 섹터가 없습니다."
-
-            # ③ 관심의 방향 — 검색량 분포의 요약 (나열이 아니라 방향 판독)
-            if search_deltas:
-                ups = {k: v for k, v in search_deltas.items() if v > 0}
-                n_dn = len(search_deltas) - len(ups)
-                if ups and len(ups) <= 3:
-                    up_txt = " · ".join(f"{k}(+{v:.1f}%)" for k, v in sorted(ups.items(), key=lambda x: -x[1]))
-                    body3 = (f"테마 검색 {len(search_deltas)}종 중 {n_dn}종 하락 — 관심 전반이 식는 가운데 "
-                             f"<b>{up_txt}</b>만 상승. 소수 키워드로의 관심 집중 국면입니다.")
-                elif len(ups) > len(search_deltas) / 2:
-                    body3 = f"테마 검색 {len(search_deltas)}종 중 {len(ups)}종 상승 — 대중 관심이 전반적으로 확대되는 국면입니다."
-                else:
-                    body3 = f"테마 검색 {len(search_deltas)}종 중 상승 {len(ups)} / 하락 {n_dn} — 뚜렷한 방향 없이 혼조입니다."
-            else:
-                body3 = "검색량 데이터 없음."
-
-            brief_boxes = (
-                box.format(bd="#E9D8FD", bg="#FBF7FF", tc=NAVY, title="이번 주 달라진 것 — 단계 전환", body=body1)
-                + box.format(bd="#FBD5D9", bg="#FEF6F7", tc="#C2333F", title="신호가 모이는 곳 — 가격 × 수급 교차", body=body2)
-                + box.format(bd="#E4E7EC", bg="#FAFBFC", tc="#475467", title="관심의 방향 — 검색 수요", body=body3)
-            )
-        else:
-            brief_boxes = f'<div style="font-size:0.8rem;color:{GRAY};">시그널 보드 데이터가 없어 브리핑을 생성할 수 없습니다.</div>'
+        if not issue_blocks:
+            issue_blocks = f'<div style="font-size:0.8rem;color:{GRAY};">뉴스 데이터를 불러오지 못했습니다.</div>'
+        news_tag = "구글 뉴스 실시간" if news_live else "수집 실패"
         st.markdown(
-            f'<div class="card"><div class="card-title">시장 주요 트렌드 브리핑 '
-            f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">시그널 보드·뉴스 실데이터 기반 자동 생성 (규칙 엔진 — LLM 연동 시 교체)</span></div>'
-            f"{brief_boxes}</div>",
+            f'<div class="card"><div class="card-title">금주 언론 이슈 '
+            f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">ETF 헤드라인 {len(articles)}건 · 언급 많은 순 · {news_tag}</span></div>'
+            f"{issue_blocks}"
+            f'<div style="font-size:0.7rem;color:{GRAY};margin-top:8px;">'
+            f'이번 주 언론이 가장 많이 다룬 주제 순 — 화제성의 측정치입니다. 콘텐츠 소재로 활용</div></div>',
             unsafe_allow_html=True,
         )
+        if articles:
+            with st.expander(f"콘텐츠 소재함 — 전체 기사 보기 ({len(articles)}건)"):
+                st.markdown("\n".join(f"- [{a['title']}]({a['link']})" for a in articles))
     st.write("")
 
     t1, t2 = st.columns([6, 6], gap="large")
