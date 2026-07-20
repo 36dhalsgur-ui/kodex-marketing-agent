@@ -841,3 +841,52 @@ def theme_signal_board(
     df = pd.DataFrame(rows)
     df["_ord"] = df["라벨"].map(LABEL_ORDER)
     return df.sort_values(["_ord", "가격4주"], ascending=[True, False]).drop(columns="_ord")
+
+
+# ══════════════════════════════════════════════
+# 실시간 뉴스 키워드 언급량 — 구글 뉴스 RSS (키 불필요, 실데이터)
+# ══════════════════════════════════════════════
+# 사전 매칭 방식: 조잡한 형태소 토큰화 대신 금융·테마 사전으로 헤드라인 매칭
+NEWS_KW_PATTERNS = [
+    ("반도체", r"반도체"), ("AI", r"AI|인공지능"), ("2차전지", r"2차전지|이차전지"),
+    ("방산", r"방산|방위산업"), ("조선", r"조선"), ("은행", r"은행"), ("보험", r"보험"),
+    ("바이오", r"바이오|제약"), ("배당", r"배당"), ("금리", r"금리"), ("채권", r"채권"),
+    ("금 현물", r"금값|금 시세|금현물|골드"), ("원자력", r"원자력|원전|SMR"),
+    ("전력", r"전력|전선"), ("미국주식", r"미국|나스닥|S&P|월가"), ("커버드콜", r"커버드콜"),
+    ("리츠", r"리츠"), ("밸류업", r"밸류업"), ("연금", r"연금|퇴직연금|IRP"),
+    ("코스피", r"코스피"), ("코스닥", r"코스닥"), ("엔비디아", r"엔비디아"),
+    ("비트코인", r"비트코인|가상자산"), ("상장폐지", r"상장폐지|상폐"), ("신규상장", r"신규 상장|상장[^폐]"),
+]
+
+
+def fetch_news_mentions(query: str = "ETF", max_kw: int = 12):
+    """구글 뉴스 RSS 헤드라인에서 키워드 언급량 집계.
+    반환: (키워드 목록 [{키워드, 언급량, url}], 최근 기사 [{title, link}], 실데이터 여부)"""
+    import re as _re
+    try:
+        r = requests.get(
+            f"https://news.google.com/rss/search?q={quote(query)}&hl=ko&gl=KR&ceid=KR:ko",
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=8,
+        )
+        root = ET.fromstring(r.content)
+        items = root.findall(".//item")
+        articles = []
+        for it in items:
+            t, l = it.find("title"), it.find("link")
+            if t is not None and t.text:
+                articles.append({"title": t.text, "link": l.text if l is not None else "#"})
+        if not articles:
+            return [], [], False
+        counts = []
+        for name, pat in NEWS_KW_PATTERNS:
+            n = sum(1 for a in articles if _re.search(pat, a["title"]))
+            if n > 0:
+                counts.append({
+                    "키워드": name, "언급량": n,
+                    "url": f"https://news.google.com/rss/search?q={quote(name + ' ETF')}" .replace("/rss", "")
+                           + "&hl=ko&gl=KR&ceid=KR%3Ako",
+                })
+        counts.sort(key=lambda x: -x["언급량"])
+        return counts[:max_kw], articles[:30], True
+    except Exception:
+        return [], [], False

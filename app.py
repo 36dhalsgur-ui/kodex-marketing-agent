@@ -21,7 +21,7 @@ import data as D
 # 앱 전체가 죽는다 — 필수 속성 누락 시 강제 재로드로 자가 복구한다.
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score",
-    "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "theme_trend_table",
+    "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "theme_signal_board", "demo_theme_flows", "signal_label",
     "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
 )
@@ -315,6 +315,11 @@ def load_youtube():
 @st.cache_data
 def load_theme_flows():
     return D.demo_theme_flows()
+
+
+@st.cache_data(ttl=1800)
+def load_news_mentions():
+    return D.fetch_news_mentions()
 
 
 @st.cache_data(ttl=3600)
@@ -752,6 +757,80 @@ with tab_trend:
 - 과열기의 대응(수확 지속 vs 소구 전환의 비중)은 데이터가 아니라 경영 판단의 영역입니다. 보드는 국면 정보와 근거까지만 제공합니다.
 """
             )
+    st.write("")
+
+    # ── 실시간 뉴스 키워드 언급량 + 시장 트렌드 브리핑 (구글 뉴스 RSS · 실데이터)
+    kw_counts, articles, news_live = load_news_mentions()
+    nc1, nc2 = st.columns([6, 6], gap="large")
+    with nc1:
+        if kw_counts:
+            mx = max(k["언급량"] for k in kw_counts)
+            rows_html = ""
+            for k in kw_counts:
+                w = max(6, round(k["언급량"] / mx * 100))
+                rows_html += (
+                    f'<a class="kw-link" href="{k["url"]}" target="_blank">'
+                    f'<div style="display:flex;align-items:center;gap:10px;padding:5px 2px;">'
+                    f'<span class="kw-name" style="min-width:5.2em;font-size:0.84rem;">{k["키워드"]} ↗</span>'
+                    f'<span style="flex:1;"><span style="display:block;height:9px;width:{w}%;'
+                    f'background:{NAVY};opacity:{0.35 + 0.65 * k["언급량"] / mx:.2f};border-radius:3px;"></span></span>'
+                    f'<span style="font-size:0.78rem;color:#475467;font-variant-numeric:tabular-nums;min-width:2.8em;text-align:right;">{k["언급량"]}건</span>'
+                    f"</div></a>"
+                )
+            st.markdown(
+                f'<div class="card"><div class="card-title">실시간 뉴스 키워드 언급량 '
+                f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">구글 뉴스 ETF 기사 {len(articles)}건+ 헤드라인 사전 매칭 · 실데이터</span></div>'
+                f"{rows_html}"
+                f'<div style="font-size:0.7rem;color:{GRAY};margin-top:8px;">키워드를 클릭하면 해당 키워드의 실제 기사 목록으로 이동합니다</div></div>',
+                unsafe_allow_html=True,
+            )
+            with st.expander(f"최근 헤드라인 보기 ({len(articles)}건)"):
+                st.markdown("\n".join(f"- [{a['title']}]({a['link']})" for a in articles))
+        else:
+            st.info("뉴스 수집 실패 — 네트워크 확인 후 새로고침해주세요.")
+    with nc2:
+        brief_boxes = ""
+        try:
+            sb_b = json.loads(board_file.read_text()) if board_file.exists() else None
+        except Exception:
+            sb_b = None
+        if sb_b:
+            b_rows = sb_b.get("board", [])
+            up = [r for r in b_rows if r.get("단계") in ("태동기", "확산기")]
+            up.sort(key=lambda x: -(x.get("RS모멘텀") or 0))
+            down = [r for r in b_rows if r.get("단계") == "쇠퇴기"]
+            down.sort(key=lambda x: (x.get("RS모멘텀") or 0))
+            watch = sorted(
+                down, key=lambda x: -((x.get("외국인13주억") or 0) + (x.get("연기금13주억") or 0))
+            )[:3]
+            rising_txt = (
+                " · ".join(f"{r['섹터']}({r.get('RS모멘텀', 0):+.1f})" for r in up[:4]) or "해당 없음"
+            )
+            down_txt = " · ".join(f"{r['섹터']}({r.get('RS모멘텀', 0):+.1f})" for r in down[:4])
+            watch_txt = " · ".join(r["섹터"] for r in watch)
+            kw_txt = " · ".join(k["키워드"] for k in kw_counts[:4]) if kw_counts else "—"
+            box = (
+                '<div style="border:1px solid {bd};background:{bg};border-radius:10px;'
+                'padding:12px 14px;margin-bottom:9px;">'
+                '<div style="font-size:0.78rem;font-weight:800;color:{tc};margin-bottom:4px;">{title}</div>'
+                '<div style="font-size:0.8rem;color:#374151;line-height:1.6;">{body}</div></div>'
+            )
+            brief_boxes = (
+                box.format(bd="#FBD5D9", bg="#FEF6F7", tc="#C2333F", title="라이징 — 시장 대비 강세 섹터",
+                           body=f"상대강도 모멘텀 상위: <b>{rising_txt}</b>. 단계 기준 태동·확산 구간의 시장 주도군입니다.")
+                + box.format(bd="#CBDDF5", bg="#F3F7FD", tc="#2A6FDB", title="하락·정체 — 상대약세 심화 섹터",
+                             body=f"쇠퇴기 {len(down)}개 중 약세 심화: <b>{down_txt}</b>. 노출 축소 검토 대상입니다.")
+                + box.format(bd="#E4E7EC", bg="#FAFBFC", tc=NAVY, title="시장 관심 변화",
+                             body=f"뉴스 관심 집중 키워드: <b>{kw_txt}</b>. 쇠퇴 구간에서 외국인·연기금 매수 상위(재매집 후보): <b>{watch_txt}</b>.")
+            )
+        else:
+            brief_boxes = f'<div style="font-size:0.8rem;color:{GRAY};">시그널 보드 데이터가 없어 브리핑을 생성할 수 없습니다.</div>'
+        st.markdown(
+            f'<div class="card"><div class="card-title">시장 주요 트렌드 브리핑 '
+            f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">시그널 보드·뉴스 실데이터 기반 자동 생성 (규칙 엔진 — LLM 연동 시 교체)</span></div>'
+            f"{brief_boxes}</div>",
+            unsafe_allow_html=True,
+        )
     st.write("")
 
     # ── 테마 검색량 — 네이버 데이터랩 주간 검색량의 전주 대비 증감
