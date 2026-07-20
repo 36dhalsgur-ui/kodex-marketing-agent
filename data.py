@@ -671,7 +671,9 @@ def fetch_theme_search(client_id: str | None = None, client_secret: str | None =
     if not (cid and csec):
         return dict(_DEMO_SEARCH_DELTA), False
     try:
-        end = dt.date.today()
+        today = dt.date.today()
+        # 부분 주 오염 방지: 진행 중인 주를 제외하고 지난 일요일까지만 조회
+        end = today - dt.timedelta(days=today.weekday() + 1)
         start = end - dt.timedelta(weeks=8)
         deltas: dict[str, float] = {}
         # 데이터랩은 요청당 5개 그룹 제한 → 나눠서 호출
