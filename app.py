@@ -1152,16 +1152,20 @@ with tab_channel:
             unsafe_allow_html=True,
         )
         fig_dl = go.Figure()
-        palette = {"KODEX": NAVY, "TIGER": "#E88D2A", "ACE": "#C0392B", "RISE": "#C89312"}
+        palette = {
+            "KODEX": NAVY, "TIGER": "#E88D2A", "ACE": "#C0392B", "SOL": "#2E86C1",
+            "HANARO": "#27AE60", "RISE": "#C89312", "PLUS": "#D9480F", "TIMEFOLIO": "#7D8597",
+        }
         for g in D.DATALAB_GROUPS:
             sub = datalab_df[datalab_df["group"] == g]
             fig_dl.add_trace(go.Scatter(
                 x=sub["date"], y=sub["ratio"], name=g, mode="lines",
-                line=dict(color=palette.get(g, "#888"), width=2.5 if g == "KODEX" else 1.6),
+                line=dict(color=palette.get(g, "#888"), width=2.6 if g == "KODEX" else 1.6),
             ))
-        fig_dl = base_layout(fig_dl, height=300)
-        fig_dl.update_layout(yaxis_title="검색량 지수")
+        fig_dl = base_layout(fig_dl, height=320)
+        fig_dl.update_layout(yaxis_title="검색량 지수", legend=dict(orientation="h"))
         st.plotly_chart(fig_dl, use_container_width=True)
+        st.caption("네이버 데이터랩 주간 검색량 · 8개 브랜드 · KODEX 앵커로 2개 요청 배율 보정 · 브랜드명 오염이 심한 SOL·PLUS 등은 'ETF' 한정 키워드 사용")
 
 # ──────────────────────────────────────────────
 # ③ 마케팅 효과 측정 — DiD (KODEX 중심 재설계)

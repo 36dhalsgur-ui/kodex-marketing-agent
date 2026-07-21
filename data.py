@@ -446,50 +446,87 @@ def fetch_partners(n_per_source: int = 8) -> list[dict]:
 # 네이버 데이터랩 검색 트렌드
 # NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 설정 시 실데이터, 미설정 시 데모
 # ══════════════════════════════════════════════
-DATALAB_GROUPS = ["KODEX", "TIGER", "ACE", "RISE"]  # 일반 키워드 "ETF"는 상대지수 최대값을 독점해 브랜드 비교를 뭉개므로 제외
+DATALAB_GROUPS = ["KODEX", "TIGER", "ACE", "SOL", "HANARO", "RISE", "PLUS", "TIMEFOLIO"]
+
+# 브랜드별 검색 키워드 — SOL·PLUS·ACE·RISE·TIGER는 단독어 오염이 심해(예: SOL=신한앱·솔라나)
+# 'ETF' 한정어를 사용, 고유 브랜드(KODEX·HANARO·TIMEFOLIO)만 단독 키워드 허용 (2026-07 실측)
+DATALAB_KEYWORDS = {
+    "KODEX": ["KODEX", "코덱스 ETF"],
+    "TIGER": ["TIGER ETF", "타이거 ETF"],
+    "ACE": ["ACE ETF", "에이스 ETF"],
+    "SOL": ["SOL ETF", "쏠 ETF"],
+    "HANARO": ["HANARO", "하나로 ETF"],
+    "RISE": ["RISE ETF", "라이즈 ETF"],
+    "PLUS": ["PLUS ETF", "플러스 ETF"],
+    "TIMEFOLIO": ["TIMEFOLIO", "타임폴리오"],
+}
+_DATALAB_ANCHOR = "KODEX"  # 데이터랩 요청당 그룹 5개 제한 → 2회 분할, 공통 앵커로 배율 보정
 
 
 def _demo_datalab(n_weeks: int = 12) -> pd.DataFrame:
     rng = np.random.default_rng(7)
     today = dt.date.today()
     rows = []
-    base = {"KODEX": 62, "TIGER": 55, "ACE": 30, "RISE": 24}
+    base = {"KODEX": 82, "TIGER": 58, "ACE": 30, "SOL": 22, "HANARO": 18,
+            "RISE": 26, "PLUS": 12, "TIMEFOLIO": 14}
     for g in DATALAB_GROUPS:
-        level = base[g]
+        level = base.get(g, 20)
         for i in range(n_weeks - 1, -1, -1):
             d = today - dt.timedelta(weeks=i)
-            level = max(5, level + rng.normal(0.5, 4))
+            level = max(4, level + rng.normal(0.3, 3))
             rows.append({"date": d.isoformat(), "group": g, "ratio": round(level, 1)})
     return pd.DataFrame(rows)
 
 
+def _datalab_batch(cid, csec, start, end, groups) -> dict[str, dict]:
+    """한 번의 데이터랩 요청 → {브랜드: {날짜: ratio}}."""
+    body = {
+        "startDate": start.isoformat(), "endDate": end.isoformat(), "timeUnit": "week",
+        "keywordGroups": [{"groupName": g, "keywords": DATALAB_KEYWORDS[g]} for g in groups],
+    }
+    r = requests.post(
+        "https://openapi.naver.com/v1/datalab/search", json=body,
+        headers={"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": csec,
+                 "Content-Type": "application/json"}, timeout=10,
+    )
+    r.raise_for_status()
+    return {res["title"]: {pt["period"]: pt["ratio"] for pt in res["data"]}
+            for res in r.json()["results"]}
+
+
 def fetch_datalab(client_id: str | None = None, client_secret: str | None = None) -> tuple[pd.DataFrame, bool]:
-    """네이버 데이터랩 주간 검색량. 반환: (데이터, 실데이터 여부)."""
+    """네이버 데이터랩 주간 검색량 (8개 브랜드). 반환: (데이터, 실데이터 여부).
+
+    데이터랩은 요청당 키워드 그룹 5개 제한 + 요청마다 최대값=100으로 따로 정규화되므로,
+    두 요청에 공통 앵커(KODEX)를 넣고 앵커 수준이 일치하도록 2번째 배치를 배율 보정한다."""
     cid = client_id or os.environ.get("NAVER_CLIENT_ID")
     csec = client_secret or os.environ.get("NAVER_CLIENT_SECRET")
     if not (cid and csec):
         return _demo_datalab(), False
     try:
         today = dt.date.today()
-        end = today - dt.timedelta(days=today.weekday() + 1)  # 지난 일요일 — 미완결 주가 0 근처로 꺾여 보이는 왜곡 방지
+        end = today - dt.timedelta(days=today.weekday() + 1)  # 지난 일요일 — 미완결 주 왜곡 방지
         start = end - dt.timedelta(weeks=12)
-        body = {
-            "startDate": start.isoformat(),
-            "endDate": end.isoformat(),
-            "timeUnit": "week",
-            "keywordGroups": [{"groupName": g, "keywords": [g, f"{g} ETF"]} for g in DATALAB_GROUPS],
-        }
-        r = requests.post(
-            "https://openapi.naver.com/v1/datalab/search",
-            json=body,
-            headers={"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": csec},
-            timeout=6,
-        )
-        r.raise_for_status()
+        others = [b for b in DATALAB_GROUPS if b != _DATALAB_ANCHOR]
+        batch1 = [_DATALAB_ANCHOR] + others[:4]   # 앵커 + 4 (5개)
+        batch2 = [_DATALAB_ANCHOR] + others[4:]   # 앵커 + 나머지
+        d1 = _datalab_batch(cid, csec, start, end, batch1)
+        d2 = _datalab_batch(cid, csec, start, end, batch2)
+
+        # 앵커 배율: batch1 기준으로 batch2를 맞춤
+        a1, a2 = d1[_DATALAB_ANCHOR], d2[_DATALAB_ANCHOR]
+        common = [p for p in a1 if p in a2 and a2[p] > 0]
+        k = (sum(a1[p] for p in common) / sum(a2[p] for p in common)) if common else 1.0
+
         rows = []
-        for res in r.json()["results"]:
-            for pt in res["data"]:
-                rows.append({"date": pt["period"], "group": res["title"], "ratio": pt["ratio"]})
+        for g in batch1:
+            for p, v in d1[g].items():
+                rows.append({"date": p, "group": g, "ratio": round(v, 2)})
+        for g in batch2:
+            if g == _DATALAB_ANCHOR:
+                continue  # 앵커는 batch1에서 이미 추가
+            for p, v in d2[g].items():
+                rows.append({"date": p, "group": g, "ratio": round(v * k, 2)})
         return pd.DataFrame(rows), True
     except Exception:
         return _demo_datalab(), False
