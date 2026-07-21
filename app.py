@@ -931,75 +931,20 @@ with tab_channel:
                 break
         return " · ".join(found) if found else "—"
 
-    if ch_brands:
-        st.markdown(
-            f'<div class="sec-tag">CAMPAIGN BOARD</div>'
-            f'<div style="font-size:1.02rem;font-weight:800;">경쟁사 캠페인 보드 '
-            f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">공식 홈페이지 배너({ch_data.get("asof", "")} 수집) · 유튜브·블로그 실시간 · '
-            f'<span style="color:#C2333F;">NEW</span> = 전주에 없던 배너</span></div>',
-            unsafe_allow_html=True,
-        )
-        def src_cell(title: str, link: str, sub: str, badge: str = "") -> str:
-            """소스별 셀 — 제목(해당 소스로만 링크) + 아랫줄 부가정보."""
-            return (
-                f'<a href="{link}" target="_blank" style="color:{INK};text-decoration:none;font-size:0.8rem;">'
-                f'{title}</a>{badge}'
-                f'<div style="font-size:0.68rem;color:{GRAY};margin-top:1px;">{sub}</div>'
-            )
+    NEW_BADGE = ('<span style="font-size:0.6rem;font-weight:800;color:#fff;background:#D63C48;'
+                 'border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle;">NEW</span>')
 
-        rows_html = ""
-        for brand in D.ISSUERS:
-            info = ch_brands.get(brand, {})
-            banners = info.get("배너", [])
-            home = info.get("홈", "#")
-            main_b = banners[0] if banners else None
-            new_tag = ('<span style="font-size:0.62rem;font-weight:800;color:#fff;background:#D63C48;'
-                       'border-radius:4px;padding:1px 5px;margin-left:6px;">NEW</span>'
-                       if main_b and main_b.get("NEW") else "")
-            hp_html = (
-                src_cell(main_b["제목"][:44], main_b["링크"], f"배너 {len(banners)}건 수집", new_tag)
-                if main_b else f'<span style="color:{GRAY};font-size:0.78rem;">{info.get("비고", "수집 없음")}</span>'
-            )
-            vids = youtube.get(brand, [])
-            yt_n = sum(1 for v in vids if v.get("published", "") >= _week_ago)
-            yt_html = (
-                src_cell(vids[0]["title"][:44], vids[0]["url"], f"이번 주 {yt_n}건 · 최신 {vids[0]['published']}")
-                if vids else f'<span style="color:{GRAY};font-size:0.78rem;">수집 실패</span>'
-            )
-            posts = blogs.get(brand, [])
-            bl_n = sum(1 for p in posts if p.get("date", "") >= _week_ago)
-            bl_html = (
-                src_cell(posts[0]["title"][:44], posts[0]["link"], f"이번 주 {bl_n}건 · 최신 {posts[0]['date']}")
-                if posts else f'<span style="color:{GRAY};font-size:0.78rem;">수집 실패</span>'
-            )
-            rows_html += (
-                f'<tr style="border-bottom:1px solid #F0F2F7;vertical-align:top;">'
-                f'<td style="padding:9px 4px;white-space:nowrap;">'
-                f'<a href="{home}" target="_blank" style="font-weight:800;color:{INK};text-decoration:none;">{brand}</a></td>'
-                f'<td style="padding:9px 4px;">{hp_html}</td>'
-                f'<td style="padding:9px 4px;">{yt_html}</td>'
-                f'<td style="padding:9px 4px;">{bl_html}</td>'
-                f'<td style="padding:9px 4px;font-size:0.75rem;color:#475467;white-space:nowrap;">{brand_themes(brand)}</td></tr>'
-            )
-        st.markdown(
-            '<div class="card" style="padding:6px 16px 10px;">'
-            '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;table-layout:fixed;">'
-            '<colgroup><col style="width:9%"><col style="width:30%"><col style="width:27%"><col style="width:22%"><col style="width:12%"></colgroup>'
-            '<thead><tr style="color:#667085;font-size:0.72rem;border-bottom:1px solid #E4E7EC;text-align:left;">'
-            '<th style="padding:8px 4px;">브랜드<br><span style="font-weight:600;">클릭=공식홈</span></th>'
-            '<th style="padding:8px 4px;">공식 홈페이지 — 메인 배너</th>'
-            '<th style="padding:8px 4px;">유튜브 — 최신 영상</th>'
-            '<th style="padding:8px 4px;">공식 블로그 — 최신 글</th>'
-            '<th style="padding:8px 4px;">콘텐츠 테마</th></tr></thead>'
-            f'<tbody>{rows_html}</tbody></table>'
-            f'<div style="font-size:0.7rem;color:{GRAY};margin-top:6px;">'
-            '열마다 출처가 분리되어 있습니다 — 제목 클릭 시 각각 홈페이지 배너 페이지 / 유튜브 영상 / 블로그 글로 이동. '
-            '"이번 주 N건"은 최근 7일 게시물 수, 테마는 세 출처 제목의 키워드 매칭입니다.</div></div>',
-            unsafe_allow_html=True,
+    def feed_row(chip: str, title: str, right: str, link: str, badge: str = "") -> str:
+        """소스 피드 한 줄 — 좌측 출처 칩 + 제목 + 우측 정보 (2번째 이미지 스타일)."""
+        return (
+            f'<a class="kw-link" href="{link}" target="_blank"><div class="kw-row" style="align-items:center;">'
+            f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
+            f'border-radius:5px;padding:2px 8px;margin-right:10px;white-space:nowrap;'
+            f'display:inline-block;min-width:80px;text-align:center;">{chip}</span>'
+            f'<span class="kw-name" style="flex:1;font-size:0.84rem;font-weight:600;">{title}</span>{badge}'
+            f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;margin-left:10px;">{right}</span>'
+            f'</div></a>'
         )
-        st.write("")
-    else:
-        st.info("캠페인 보드 데이터가 없습니다 — 로컬에서 `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
 
     grp_amc, grp_sec, grp_bank = st.tabs(["운용사 (경쟁사)", "증권 (판매채널)", "은행 (판매채널)"])
 
@@ -1057,27 +1002,50 @@ with tab_channel:
 
     with grp_amc:
         st.write("")
-        # ── 배너·캠페인 상세
+        # ── ① 공식 홈페이지 — 메인 배너 (브랜드별 1행, 우측=콘텐츠 테마)
+        st.markdown(
+            '<div class="sec-tag">HOMEPAGE</div>'
+            '<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">공식 홈페이지 — 메인 배너</div>'
+            f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">각 사 홈페이지 첫 배너 = 지금 가장 미는 캠페인 · 클릭 시 배너 페이지 · '
+            f'<span style="color:#C2333F;font-weight:700;">NEW</span> = 전주에 없던 배너</div>',
+            unsafe_allow_html=True,
+        )
         if ch_brands:
-            st.markdown('<div class="sec-tag">HOMEPAGE BANNERS</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">홈페이지 배너·캠페인 상세</div>', unsafe_allow_html=True)
-            bcols = st.columns(4, gap="medium")
-            for i, brand in enumerate(D.ISSUERS):
-                banners = ch_brands.get(brand, {}).get("배너", [])
-                items = "".join(
-                    f'<a href="{b["링크"]}" target="_blank" style="display:block;font-size:0.78rem;color:#374151;'
-                    f'text-decoration:none;padding:3px 0;border-bottom:1px solid #F5F6FA;">'
-                    + ('<span style="color:#D63C48;font-weight:800;">NEW </span>' if b.get("NEW") else "")
-                    + f'{b["제목"][:48]}</a>'
-                    for b in banners[:4]
-                ) or f'<div style="font-size:0.75rem;color:{GRAY};">수집된 배너 없음</div>'
-                bcols[i % 4].markdown(
-                    f'<div class="card" style="padding:12px 14px;margin-bottom:12px;">'
-                    f'<div style="font-weight:800;font-size:0.9rem;margin-bottom:4px;">{brand}</div>{items}</div>',
-                    unsafe_allow_html=True,
-                )
-            st.write("")
+            hp_rows = ""
+            for brand in D.ISSUERS:
+                info = ch_brands.get(brand, {})
+                banners = info.get("배너", [])
+                if banners:
+                    b = banners[0]
+                    hp_rows += feed_row(brand, b["제목"][:52], brand_themes(brand), b["링크"],
+                                        NEW_BADGE if b.get("NEW") else "")
+                else:
+                    hp_rows += feed_row(
+                        brand, f'<span style="color:{GRAY};">{info.get("비고", "수집된 배너 없음")}</span>',
+                        "", info.get("홈", "#"))
+            st.markdown(f'<div class="card" style="padding:8px 16px;">{hp_rows}</div>', unsafe_allow_html=True)
+            with st.expander("브랜드별 전체 배너 보기"):
+                bcols = st.columns(2, gap="large")
+                for i, brand in enumerate(D.ISSUERS):
+                    banners = ch_brands.get(brand, {}).get("배너", [])
+                    items = "".join(
+                        f'<a href="{b["링크"]}" target="_blank" style="display:block;font-size:0.8rem;color:#374151;'
+                        f'text-decoration:none;padding:3px 0;border-bottom:1px solid #F5F6FA;">'
+                        + ('<span style="color:#D63C48;font-weight:800;">NEW </span>' if b.get("NEW") else "")
+                        + f'{b["제목"][:52]}</a>'
+                        for b in banners
+                    ) or f'<div style="font-size:0.75rem;color:{GRAY};">수집된 배너 없음</div>'
+                    bcols[i % 2].markdown(
+                        f'<div style="margin-bottom:14px;"><div style="font-weight:800;font-size:0.88rem;margin-bottom:2px;">{brand}</div>{items}</div>',
+                        unsafe_allow_html=True,
+                    )
+            st.caption(f'공식 홈페이지 배너 주간 배치 수집 ({ch_data.get("asof", "")}) · 우측 = 배너·영상·글 제목에서 매칭된 콘텐츠 테마')
+        else:
+            st.info("배너 데이터가 없습니다 — 로컬에서 `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
 
-        st.markdown('<div class="sec-tag">YOUTUBE · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">브랜드 유튜브 최신 영상</div>', unsafe_allow_html=True)
+        # ── ② 공식 유튜브 — 최신 영상 (썸네일 그리드)
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        st.markdown('<div class="sec-tag">YOUTUBE · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">공식 유튜브 — 최신 영상</div>', unsafe_allow_html=True)
 
         def yt_video_card(v: dict) -> str:
             views = f"{v['views']:,}회" if v["views"] else "조회수 비공개"
@@ -1107,6 +1075,18 @@ with tab_channel:
         else:
             st.info("유튜브 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
 
+        # ── ③ 공식 블로그 — 최신 글 (전 브랜드 최신순 피드)
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        st.markdown('<div class="sec-tag">BLOG · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">공식 블로그 — 최신 글</div>', unsafe_allow_html=True)
+        blog_feed = sorted((p for ps in blogs.values() for p in ps), key=lambda p: p.get("date", ""), reverse=True)
+        if blog_feed:
+            rows = "".join(feed_row(p["brand"], p["title"][:54], p["date"], p["link"]) for p in blog_feed[:16])
+            st.markdown(f'<div class="card" style="padding:8px 16px;">{rows}</div>', unsafe_allow_html=True)
+            st.caption("네이버 블로그 RSS 실시간 수집 (30분 캐시) · 전 브랜드 최신순 · KODEX는 자체 블로그(samsungfundblog.com)")
+        else:
+            st.info("블로그 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
+
+        # ── ④ 운용사 뉴스 이슈 (외부 언론)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
         st.markdown('<div class="sec-tag">NEWS</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">운용사 뉴스 이슈</div>', unsafe_allow_html=True)
 
@@ -1151,29 +1131,7 @@ with tab_channel:
                 col.markdown(issuer_card(issuer), unsafe_allow_html=True)
             st.write("")
 
-        # ── 공식 블로그 최근 글
-        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-        st.markdown('<div class="sec-tag">BLOG · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">공식 블로그 최근 글</div>', unsafe_allow_html=True)
-        if any(blogs.values()):
-            blog_cols = st.columns(2, gap="large")
-            for i, brand in enumerate(D.ISSUERS):
-                posts = blogs.get(brand, [])[:3]
-                items = "".join(
-                    f'<a class="kw-link" href="{p["link"]}" target="_blank"><div class="kw-row">'
-                    f'<span class="kw-name" style="font-size:0.82rem;font-weight:600;">{p["title"][:46]}</span>'
-                    f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;">{p["date"]}</span></div></a>'
-                    for p in posts
-                ) or f'<div style="font-size:0.75rem;color:{GRAY};padding:4px 0;">수집 실패 또는 게시물 없음</div>'
-                blog_cols[i % 2].markdown(
-                    f'<div class="card" style="padding:10px 16px;margin-bottom:12px;">'
-                    f'<div class="card-title" style="margin-bottom:2px;">{brand}</div>{items}</div>',
-                    unsafe_allow_html=True,
-                )
-            st.caption("네이버 블로그 RSS 실시간 수집 (30분 캐시) · KODEX는 자체 블로그(samsungfundblog.com)")
-        else:
-            st.info("블로그 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
-
-        # ── 브랜드 검색량 (캠페인 → 관심 반응 확인)
+        # ── ⑤ 브랜드 검색량 (캠페인 → 관심 반응 확인)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
         live_badge = "실데이터" if datalab_live else "데모 — NAVER_CLIENT_ID/SECRET 설정 시 실데이터"
         st.markdown(
