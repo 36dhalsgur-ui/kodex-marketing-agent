@@ -562,6 +562,54 @@ def week_label_of(date_str: str) -> str:
     return f"{d.month}월 {(d.day - 1) // 7 + 1}주"
 
 
+# 캠페인 신호어 — 특정 상품을 미는 일회성 집행
+_CAMPAIGN_PAT = re.compile(r"신규\s?상장|출시|런칭|이벤트|특별\s?분배|오픈|사전\s?예약")
+# 정기물 — 특정 상품 푸시가 아니라 매주·매분기 반복되는 리포트류. DiD의 '개입'으로 볼 수 없다.
+# ※ '팩트체크' 같은 순회 시리즈는 회차마다 다른 상품을 다루므로(실측 확인) 정기물이 아니라 캠페인이다.
+_ROUTINE_PAT = re.compile(r"WEEKLY|주간|월간|분기|성과\s?리뷰|운용\s?계획|시황|랭킹|리포트", re.I)
+
+
+def classify_marketing_events(events: list[dict]) -> list[dict]:
+    """이벤트를 캠페인 / 정기 / 단순언급으로 분류하고 '유형'·'근거'를 채운다.
+
+    캠페인 = ① 캠페인 신호어(신규상장·출시·이벤트·특별분배 등)가 있거나
+             ② 같은 ETF가 7일 이내에 2개 이상 채널에 등장(집중 집행)
+    정기   = 주간·분기 리포트 등 평소 반복 포맷 → 개입이 아니므로 DiD 제외
+    단순언급 = 1개 채널 단발 등장 (교육 콘텐츠에 예시로 언급된 경우 등)"""
+    def _d(s):
+        try:
+            return dt.date.fromisoformat(s[:10])
+        except Exception:
+            return None
+
+    by_etf: dict[str, list[dict]] = {}
+    for e in events:
+        by_etf.setdefault(e["표기명"], []).append(e)
+
+    multi = set()
+    for evs in by_etf.values():
+        for i, a in enumerate(evs):
+            da = _d(a["date"])
+            if da is None:
+                continue
+            chans = {b["채널"] for b in evs
+                     if _d(b["date"]) and abs((da - _d(b["date"])).days) <= 7}
+            if len(chans) >= 2:
+                multi.add(id(a))
+
+    for e in events:
+        title = e.get("제목", "")
+        if _CAMPAIGN_PAT.search(title):
+            e["유형"], e["근거"] = "캠페인", "캠페인 신호어"
+        elif id(e) in multi:
+            e["유형"], e["근거"] = "캠페인", "복수 채널 동시 집행"
+        elif _ROUTINE_PAT.search(title):
+            e["유형"], e["근거"] = "정기", "정기 리포트 포맷"
+        else:
+            e["유형"], e["근거"] = "단순언급", "단발 언급"
+    return events
+
+
 def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list[dict],
                             universe: list[str] | None = None) -> list[dict]:
     """채널 수집물에서 ETF를 지목한 마케팅 이벤트를 추출.
@@ -592,6 +640,7 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
             "제목": title, "링크": link, "date": (date or "")[:10],
             "주차": week_label_of(date or ""), "분석가능": matched is not None,
         })
+    classify_marketing_events(events)
     events.sort(key=lambda e: e["date"], reverse=True)
     return events
 

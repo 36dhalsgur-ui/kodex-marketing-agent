@@ -21,7 +21,7 @@ import data as D
 # 배포 환경 핫리로드 시 data 모듈이 구버전으로 캐시되면 필수 함수가 없어
 # 앱 전체가 죽는다 — 필수 속성 누락 시 강제 재로드로 자가 복구한다.
 _REQUIRED_ATTRS = (
-    "kodex_etfs", "control_group", "did_series", "did_score", "detect_marketing_events",
+    "kodex_etfs", "control_group", "did_series", "did_score", "detect_marketing_events", "classify_marketing_events",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
@@ -1189,40 +1189,56 @@ with tab_did:
     ]
     events = D.detect_marketing_events(
         _kodex_banners, youtube.get("KODEX", []), blogs.get("KODEX", []))
-    usable = [e for e in events if e["분석가능"]]
+    campaigns = [e for e in events if e["유형"] == "캠페인"]
+    others = [e for e in events if e["유형"] != "캠페인"]
+    usable = [e for e in campaigns if e["분석가능"]]
 
     CH_ICON = {"홈페이지": "#6B4FBB", "유튜브": "#C2333F", "블로그": "#1E7A55"}
 
+    def ev_row(e: dict, dim: bool = False) -> str:
+        dot = CH_ICON.get(e["채널"], "#98A2B3")
+        if dim:
+            right = f'<span style="font-size:0.68rem;color:{GRAY};">{e["유형"]} · DiD 제외</span>'
+        else:
+            right = ('<span style="font-size:0.68rem;font-weight:700;color:#1E7A55;">분석 가능</span>'
+                     if e["분석가능"] else
+                     f'<span style="font-size:0.68rem;color:{GRAY};">순매수 미연동</span>')
+        name_color = GRAY if dim else INK
+        return (
+            f'<a class="kw-link" href="{e["링크"]}" target="_blank"><div class="kw-row" style="align-items:center;">'
+            f'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:9px;"></span>'
+            f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
+            f'border-radius:5px;padding:2px 7px;margin-right:9px;white-space:nowrap;">{e["채널"]}</span>'
+            f'<span class="kw-name" style="flex:1;font-size:0.83rem;font-weight:700;color:{name_color};">{e["표기명"]}</span>'
+            f'<span style="font-size:0.7rem;color:#98A2B3;margin-right:10px;white-space:nowrap;">{e["근거"]}</span>'
+            f'<span style="font-size:0.75rem;color:#475467;margin-right:10px;white-space:nowrap;">{e["주차"]}</span>'
+            f'{right}</div></a>'
+        )
+
     st.markdown(
         f'<div class="sec-tag">DETECTED CAMPAIGNS</div>'
-        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">감지된 마케팅 이벤트 '
-        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">채널 수집물이 특정 ETF를 지목한 건 = DiD의 처치</span></div>'
+        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">감지된 캠페인 '
+        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">특정 ETF를 미는 일회성 집행만 = DiD의 처치</span></div>'
         f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
-        f'총 {len(events)}건 감지 · 순매수 데이터가 있어 분석 가능한 건 {len(usable)}건</div>',
+        f'캠페인 {len(campaigns)}건 (분석 가능 {len(usable)}건) · 정기물·단발 언급 {len(others)}건은 개입으로 보지 않아 제외</div>',
         unsafe_allow_html=True,
     )
-    if events:
-        ev_rows = ""
-        for e in events[:8]:
-            dot = CH_ICON.get(e["채널"], "#98A2B3")
-            ok = ('<span style="font-size:0.68rem;font-weight:700;color:#1E7A55;">분석 가능</span>'
-                  if e["분석가능"] else
-                  f'<span style="font-size:0.68rem;color:{GRAY};">순매수 미연동</span>')
-            ev_rows += (
-                f'<a class="kw-link" href="{e["링크"]}" target="_blank"><div class="kw-row" style="align-items:center;">'
-                f'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:9px;"></span>'
-                f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
-                f'border-radius:5px;padding:2px 7px;margin-right:9px;white-space:nowrap;">{e["채널"]}</span>'
-                f'<span class="kw-name" style="flex:1;font-size:0.83rem;font-weight:700;">{e["표기명"]}</span>'
-                f'<span style="font-size:0.75rem;color:#475467;margin:0 10px;white-space:nowrap;">{e["주차"]}</span>'
-                f'{ok}</div></a>'
-            )
-        st.markdown(f'<div class="card" style="padding:8px 16px;">{ev_rows}</div>', unsafe_allow_html=True)
+    if campaigns:
+        st.markdown(
+            f'<div class="card" style="padding:8px 16px;">{"".join(ev_row(e) for e in campaigns[:8])}</div>',
+            unsafe_allow_html=True)
     else:
-        st.info("감지된 마케팅 이벤트가 없습니다 — 채널 모니터링 수집물에서 ETF를 지목한 콘텐츠를 찾지 못했습니다.")
+        st.info("감지된 캠페인이 없습니다 — 수집물에 특정 ETF를 미는 일회성 집행이 없습니다.")
+    if others:
+        with st.expander(f"DiD에서 제외된 콘텐츠 {len(others)}건 — 정기물 · 단발 언급"):
+            st.markdown(
+                f'<div style="padding:0 4px;">{"".join(ev_row(e, dim=True) for e in others[:12])}</div>',
+                unsafe_allow_html=True)
+            st.caption("정기 리포트는 평소 반복되는 베이스라인이라 개입이 아니고, 단발 언급은 "
+                       "교육 콘텐츠에 예시로 등장한 경우가 많아 해당 ETF를 위한 마케팅으로 보기 어렵습니다.")
     st.write("")
 
-    # ── 분석할 이벤트 선택 (처치 ETF + 개입 주차가 함께 결정된다)
+    # ── 분석할 캠페인 선택 (처치 ETF + 개입 주차가 함께 결정된다)
     manual_mode = False
     if usable:
         labels = [f'{e["표기명"]} · {e["주차"]} · {e["채널"]}' for e in usable]
@@ -1232,7 +1248,7 @@ with tab_did:
         treat, event_week = ev["ETF"], ev["주차"]
     else:
         st.warning(
-            "분석 가능한 이벤트가 없습니다 — 감지된 마케팅 ETF들이 순매수 유니버스에 없습니다. "
+            "분석 가능한 캠페인이 없습니다 — 캠페인 대상 ETF가 순매수 유니버스에 없습니다. "
             "실제 KODEX 라인업·순매수 실데이터를 연동하면 해소됩니다. 아래는 수동 지정 모드입니다."
         )
         manual_mode = True
