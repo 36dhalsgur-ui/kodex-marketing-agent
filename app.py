@@ -40,7 +40,7 @@ def news_link(query: str) -> str:
 # 페이지 설정 & 스타일
 # ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="KODEX 마케팅 AI Agent",
+    page_title="KODEX ETF 마케팅 AI Agent",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -450,8 +450,8 @@ datalab_df, datalab_live = load_datalab(tuple(D.DATALAB_GROUPS))
 # ──────────────────────────────────────────────
 st.markdown(
     '<div class="agent-overline">MARKETING INTELLIGENCE · WEEKLY MONITOR</div>'
-    '<div class="agent-title">KODEX 마케팅 AI Agent</div>'
-    '<div class="agent-sub">모니터링 → 마케팅 효과 측정(DiD) → 주간 리포트 — 채널 탭 기반 통합 분석</div>',
+    '<div class="agent-title">KODEX ETF 마케팅 AI Agent</div>'
+    '<div class="agent-sub">시장 트렌드 → 채널 모니터링 → 마케팅 효과 측정(DiD) → 주간 리포트</div>',
     unsafe_allow_html=True,
 )
 
