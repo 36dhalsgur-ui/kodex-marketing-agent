@@ -1318,14 +1318,56 @@ with tab_did:
         if sc.get("did") is not None:
             score = sc.get("score")
             if score is not None:
-                verdict = "효과 우수" if score >= 70 else ("효과 양호" if score >= 55 else ("중립" if score >= 45 else "효과 미약"))
+                # 판정 구간은 Z(표준편차 배수)에 직접 대응시킨다 — 50점 = 평소와 같음이 기준선
+                z = sc["z"]
+                if z >= 1.65:
+                    verdict, vcolor, vsay = "이례적으로 강함", "#2E9E62", "평소 상위 5% 수준 — 마케팅 효과가 뚜렷합니다."
+                elif z >= 1.0:
+                    verdict, vcolor, vsay = "평소보다 강함", "#7FE0A7", "평소보다 1σ 이상 높습니다 — 효과가 있었다고 볼 만합니다."
+                elif z >= 0.5:
+                    verdict, vcolor, vsay = "다소 강함", "#B8E6C8", "평소보다 조금 높지만 단정하기엔 약합니다."
+                elif z > -0.5:
+                    verdict, vcolor, vsay = "평소와 차이 없음", "#C7CFDF", "평소 변동 범위 안입니다 — 효과가 있었는지 판별되지 않습니다."
+                else:
+                    verdict, vcolor, vsay = "평소보다 부진", "#9DB2D9", "평소보다 오히려 낮습니다 — 이번 캠페인 주간의 순유입은 평소만 못했습니다."
+                base_txt = (f'이 ETF 평소 DiD {sc["base_mean"]:+.2f}%p ± {sc["base_std"]:.2f}%p ({sc["n_hist"]}주)'
+                            if sc.get("base_mean") is not None else "")
                 st.markdown(
-                    f'<div class="did-result"><div class="did-result-label">DiD {sc["did"]:+.2f}%p · Z {sc["z"]:+.2f} → 마케팅 효과 점수</div>'
-                    f'<div class="did-result-val">{score:.0f}점 <span style="font-size:0.9rem;opacity:0.7;">/ 100 · {verdict}</span></div>'
-                    f'<div class="score-track"><div class="score-fill" style="width:{score}%;"></div></div>'
-                    f'<div class="did-result-note">시장 공통 효과 제거 후 순수 마케팅 효과 — 과거 {D.ZSCORE_WINDOW}주 분포 대비 상대 위치</div></div>',
+                    f'<div class="did-result">'
+                    f'<div class="did-result-label">DiD {sc["did"]:+.2f}%p · {base_txt}</div>'
+                    f'<div class="did-result-val">{score:.0f}점 '
+                    f'<span style="font-size:0.9rem;opacity:0.75;">/ 100 · {verdict}</span></div>'
+                    f'<div class="score-track" style="position:relative;">'
+                    f'<div class="score-fill" style="width:{score}%;background:{vcolor};"></div>'
+                    f'<div style="position:absolute;left:50%;top:-3px;width:2px;height:calc(100% + 6px);'
+                    f'background:rgba(255,255,255,0.85);"></div></div>'
+                    f'<div style="display:flex;justify-content:space-between;font-size:0.6rem;opacity:0.6;margin-top:3px;">'
+                    f'<span>0 · 평소보다 낮음</span><span>50 · 평소와 같음</span><span>100 · 평소보다 높음</span></div>'
+                    f'<div class="did-result-note">{vsay}</div></div>',
                     unsafe_allow_html=True,
                 )
+                with st.expander("점수 해석 기준"):
+                    st.markdown(
+                        f"""
+**점수는 "이 ETF의 평소 DiD와 비교해 이번 주가 얼마나 달랐나"입니다.**
+절대적인 효과 크기가 아니라 **평소 대비 상대 위치**입니다.
+
+- **50점 = 평소와 똑같음** (기준선). 0점이 아니라 50점이 "효과 없음"입니다.
+- 점수는 Z(표준편차 배수)를 0~100으로 변환한 값입니다.
+
+| 점수 | Z | 판정 | 의미 |
+|---|---|---|---|
+| 84점 이상 | +1.65σ 이상 | 이례적으로 강함 | 평소 분포의 상위 5% |
+| 73~84점 | +1.0σ 이상 | 평소보다 강함 | 효과가 있었다고 볼 만함 |
+| 62~73점 | +0.5σ 이상 | 다소 강함 | 방향은 긍정, 단정은 이름 |
+| 38~62점 | ±0.5σ 이내 | 평소와 차이 없음 | 판별 불가 |
+| 38점 미만 | −0.5σ 이하 | 평소보다 부진 | 평소만 못함 |
+
+**주의** — 기준이 되는 "평소"는 해당 ETF 자신의 과거 {D.ZSCORE_WINDOW}주 DiD 분포입니다.
+따라서 평소에도 마케팅을 자주 한 ETF는 기준선이 높아 점수가 짜게 나옵니다.
+마케팅을 한 적 없는 ETF들과 비교하는 절대 기준선은 별도 작업(귀무분포)이 필요합니다.
+                        """
+                    )
             else:
                 st.markdown(
                     f'<div class="did-result"><div class="did-result-label">DiD (점수화 불가)</div>'

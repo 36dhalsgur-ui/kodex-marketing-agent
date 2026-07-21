@@ -722,6 +722,10 @@ def did_score(series: pd.DataFrame, week: str) -> dict:
         z = (result["did"] - hist.mean()) / hist.std()
         result["z"] = round(float(z), 2)
         result["score"] = round(100 / (1 + math.exp(-z)), 1)
+        # 해석용 기준값 — '평소'가 실제로 몇 %p인지 보여주기 위해 함께 반환
+        result["base_mean"] = round(float(hist.mean()), 2)
+        result["base_std"] = round(float(hist.std()), 2)
+        result["n_hist"] = int(len(hist))
     else:
         result["fallback"] = f"이력 {len(hist)}주 — Z-score 산출에 부족(최소 4주), DiD 원값만 제공"
     return result
