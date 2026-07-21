@@ -21,7 +21,7 @@ import data as D
 # 배포 환경 핫리로드 시 data 모듈이 구버전으로 캐시되면 필수 함수가 없어
 # 앱 전체가 죽는다 — 필수 속성 누락 시 강제 재로드로 자가 복구한다.
 _REQUIRED_ATTRS = (
-    "kodex_etfs", "control_group", "did_series", "did_score",
+    "kodex_etfs", "control_group", "did_series", "did_score", "detect_marketing_events",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
@@ -1176,25 +1176,85 @@ with tab_did:
     section_header(
         "STEP 3 · MEASURE",
         "마케팅 효과 측정 — DiD 인과분석",
-        "②에서 감지한 KODEX 마케팅이 실제 순매수에 미친 효과를 검증합니다. "
-        "처치군은 KODEX ETF 고정, 대조군은 동일 테마 경쟁 ETF 평균 — 8주 베이스라인 · Z-score → 0~100점.",
+        "②에서 실제로 감지된 마케팅만 분석 대상입니다. 개입 시점(집행 주차)을 기준으로 "
+        "처치군 KODEX ETF와 동일 테마 경쟁 ETF 평균을 비교해 시장효과를 제거합니다.",
     )
     st.write("")
 
-    c_sel1, c_sel2 = st.columns([5, 7], gap="large")
-    with c_sel1:
-        treat = st.selectbox("처치군 — 마케팅한 KODEX ETF", D.kodex_etfs(),
-                             index=D.kodex_etfs().index("KODEX 미국반도체"))
-    auto_controls = D.control_group(treat)
-    with c_sel2:
-        controls = st.multiselect(
-            "대조군 — 동일 테마 경쟁 ETF (자동 매핑, 수정 가능)",
-            options=sorted(n for n, _, i in D.ETF_UNIVERSE if i != "KODEX"),
-            default=auto_controls,
+    # ── 마케팅 이벤트 탐지 — 채널 수집물(배너·유튜브·블로그)이 지목한 ETF = 처치
+    _kodex_banners = [
+        dict(b, date=ch_data.get("asof", ""))
+        for br in ch_data.get("brands", []) if br.get("브랜드") == "KODEX"
+        for b in br.get("배너", [])
+    ]
+    events = D.detect_marketing_events(
+        _kodex_banners, youtube.get("KODEX", []), blogs.get("KODEX", []))
+    usable = [e for e in events if e["분석가능"]]
+
+    CH_ICON = {"홈페이지": "#6B4FBB", "유튜브": "#C2333F", "블로그": "#1E7A55"}
+
+    st.markdown(
+        f'<div class="sec-tag">DETECTED CAMPAIGNS</div>'
+        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">감지된 마케팅 이벤트 '
+        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">채널 수집물이 특정 ETF를 지목한 건 = DiD의 처치</span></div>'
+        f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
+        f'총 {len(events)}건 감지 · 순매수 데이터가 있어 분석 가능한 건 {len(usable)}건</div>',
+        unsafe_allow_html=True,
+    )
+    if events:
+        ev_rows = ""
+        for e in events[:8]:
+            dot = CH_ICON.get(e["채널"], "#98A2B3")
+            ok = ('<span style="font-size:0.68rem;font-weight:700;color:#1E7A55;">분석 가능</span>'
+                  if e["분석가능"] else
+                  f'<span style="font-size:0.68rem;color:{GRAY};">순매수 미연동</span>')
+            ev_rows += (
+                f'<a class="kw-link" href="{e["링크"]}" target="_blank"><div class="kw-row" style="align-items:center;">'
+                f'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:9px;"></span>'
+                f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
+                f'border-radius:5px;padding:2px 7px;margin-right:9px;white-space:nowrap;">{e["채널"]}</span>'
+                f'<span class="kw-name" style="flex:1;font-size:0.83rem;font-weight:700;">{e["표기명"]}</span>'
+                f'<span style="font-size:0.75rem;color:#475467;margin:0 10px;white-space:nowrap;">{e["주차"]}</span>'
+                f'{ok}</div></a>'
+            )
+        st.markdown(f'<div class="card" style="padding:8px 16px;">{ev_rows}</div>', unsafe_allow_html=True)
+    else:
+        st.info("감지된 마케팅 이벤트가 없습니다 — 채널 모니터링 수집물에서 ETF를 지목한 콘텐츠를 찾지 못했습니다.")
+    st.write("")
+
+    # ── 분석할 이벤트 선택 (처치 ETF + 개입 주차가 함께 결정된다)
+    manual_mode = False
+    if usable:
+        labels = [f'{e["표기명"]} · {e["주차"]} · {e["채널"]}' for e in usable]
+        pick = st.selectbox("분석할 마케팅 이벤트", labels,
+                            help="선택한 이벤트의 ETF가 처치군, 집행 주차가 개입 시점이 됩니다")
+        ev = usable[labels.index(pick)]
+        treat, event_week = ev["ETF"], ev["주차"]
+    else:
+        st.warning(
+            "분석 가능한 이벤트가 없습니다 — 감지된 마케팅 ETF들이 순매수 유니버스에 없습니다. "
+            "실제 KODEX 라인업·순매수 실데이터를 연동하면 해소됩니다. 아래는 수동 지정 모드입니다."
         )
+        manual_mode = True
+        treat = st.selectbox("처치군 — 마케팅한 KODEX ETF (수동)", D.kodex_etfs())
+        event_week = sel_week
+
+    weeks_avail = list(dict.fromkeys(netbuy_df["주차"]))
+    if event_week not in weeks_avail:   # 순매수 데이터에 없는 주차면 최신 주차로 대체
+        event_week = weeks_avail[-1]
+
+    auto_controls = D.control_group(treat)
+    controls = st.multiselect(
+        "대조군 — 동일 테마 경쟁 ETF (자동 매핑, 수정 가능)",
+        options=sorted(n for n, _, i in D.ETF_UNIVERSE if i != "KODEX"),
+        default=auto_controls,
+    )
+    st.caption(f"처치군 **{treat}** · 개입 주차 **{event_week}**"
+               + ("  (수동 지정 — 실제 마케팅 여부는 검증되지 않음)" if manual_mode
+                  else "  (감지된 마케팅 집행 시점 기준)"))
 
     series = D.did_series(netbuy_df, treat, controls)
-    sc = D.did_score(series, sel_week)
+    sc = D.did_score(series, event_week)
 
     d1, d2 = st.columns([7, 5], gap="large")
     with d1:
@@ -1269,10 +1329,10 @@ with tab_did:
         fig_did = go.Figure()
         fig_did.add_trace(go.Bar(
             x=series["주차"], y=series["DiD"], name="DiD",
-            marker_color=[NAVY if w == sel_week else "#C7CFDF" for w in series["주차"]],
+            marker_color=[NAVY if w == event_week else "#C7CFDF" for w in series["주차"]],
         ))
         fig_did = base_layout(fig_did, height=220)
-        fig_did.update_layout(title=dict(text="주차별 DiD 추이", font=dict(size=14)),
+        fig_did.update_layout(title=dict(text=f"주차별 DiD 추이 (진한 막대 = 개입 주차 {event_week})", font=dict(size=14)),
                               margin=dict(l=10, r=10, t=40, b=10))
         fig_did.update_yaxes(ticksuffix="%p")
         st.plotly_chart(fig_did, use_container_width=True)
@@ -1304,7 +1364,7 @@ with tab_report:
 
     st.markdown(
         f'<div class="card" style="background:{NAVY};border:none;color:white;">'
-        f'<div class="did-result-label" style="margin-bottom:10px;">EXECUTIVE SUMMARY · {sel_week}</div>'
+        f'<div class="did-result-label" style="margin-bottom:10px;">EXECUTIVE SUMMARY · {event_week}</div>'
         + "".join(
             f'<div style="font-size:0.92rem;font-weight:600;line-height:1.7;">{i+1}. {s}</div>'
             for i, s in enumerate(ins["summary"])

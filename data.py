@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import math
 import os
+import re
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
@@ -539,6 +540,60 @@ def fetch_datalab(client_id: str | None = None, client_secret: str | None = None
 LAPLACE_ALPHA = 10.0   # 억원 — 소형 ETF 변화율 폭발 방지
 BASELINE_WEEKS = 8
 ZSCORE_WINDOW = 15     # 권장 15주 (데이터 부족 시 가용 주차 사용)
+
+
+# ── 마케팅 이벤트 탐지 — DiD의 '처치'를 채널 수집물에서 정의한다 ──────────
+# 배너·유튜브·블로그 제목이 특정 ETF를 지목하면 그 주차를 개입 시점으로 본다.
+# ETF명 매칭은 '정확일치'만 허용 — 부분일치를 허용하면
+# 'KODEX 200커버드콜액티브'가 별개 상품인 'KODEX 200'에 붙어 분석이 오염된다(실측 확인).
+_ETF_MENTION = re.compile(r"KODEX\s+[가-힣A-Za-z0-9&\+\.]+(?:\s*[가-힣A-Za-z0-9&\+\.]+)?")
+
+
+def _norm_etf(name: str) -> str:
+    return re.sub(r"[\s·\-]|ETF", "", name).upper()
+
+
+def week_label_of(date_str: str) -> str:
+    """ISO 날짜 → 주차 라벨('7월 3주'). week_labels()와 동일 규칙."""
+    try:
+        d = dt.date.fromisoformat(date_str[:10])
+    except Exception:
+        return ""
+    return f"{d.month}월 {(d.day - 1) // 7 + 1}주"
+
+
+def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list[dict],
+                            universe: list[str] | None = None) -> list[dict]:
+    """채널 수집물에서 ETF를 지목한 마케팅 이벤트를 추출.
+
+    반환: [{ETF, 표기명, 주차, date, 채널, 제목, 링크, 분석가능}] — 날짜 내림차순.
+    분석가능=False는 순매수 유니버스에 없는 ETF(=DiD 계산 불가, 데이터 연동 필요)."""
+    uni = {_norm_etf(n): n for n in (universe if universe is not None else kodex_etfs())}
+    src = []
+    for b in banners or []:
+        src.append(("홈페이지", b.get("제목", ""), b.get("링크", ""), b.get("date", "")))
+    for v in videos or []:
+        src.append(("유튜브", v.get("title", ""), v.get("url", ""), v.get("published", "")))
+    for p in posts or []:
+        src.append(("블로그", p.get("title", ""), p.get("link", ""), p.get("date", "")))
+
+    events = []
+    for channel, title, link, date in src:
+        m = _ETF_MENTION.search(title or "")
+        if not m:
+            continue
+        raw = re.sub(r"\s*ETF\s*$", "", m.group(0).strip())
+        tail = raw[len("KODEX"):].strip()
+        if len(tail) < 2 or tail.startswith("ETF"):
+            continue  # 'KODEX ETF가 제안하는' 같은 브랜드 일반 언급은 제외
+        matched = uni.get(_norm_etf(raw))
+        events.append({
+            "ETF": matched or raw, "표기명": raw, "채널": channel,
+            "제목": title, "링크": link, "date": (date or "")[:10],
+            "주차": week_label_of(date or ""), "분석가능": matched is not None,
+        })
+    events.sort(key=lambda e: e["date"], reverse=True)
+    return events
 
 
 def kodex_etfs() -> list[str]:
