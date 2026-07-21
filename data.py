@@ -339,6 +339,63 @@ def fetch_youtube(n_per_channel: int = 3) -> dict[str, list[dict]]:
 
 
 # ══════════════════════════════════════════════
+# 공식 블로그 (네이버 블로그 RSS + KODEX 워드프레스 RSS) — 키 불필요
+# ID 출처: 각 사 공식 홈페이지 푸터 (2026-07 실측)
+# ══════════════════════════════════════════════
+BRAND_BLOGS = {
+    "KODEX": "https://samsungfundblog.com/feed",          # 자체 블로그 (워드프레스)
+    "TIGER": "https://blog.rss.naver.com/m_invest.xml",
+    "ACE": "https://blog.rss.naver.com/aceetf.xml",
+    "SOL": "https://blog.rss.naver.com/soletf.xml",
+    "RISE": "https://blog.rss.naver.com/riseetf.xml",
+    "PLUS": "https://blog.rss.naver.com/hanwhaasset.xml",
+    "HANARO": "https://blog.rss.naver.com/hanaro_etf.xml",
+    "TIMEFOLIO": "https://blog.rss.naver.com/timefolioetf.xml",
+}
+
+_RSS_MONTH = {m: i + 1 for i, m in enumerate(
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])}
+
+
+def _rss_date(pub: str) -> str:
+    """'Tue, 14 Jul 2026 06:50:03 +0000' → '2026-07-14'. 실패 시 빈 문자열."""
+    try:
+        parts = pub.strip().split()
+        d, mon, y = int(parts[1]), _RSS_MONTH[parts[2]], int(parts[3])
+        return f"{y:04d}-{mon:02d}-{d:02d}"
+    except Exception:
+        return ""
+
+
+def _fetch_blog(brand: str, url: str, n: int = 6) -> list[dict]:
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+    root = ET.fromstring(r.content)
+    posts = []
+    for item in root.iter("item"):
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        date_s = _rss_date(item.findtext("pubDate") or "")
+        if title:
+            posts.append({"brand": brand, "title": title, "link": link, "date": date_s})
+        if len(posts) >= n:
+            break
+    return posts
+
+
+def fetch_blogs(n_per_blog: int = 6) -> dict[str, list[dict]]:
+    """8개 브랜드 공식 블로그 최신 글을 병렬 수집. 실패 브랜드는 빈 리스트."""
+    out: dict[str, list[dict]] = {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(_fetch_blog, b, u, n_per_blog): b for b, u in BRAND_BLOGS.items()}
+        for fut, brand in futures.items():
+            try:
+                out[brand] = fut.result()
+            except Exception:
+                out[brand] = []
+    return out
+
+
+# ══════════════════════════════════════════════
 # 네이버 데이터랩 검색 트렌드
 # NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 설정 시 실데이터, 미설정 시 데모
 # ══════════════════════════════════════════════
@@ -366,7 +423,8 @@ def fetch_datalab(client_id: str | None = None, client_secret: str | None = None
     if not (cid and csec):
         return _demo_datalab(), False
     try:
-        end = dt.date.today()
+        today = dt.date.today()
+        end = today - dt.timedelta(days=today.weekday() + 1)  # 지난 일요일 — 미완결 주가 0 근처로 꺾여 보이는 왜곡 방지
         start = end - dt.timedelta(weeks=12)
         body = {
             "startDate": start.isoformat(),

@@ -23,7 +23,7 @@ import data as D
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
-    "NEWS_KW_PATTERNS",
+    "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS",
     "theme_signal_board", "demo_theme_flows", "signal_label",
     "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
 )
@@ -311,7 +311,12 @@ def load_theme_returns():
 
 @st.cache_data(ttl=1800)
 def load_youtube():
-    return D.fetch_youtube(n_per_channel=3)
+    return D.fetch_youtube(n_per_channel=8)
+
+
+@st.cache_data(ttl=1800)
+def load_blogs():
+    return D.fetch_blogs(n_per_blog=6)
 
 
 @st.cache_data
@@ -888,106 +893,232 @@ with tab_trend:
         elif wk_rows:
             st.info("주간 수급 데이터가 없습니다 — 배치 재실행 후 표시됩니다.")
 
-    st.write("")
-    live_badge = "실데이터" if datalab_live else "데모 — NAVER_CLIENT_ID/SECRET 설정 시 실데이터"
-    st.markdown(
-        f'<div class="sec-tag">NAVER DATALAB</div>'
-        f'<div style="font-size:1.02rem;font-weight:800;">브랜드 검색량 트렌드 <span style="font-size:0.7rem;color:{FAINT};font-weight:600;">({live_badge})</span></div>',
-        unsafe_allow_html=True,
-    )
-    fig_dl = go.Figure()
-    palette = {"KODEX": NAVY, "TIGER": "#E88D2A", "ACE": "#C0392B", "RISE": "#C89312", "ETF": "#A5B1C9"}
-    for g in D.DATALAB_GROUPS:
-        sub = datalab_df[datalab_df["group"] == g]
-        fig_dl.add_trace(go.Scatter(
-            x=sub["date"], y=sub["ratio"], name=g, mode="lines",
-            line=dict(color=palette.get(g, "#888"), width=2.5 if g == "KODEX" else 1.6),
-        ))
-    fig_dl = base_layout(fig_dl, height=300)
-    fig_dl.update_layout(yaxis_title="검색량 지수")
-    st.plotly_chart(fig_dl, use_container_width=True)
 
 # ──────────────────────────────────────────────
-# ② 채널 모니터링 — 유튜브(실썸네일) + 뉴스
+# ② 채널 모니터링 — 캠페인 보드(배너 배치) + 유튜브·블로그·뉴스
 # ──────────────────────────────────────────────
 with tab_channel:
     st.write("")
-    section_header("STEP 2 · MONITOR", "채널 모니터링", "8개 ETF 브랜드의 유튜브 최신 콘텐츠와 뉴스 이슈를 수집합니다. 여기서 감지된 마케팅이 ③ 효과 측정의 입력이 됩니다.")
+    section_header("STEP 2 · MONITOR", "채널 모니터링", "경쟁 운용사가 지금 무엇을 밀고 있는지 — 공식 홈페이지 배너·유튜브·블로그·뉴스를 수집합니다. 여기서 감지된 마케팅이 ③ 효과 측정의 입력이 됩니다.")
     st.write("")
 
-    st.markdown('<div class="sec-tag">YOUTUBE · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">브랜드 유튜브 최신 영상</div>', unsafe_allow_html=True)
+    blogs = load_blogs()
+    _week_ago = (dt.date.today() - dt.timedelta(days=7)).isoformat()
 
-    def yt_video_card(v: dict) -> str:
-        views = f"{v['views']:,}회" if v["views"] else "조회수 비공개"
-        return (
-            f'<div class="yt-card"><a class="yt-real-thumb" href="{v["url"]}" target="_blank">'
-            f'<img src="{v["thumbnail"]}" alt="thumbnail" loading="lazy">'
-            f'<span class="yt-brand-chip">{v["brand"]}</span></a>'
-            f'<div class="yt-body"><a class="yt-title" href="{v["url"]}" target="_blank">{v["title"]}</a>'
-            f'<div class="yt-meta">{views} · {v["published"]}</div></div></div>'
+    # ── 경쟁사 캠페인 보드 — 주간 배치(data/channel_board.json) + RSS 실시간
+    ch_file = Path(__file__).parent / "data" / "channel_board.json"
+    try:
+        ch_data = json.loads(ch_file.read_text()) if ch_file.exists() else {}
+    except Exception:
+        ch_data = {}
+    ch_brands = {b["브랜드"]: b for b in ch_data.get("brands", [])}
+
+    def brand_themes(brand: str) -> str:
+        """배너·영상·블로그 제목에서 테마 키워드 매칭 (뉴스 소재함과 동일한 사전)."""
+        texts = [x["제목"] for x in ch_brands.get(brand, {}).get("배너", [])]
+        texts += [v["title"] for v in youtube.get(brand, [])[:5]]
+        texts += [p["title"] for p in blogs.get(brand, [])[:5]]
+        found = []
+        for kw, pat in getattr(D, "NEWS_KW_PATTERNS", []):
+            if any(re.search(pat, t) for t in texts):
+                found.append(kw)
+            if len(found) >= 3:
+                break
+        return " · ".join(found) if found else "—"
+
+    if ch_brands:
+        st.markdown(
+            f'<div class="sec-tag">CAMPAIGN BOARD</div>'
+            f'<div style="font-size:1.02rem;font-weight:800;">경쟁사 캠페인 보드 '
+            f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">공식 홈페이지 배너({ch_data.get("asof", "")} 수집) · 유튜브·블로그 실시간 · '
+            f'<span style="color:#C2333F;">NEW</span> = 전주에 없던 배너</span></div>',
+            unsafe_allow_html=True,
         )
-
-    latest = [vids[0] for vids in youtube.values() if vids]
-    if latest:
-        for row_start in range(0, len(latest), 4):
-            cols = st.columns(4, gap="medium")
-            for col, v in zip(cols, latest[row_start : row_start + 4]):
-                col.markdown(yt_video_card(v), unsafe_allow_html=True)
-            st.write("")
-        all_videos = [v for vids in youtube.values() for v in vids]
-        top_view = sorted(all_videos, key=lambda v: -v["views"])[:8]
-        with st.expander("조회수 TOP 8 전체 보기"):
-            for row_start in range(0, len(top_view), 4):
-                cols = st.columns(4, gap="medium")
-                for col, v in zip(cols, top_view[row_start : row_start + 4]):
-                    col.markdown(yt_video_card(v), unsafe_allow_html=True)
-        st.caption("유튜브 채널 RSS 실시간 수집 (30분 캐시) · API 키 없이 동작, YOUTUBE_API_KEY 설정 시 좋아요·댓글 확장 가능")
-    else:
-        st.info("유튜브 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
-
-    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    st.markdown('<div class="sec-tag">NEWS</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">운용사 뉴스 이슈</div>', unsafe_allow_html=True)
-
-    BRAND_STYLE = {
-        "KODEX": "linear-gradient(135deg,#16244D 0%,#3B5BA5 100%)",
-        "TIGER": "linear-gradient(135deg,#B45309 0%,#E88D2A 100%)",
-        "ACE": "linear-gradient(135deg,#7F1D1D 0%,#C0392B 100%)",
-        "SOL": "linear-gradient(135deg,#1E40AF 0%,#3B82F6 100%)",
-        "HANARO": "linear-gradient(135deg,#166534 0%,#34B364 100%)",
-        "RISE": "linear-gradient(135deg,#854D0E 0%,#C89312 100%)",
-        "PLUS": "linear-gradient(135deg,#9A3412 0%,#D9480F 100%)",
-        "TIMEFOLIO": "linear-gradient(135deg,#1F2937 0%,#4B5563 100%)",
-    }
-
-    def issuer_card(issuer: str) -> str:
-        entries = [
-            n if isinstance(n, dict) else {"title": n, "url": news_link(f"{issuer} ETF")}
-            for n in D.ISSUER_NEWS[issuer]
-        ]
-        primary = entries[0]
-        tag = primary["title"].split("—")[0].split(",")[0].strip()
-        tag = tag if len(tag) <= 26 else tag[:25] + "…"
-        grad = BRAND_STYLE.get(issuer, BRAND_STYLE["TIMEFOLIO"])
-        html = (
-            f'<div class="yt-card">'
-            f'<a class="yt-thumb" href="{primary["url"]}" target="_blank" style="background:{grad};">'
-            f'<span class="yt-chip">NEWS BRIEF</span>'
-            f'<span><span class="yt-brand">{issuer}</span>'
-            f'<div class="yt-tag">{tag}</div></span></a>'
-            f'<div class="yt-body">'
-            f'<a class="yt-title" href="{primary["url"]}" target="_blank">{primary["title"]}</a>'
+        rows_html = ""
+        for brand in D.ISSUERS:
+            info = ch_brands.get(brand, {})
+            banners = info.get("배너", [])
+            main_b = banners[0] if banners else None
+            new_tag = ('<span style="font-size:0.62rem;font-weight:800;color:#fff;background:#D63C48;'
+                       'border-radius:4px;padding:1px 5px;margin-left:6px;">NEW</span>'
+                       if main_b and main_b.get("NEW") else "")
+            main_html = (
+                f'<a href="{main_b["링크"]}" target="_blank" style="color:{INK};text-decoration:none;">'
+                f'{main_b["제목"][:52]}</a>{new_tag}' if main_b else
+                f'<span style="color:{GRAY};">{info.get("비고", "수집 없음")}</span>'
+            )
+            yt_n = sum(1 for v in youtube.get(brand, []) if v.get("published", "") >= _week_ago)
+            bl_n = sum(1 for p in blogs.get(brand, []) if p.get("date", "") >= _week_ago)
+            rows_html += (
+                f'<tr><td style="font-weight:800;white-space:nowrap;">{brand}</td>'
+                f'<td style="font-size:0.82rem;">{main_html}</td>'
+                f'<td style="text-align:center;">{yt_n or "–"}</td>'
+                f'<td style="text-align:center;">{bl_n or "–"}</td>'
+                f'<td style="font-size:0.78rem;color:#475467;white-space:nowrap;">{brand_themes(brand)}</td></tr>'
+            )
+        st.markdown(
+            '<div class="card" style="padding:6px 16px 10px;">'
+            '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">'
+            '<thead><tr style="color:#667085;font-size:0.72rem;border-bottom:1px solid #E4E7EC;">'
+            '<th style="text-align:left;padding:8px 4px;">브랜드</th>'
+            '<th style="text-align:left;padding:8px 4px;">메인 배너 (지금 밀고 있는 캠페인)</th>'
+            '<th style="padding:8px 4px;">유튜브<br>이번 주</th>'
+            '<th style="padding:8px 4px;">블로그<br>이번 주</th>'
+            '<th style="text-align:left;padding:8px 4px;">콘텐츠 테마</th></tr></thead>'
+            f'<tbody>{rows_html}</tbody></table>'
+            f'<div style="font-size:0.7rem;color:{GRAY};margin-top:6px;">'
+            '메인 배너 = 각 사 공식 홈페이지 첫 번째 배너 (클릭 시 해당 페이지). '
+            '유튜브·블로그 수치는 최근 7일 게시물 수. 테마는 배너·영상·글 제목의 키워드 매칭입니다.</div></div>',
+            unsafe_allow_html=True,
         )
-        if len(entries) > 1:
-            html += f'<a class="yt-sub" href="{entries[1]["url"]}" target="_blank">{entries[1]["title"]} ↗</a>'
-        html += "</div></div>"
-        return html
-
-    issuer_list = getattr(D, "ISSUERS", list(D.ISSUER_NEWS.keys()))
-    for row_start in range(0, len(issuer_list), 4):
-        row_cols = st.columns(4, gap="medium")
-        for col, issuer in zip(row_cols, issuer_list[row_start : row_start + 4]):
-            col.markdown(issuer_card(issuer), unsafe_allow_html=True)
         st.write("")
+    else:
+        st.info("캠페인 보드 데이터가 없습니다 — 로컬에서 `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
+
+    grp_amc, grp_sec, grp_bank = st.tabs(["운용사 (경쟁사)", "증권 (판매채널)", "은행 (판매채널)"])
+
+    with grp_sec:
+        st.info("증권사 5개 채널(키움·토스증권·미래에셋·삼성·한국투자)의 유튜브·블로그 수집 예정 — 채널 ID 확보 후 제공됩니다. ETF 관련 콘텐츠만 필터링해 통합 피드로 표시할 계획입니다.")
+    with grp_bank:
+        st.info("은행 4개 채널(KB국민·신한·하나·NH농협)의 유튜브·블로그 수집 예정 — 퇴직연금(IRP)·신탁 맥락의 ETF 콘텐츠를 모니터링합니다.")
+
+    with grp_amc:
+        st.write("")
+        # ── 배너·캠페인 상세
+        if ch_brands:
+            st.markdown('<div class="sec-tag">HOMEPAGE BANNERS</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">홈페이지 배너·캠페인 상세</div>', unsafe_allow_html=True)
+            bcols = st.columns(4, gap="medium")
+            for i, brand in enumerate(D.ISSUERS):
+                banners = ch_brands.get(brand, {}).get("배너", [])
+                items = "".join(
+                    f'<a href="{b["링크"]}" target="_blank" style="display:block;font-size:0.78rem;color:#374151;'
+                    f'text-decoration:none;padding:3px 0;border-bottom:1px solid #F5F6FA;">'
+                    + ('<span style="color:#D63C48;font-weight:800;">NEW </span>' if b.get("NEW") else "")
+                    + f'{b["제목"][:48]}</a>'
+                    for b in banners[:4]
+                ) or f'<div style="font-size:0.75rem;color:{GRAY};">수집된 배너 없음</div>'
+                bcols[i % 4].markdown(
+                    f'<div class="card" style="padding:12px 14px;margin-bottom:12px;">'
+                    f'<div style="font-weight:800;font-size:0.9rem;margin-bottom:4px;">{brand}</div>{items}</div>',
+                    unsafe_allow_html=True,
+                )
+            st.write("")
+
+        st.markdown('<div class="sec-tag">YOUTUBE · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">브랜드 유튜브 최신 영상</div>', unsafe_allow_html=True)
+
+        def yt_video_card(v: dict) -> str:
+            views = f"{v['views']:,}회" if v["views"] else "조회수 비공개"
+            return (
+                f'<div class="yt-card"><a class="yt-real-thumb" href="{v["url"]}" target="_blank">'
+                f'<img src="{v["thumbnail"]}" alt="thumbnail" loading="lazy">'
+                f'<span class="yt-brand-chip">{v["brand"]}</span></a>'
+                f'<div class="yt-body"><a class="yt-title" href="{v["url"]}" target="_blank">{v["title"]}</a>'
+                f'<div class="yt-meta">{views} · {v["published"]}</div></div></div>'
+            )
+
+        latest = [vids[0] for vids in youtube.values() if vids]
+        if latest:
+            for row_start in range(0, len(latest), 4):
+                cols = st.columns(4, gap="medium")
+                for col, v in zip(cols, latest[row_start : row_start + 4]):
+                    col.markdown(yt_video_card(v), unsafe_allow_html=True)
+                st.write("")
+            all_videos = [v for vids in youtube.values() for v in vids]
+            top_view = sorted(all_videos, key=lambda v: -v["views"])[:8]
+            with st.expander("조회수 TOP 8 전체 보기"):
+                for row_start in range(0, len(top_view), 4):
+                    cols = st.columns(4, gap="medium")
+                    for col, v in zip(cols, top_view[row_start : row_start + 4]):
+                        col.markdown(yt_video_card(v), unsafe_allow_html=True)
+            st.caption("유튜브 채널 RSS 실시간 수집 (30분 캐시) · API 키 없이 동작, YOUTUBE_API_KEY 설정 시 좋아요·댓글 확장 가능")
+        else:
+            st.info("유튜브 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
+
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        st.markdown('<div class="sec-tag">NEWS</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">운용사 뉴스 이슈</div>', unsafe_allow_html=True)
+
+        BRAND_STYLE = {
+            "KODEX": "linear-gradient(135deg,#16244D 0%,#3B5BA5 100%)",
+            "TIGER": "linear-gradient(135deg,#B45309 0%,#E88D2A 100%)",
+            "ACE": "linear-gradient(135deg,#7F1D1D 0%,#C0392B 100%)",
+            "SOL": "linear-gradient(135deg,#1E40AF 0%,#3B82F6 100%)",
+            "HANARO": "linear-gradient(135deg,#166534 0%,#34B364 100%)",
+            "RISE": "linear-gradient(135deg,#854D0E 0%,#C89312 100%)",
+            "PLUS": "linear-gradient(135deg,#9A3412 0%,#D9480F 100%)",
+            "TIMEFOLIO": "linear-gradient(135deg,#1F2937 0%,#4B5563 100%)",
+        }
+
+        def issuer_card(issuer: str) -> str:
+            entries = [
+                n if isinstance(n, dict) else {"title": n, "url": news_link(f"{issuer} ETF")}
+                for n in D.ISSUER_NEWS[issuer]
+            ]
+            primary = entries[0]
+            tag = primary["title"].split("—")[0].split(",")[0].strip()
+            tag = tag if len(tag) <= 26 else tag[:25] + "…"
+            grad = BRAND_STYLE.get(issuer, BRAND_STYLE["TIMEFOLIO"])
+            html = (
+                f'<div class="yt-card">'
+                f'<a class="yt-thumb" href="{primary["url"]}" target="_blank" style="background:{grad};">'
+                f'<span class="yt-chip">NEWS BRIEF</span>'
+                f'<span><span class="yt-brand">{issuer}</span>'
+                f'<div class="yt-tag">{tag}</div></span></a>'
+                f'<div class="yt-body">'
+                f'<a class="yt-title" href="{primary["url"]}" target="_blank">{primary["title"]}</a>'
+            )
+            if len(entries) > 1:
+                html += f'<a class="yt-sub" href="{entries[1]["url"]}" target="_blank">{entries[1]["title"]} ↗</a>'
+            html += "</div></div>"
+            return html
+
+        issuer_list = getattr(D, "ISSUERS", list(D.ISSUER_NEWS.keys()))
+        for row_start in range(0, len(issuer_list), 4):
+            row_cols = st.columns(4, gap="medium")
+            for col, issuer in zip(row_cols, issuer_list[row_start : row_start + 4]):
+                col.markdown(issuer_card(issuer), unsafe_allow_html=True)
+            st.write("")
+
+        # ── 공식 블로그 최근 글
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        st.markdown('<div class="sec-tag">BLOG · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">공식 블로그 최근 글</div>', unsafe_allow_html=True)
+        if any(blogs.values()):
+            blog_cols = st.columns(2, gap="large")
+            for i, brand in enumerate(D.ISSUERS):
+                posts = blogs.get(brand, [])[:3]
+                items = "".join(
+                    f'<a class="kw-link" href="{p["link"]}" target="_blank"><div class="kw-row">'
+                    f'<span class="kw-name" style="font-size:0.82rem;font-weight:600;">{p["title"][:46]}</span>'
+                    f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;">{p["date"]}</span></div></a>'
+                    for p in posts
+                ) or f'<div style="font-size:0.75rem;color:{GRAY};padding:4px 0;">수집 실패 또는 게시물 없음</div>'
+                blog_cols[i % 2].markdown(
+                    f'<div class="card" style="padding:10px 16px;margin-bottom:12px;">'
+                    f'<div class="card-title" style="margin-bottom:2px;">{brand}</div>{items}</div>',
+                    unsafe_allow_html=True,
+                )
+            st.caption("네이버 블로그 RSS 실시간 수집 (30분 캐시) · KODEX는 자체 블로그(samsungfundblog.com)")
+        else:
+            st.info("블로그 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
+
+        # ── 브랜드 검색량 (캠페인 → 관심 반응 확인)
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        live_badge = "실데이터" if datalab_live else "데모 — NAVER_CLIENT_ID/SECRET 설정 시 실데이터"
+        st.markdown(
+            f'<div class="sec-tag">NAVER DATALAB</div>'
+            f'<div style="font-size:1.02rem;font-weight:800;">브랜드 검색량 트렌드 <span style="font-size:0.7rem;color:{FAINT};font-weight:600;">({live_badge}) — 위 캠페인·콘텐츠가 실제 관심으로 이어졌는지 확인</span></div>',
+            unsafe_allow_html=True,
+        )
+        fig_dl = go.Figure()
+        palette = {"KODEX": NAVY, "TIGER": "#E88D2A", "ACE": "#C0392B", "RISE": "#C89312"}
+        for g in D.DATALAB_GROUPS:
+            sub = datalab_df[datalab_df["group"] == g]
+            fig_dl.add_trace(go.Scatter(
+                x=sub["date"], y=sub["ratio"], name=g, mode="lines",
+                line=dict(color=palette.get(g, "#888"), width=2.5 if g == "KODEX" else 1.6),
+            ))
+        fig_dl = base_layout(fig_dl, height=300)
+        fig_dl.update_layout(yaxis_title="검색량 지수")
+        st.plotly_chart(fig_dl, use_container_width=True)
 
 # ──────────────────────────────────────────────
 # ③ 마케팅 효과 측정 — DiD (KODEX 중심 재설계)
