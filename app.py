@@ -25,7 +25,7 @@ _REQUIRED_ATTRS = (
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
-    "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
+    "DATALAB_GROUPS", "DATALAB_KEYWORDS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
 )
 if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
     D = importlib.reload(D)
@@ -347,7 +347,8 @@ def load_theme_search():
 
 
 @st.cache_data(ttl=3600)
-def load_datalab():
+def load_datalab(brands_sig: tuple = ()):
+    # brands_sig는 캐시 키 전용 — 브랜드 목록이 바뀌면 낡은 캐시를 자동 무효화한다
     cid = csec = None
     try:
         cid = st.secrets.get("NAVER_CLIENT_ID")
@@ -442,7 +443,7 @@ def build_did_board(df: pd.DataFrame, week: str) -> pd.DataFrame:
 
 did_board = build_did_board(netbuy_df, sel_week)
 youtube = load_youtube()
-datalab_df, datalab_live = load_datalab()
+datalab_df, datalab_live = load_datalab(tuple(D.DATALAB_GROUPS))
 
 # ──────────────────────────────────────────────
 # 헤더 + 지수 스트립 (2줄)
