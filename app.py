@@ -946,7 +946,7 @@ with tab_channel:
             f'</div></a>'
         )
 
-    grp_amc, grp_sec, grp_bank = st.tabs(["운용사 (경쟁사)", "증권 (판매채널)", "은행 (판매채널)"])
+    grp_amc, grp_sec, grp_bank = st.tabs(["운용사", "증권 (판매채널)", "은행 (판매채널)"])
 
     partners = load_partners()
 
@@ -1075,14 +1075,26 @@ with tab_channel:
         else:
             st.info("유튜브 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
 
-        # ── ③ 공식 블로그 — 최신 글 (전 브랜드 최신순 피드)
+        # ── ③ 공식 블로그 — 최신 글 (브랜드별 묶음)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
         st.markdown('<div class="sec-tag">BLOG · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">공식 블로그 — 최신 글</div>', unsafe_allow_html=True)
-        blog_feed = sorted((p for ps in blogs.values() for p in ps), key=lambda p: p.get("date", ""), reverse=True)
-        if blog_feed:
-            rows = "".join(feed_row(p["brand"], p["title"][:54], p["date"], p["link"]) for p in blog_feed[:16])
-            st.markdown(f'<div class="card" style="padding:8px 16px;">{rows}</div>', unsafe_allow_html=True)
-            st.caption("네이버 블로그 RSS 실시간 수집 (30분 캐시) · 전 브랜드 최신순 · KODEX는 자체 블로그(samsungfundblog.com)")
+        if any(blogs.values()):
+            bcols = st.columns(2, gap="large")
+            for i, brand in enumerate(D.ISSUERS):
+                posts = blogs.get(brand, [])[:4]
+                items = "".join(
+                    f'<a class="kw-link" href="{p["link"]}" target="_blank"><div class="kw-row" style="align-items:center;">'
+                    f'<span class="kw-name" style="flex:1;font-size:0.82rem;font-weight:600;">{p["title"][:44]}</span>'
+                    f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;margin-left:10px;">{p["date"]}</span>'
+                    f'</div></a>'
+                    for p in posts
+                ) or f'<div style="font-size:0.75rem;color:{GRAY};padding:4px 0;">수집 실패 또는 게시물 없음</div>'
+                bcols[i % 2].markdown(
+                    f'<div class="card" style="padding:10px 16px;margin-bottom:14px;">'
+                    f'<div class="card-title" style="margin-bottom:2px;">{brand}</div>{items}</div>',
+                    unsafe_allow_html=True,
+                )
+            st.caption("네이버 블로그 RSS 실시간 수집 (30분 캐시) · 브랜드별 최신순 · KODEX는 자체 블로그(samsungfundblog.com)")
         else:
             st.info("블로그 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
 
