@@ -7,10 +7,12 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import math
 import os
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 
@@ -72,6 +74,44 @@ ETF_UNIVERSE = [
 ISSUERS = ["KODEX", "TIGER", "ACE", "SOL", "HANARO", "RISE", "PLUS", "TIMEFOLIO"]
 
 THEMES = sorted({t for _, t, _ in ETF_UNIVERSE})
+
+# ══════════════════════════════════════════════
+# ETF 실데이터 (scripts/etf_batch.py 산출) — 있으면 데모 유니버스를 대체한다
+# 매수강도 = 개인 순매수 ÷ 순자산. ETF의 금융투자는 LP 설정·환매가 지배해
+# 마케팅 반응 지표로 부적절하므로 개인 기준을 쓴다 (실측 근거는 etf_batch.py 참조).
+# ══════════════════════════════════════════════
+_ETF_FLOWS_PATH = Path(__file__).parent / "data" / "etf_flows.json"
+
+
+def load_etf_flows() -> dict | None:
+    """배치 산출물 로드. 없으면 None(→ 데모 유지)."""
+    try:
+        if _ETF_FLOWS_PATH.exists():
+            d = json.loads(_ETF_FLOWS_PATH.read_text())
+            return d if d.get("etfs") else None
+    except Exception:
+        pass
+    return None
+
+
+def real_netbuy_frame(flows: dict) -> pd.DataFrame:
+    """배치 산출물 → 순매수 분석용 데이터프레임.
+    컬럼: 주차·종목명·테마·기초시장·운용사·순매수액(개인, 억)·순자산(억)"""
+    rows = []
+    for e in flows.get("etfs", []):
+        aum = e.get("순자산억")
+        for w in e.get("주간", []):
+            rows.append({
+                "주차": w["주차"], "종목명": e["종목명"], "테마": e["테마"],
+                "기초시장": e.get("기초시장", ""), "운용사": e["운용사"],
+                "순매수액": w.get("개인순매수억", 0), "순자산": aum,
+            })
+    df = pd.DataFrame(rows)
+    if len(df):
+        order = {w: i for i, w in enumerate(flows.get("weeks", []))}
+        df["_o"] = df["주차"].map(order)
+        df = df.sort_values(["종목명", "_o"]).drop(columns="_o").reset_index(drop=True)
+    return df
 
 
 def week_labels(n: int = 8) -> list[str]:
@@ -649,8 +689,22 @@ def kodex_etfs() -> list[str]:
     return sorted(n for n, _, issuer in ETF_UNIVERSE if issuer == "KODEX")
 
 
-def control_group(treat_name: str) -> list[str]:
-    """처치군과 동일 테마의 비(非)KODEX 경쟁 ETF 자동 매핑."""
+def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list[str]:
+    """처치군과 '테마 + 기초시장'이 모두 같은 비(非)KODEX 경쟁 ETF 자동 매핑.
+
+    기초시장까지 일치시키는 이유: 테마만 맞추면 'KODEX 미국반도체'의 대조군에
+    'HANARO Fn K-반도체'(한국)가 붙는다. 두 시장은 환율·현지 실적에 다르게 반응해
+    DiD의 평행추세 가정이 깨지고, 마케팅과 무관한 차이가 효과로 오독된다."""
+    if universe is not None and len(universe):
+        row = universe[universe["종목명"] == treat_name]
+        if len(row):
+            theme = row.iloc[0]["테마"]
+            market = row.iloc[0].get("기초시장", "")
+            peers = universe[(universe["테마"] == theme)
+                             & (universe["기초시장"] == market)
+                             & (universe["운용사"] != "KODEX")]
+            return sorted(peers["종목명"].unique())
+        return []
     theme = next((t for n, t, _ in ETF_UNIVERSE if n == treat_name), None)
     return sorted(
         n for n, t, issuer in ETF_UNIVERSE if t == theme and issuer != "KODEX"

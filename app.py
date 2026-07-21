@@ -22,6 +22,7 @@ import data as D
 # 앱 전체가 죽는다 — 필수 속성 누락 시 강제 재로드로 자가 복구한다.
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score", "detect_marketing_events", "classify_marketing_events",
+    "load_etf_flows", "real_netbuy_frame",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
@@ -301,7 +302,13 @@ def load_weekly_market():
 
 @st.cache_data
 def load_netbuy():
-    return D.add_intensity(D.demo_netbuy_data())
+    """ETF 순매수 — 배치 실데이터(개인 순매수÷순자산)가 있으면 그것을, 없으면 데모."""
+    flows = D.load_etf_flows()
+    if flows:
+        df = D.real_netbuy_frame(flows)
+        if len(df):
+            return D.add_intensity(df), True
+    return D.add_intensity(D.demo_netbuy_data()), False
 
 
 @st.cache_data
@@ -367,7 +374,7 @@ with st.sidebar:
         '<div style="font-size:1.05rem;font-weight:800;margin-bottom:4px;">분석 설정</div>',
         unsafe_allow_html=True,
     )
-    netbuy_df = load_netbuy()
+    netbuy_df, netbuy_live = load_netbuy()
     weeks = list(dict.fromkeys(netbuy_df["주차"]))
     sel_week = st.selectbox("분석 주차", weeks[1:][::-1], index=0)
     top_n = st.slider("순매수강도 TOP N", 5, 20, 15)
@@ -378,9 +385,12 @@ with st.sidebar:
         try:
             netbuy_df = D.add_intensity(pd.read_excel(up))
             weeks = list(dict.fromkeys(netbuy_df["주차"]))
+            netbuy_live = True
             st.success("업로드 데이터로 분석합니다.")
         except Exception as e:
             st.error(f"파일 형식 오류: {e}")
+    elif netbuy_live:
+        st.caption(f"KRX 실데이터 · 개인 순매수 기준 · {netbuy_df['종목명'].nunique()}개 ETF")
     else:
         st.caption("미업로드 시 데모 데이터로 동작합니다.")
 
@@ -416,12 +426,28 @@ def flow_state(prev: float, this: float) -> str:
     return "낙폭 축소" if this > prev else "낙폭 확대"
 
 
+def universe_frame(df: pd.DataFrame) -> pd.DataFrame | None:
+    """실데이터 유니버스(종목명·테마·기초시장·운용사). 데모면 None."""
+    cols = {"종목명", "테마", "기초시장", "운용사"}
+    if cols.issubset(df.columns):
+        return df[list(cols)].drop_duplicates(subset=["종목명"])
+    return None
+
+
+def kodex_list(df: pd.DataFrame) -> list[str]:
+    uni = universe_frame(df)
+    if uni is not None:
+        return sorted(uni[uni["운용사"] == "KODEX"]["종목명"].unique())
+    return D.kodex_etfs()
+
+
 @st.cache_data
 def build_did_board(df: pd.DataFrame, week: str) -> pd.DataFrame:
     """전 KODEX ETF의 금주 DiD 점수 보드."""
+    uni = universe_frame(df)
     rows = []
-    for name in D.kodex_etfs():
-        controls = D.control_group(name)
+    for name in kodex_list(df):
+        controls = D.control_group(name, uni)
         s = D.did_series(df, name, controls)
         sc = D.did_score(s, week)
         if not sc.get("available"):
@@ -1188,7 +1214,8 @@ with tab_did:
         for b in br.get("배너", [])
     ]
     events = D.detect_marketing_events(
-        _kodex_banners, youtube.get("KODEX", []), blogs.get("KODEX", []))
+        _kodex_banners, youtube.get("KODEX", []), blogs.get("KODEX", []),
+        universe=kodex_list(netbuy_df))
     campaigns = [e for e in events if e["유형"] == "캠페인"]
     others = [e for e in events if e["유형"] != "캠페인"]
     usable = [e for e in campaigns if e["분석가능"]]
@@ -1252,17 +1279,20 @@ with tab_did:
             "실제 KODEX 라인업·순매수 실데이터를 연동하면 해소됩니다. 아래는 수동 지정 모드입니다."
         )
         manual_mode = True
-        treat = st.selectbox("처치군 — 마케팅한 KODEX ETF (수동)", D.kodex_etfs())
+        treat = st.selectbox("처치군 — 마케팅한 KODEX ETF (수동)", kodex_list(netbuy_df))
         event_week = sel_week
 
     weeks_avail = list(dict.fromkeys(netbuy_df["주차"]))
     if event_week not in weeks_avail:   # 순매수 데이터에 없는 주차면 최신 주차로 대체
         event_week = weeks_avail[-1]
 
-    auto_controls = D.control_group(treat)
+    _uni = universe_frame(netbuy_df)
+    auto_controls = D.control_group(treat, _uni)
+    ctrl_options = (sorted(_uni[_uni["운용사"] != "KODEX"]["종목명"].unique()) if _uni is not None
+                    else sorted(n for n, _, i in D.ETF_UNIVERSE if i != "KODEX"))
     controls = st.multiselect(
-        "대조군 — 동일 테마 경쟁 ETF (자동 매핑, 수정 가능)",
-        options=sorted(n for n, _, i in D.ETF_UNIVERSE if i != "KODEX"),
+        "대조군 — 동일 테마·기초시장 경쟁 ETF (자동 매핑, 수정 가능)",
+        options=ctrl_options,
         default=auto_controls,
     )
     st.caption(f"처치군 **{treat}** · 개입 주차 **{event_week}**"
