@@ -689,6 +689,9 @@ def kodex_etfs() -> list[str]:
     return sorted(n for n, _, issuer in ETF_UNIVERSE if issuer == "KODEX")
 
 
+INVERSE_LEV_PAT = re.compile(r"인버스|레버리지|2X|3X|곱버스")
+
+
 def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list[str]:
     """처치군과 '테마 + 기초시장'이 모두 같은 비(非)KODEX 경쟁 ETF 자동 매핑.
 
@@ -703,7 +706,12 @@ def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list
             peers = universe[(universe["테마"] == theme)
                              & (universe["기초시장"] == market)
                              & (universe["운용사"] != "KODEX")]
-            return sorted(peers["종목명"].unique())
+            names = sorted(peers["종목명"].unique())
+            # 인버스·레버리지는 기초자산이 같아도 방향·배수가 달라 평행추세가 성립하지 않는다
+            # (예: '2차전지TOP10인버스'는 테마가 오를 때 내린다)
+            if not INVERSE_LEV_PAT.search(treat_name):
+                names = [n for n in names if not INVERSE_LEV_PAT.search(n)]
+            return names
         return []
     theme = next((t for n, t, _ in ETF_UNIVERSE if n == treat_name), None)
     return sorted(
@@ -753,11 +761,27 @@ def did_series(df: pd.DataFrame, treat: str, controls: list[str]) -> pd.DataFram
     return pd.DataFrame(rows)
 
 
+MIN_BASELINE_ACTIVE = 4   # 개입 이전에 실제 거래가 있었던 최소 주 수
+
+
 def did_score(series: pd.DataFrame, week: str) -> dict:
     """해당 주차 DiD를 Z-score 표준화 후 Sigmoid로 0~100점 변환."""
     row = series[series["주차"] == week]
     if row.empty:
         return {"available": False}
+
+    # 신규 상장 가드 — 개입 이전 기간에 거래 자체가 없었다면 DiD는 성립하지 않는다.
+    # (상장 전 순매수는 0이므로 베이스라인이 0이 되고, 상장 첫 주 유입이
+    #  통째로 '효과'로 계산돼 수백 %p 같은 허수가 나온다 — 실측 확인)
+    prior = series[series.index < row.index[0]]["처치강도"]
+    active = int((prior.fillna(0) != 0).sum())
+    if active < MIN_BASELINE_ACTIVE:
+        return {
+            "available": True, "did": None, "score": None, "z": None,
+            "delta_treat": None, "delta_ctrl": None,
+            "fallback": f"개입 이전 거래 이력 {active}주 — 신규 상장 등으로 베이스라인이 없어 "
+                        f"DiD 측정 불가 (최소 {MIN_BASELINE_ACTIVE}주 필요)",
+        }
     r = row.iloc[0]
     hist = series[series["주차"] != week]["DiD"].dropna().tail(ZSCORE_WINDOW)
     result = {
