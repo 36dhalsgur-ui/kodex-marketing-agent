@@ -23,7 +23,7 @@ import data as D
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
-    "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS",
+    "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
     "DATALAB_GROUPS", "ISSUERS", "BASELINE_WEEKS", "ZSCORE_WINDOW", "LAPLACE_ALPHA",
 )
@@ -317,6 +317,11 @@ def load_youtube():
 @st.cache_data(ttl=1800)
 def load_blogs():
     return D.fetch_blogs(n_per_blog=6)
+
+
+@st.cache_data(ttl=1800)
+def load_partners():
+    return D.fetch_partners(n_per_source=10)
 
 
 @st.cache_data
@@ -934,41 +939,62 @@ with tab_channel:
             f'<span style="color:#C2333F;">NEW</span> = 전주에 없던 배너</span></div>',
             unsafe_allow_html=True,
         )
+        def src_cell(title: str, link: str, sub: str, badge: str = "") -> str:
+            """소스별 셀 — 제목(해당 소스로만 링크) + 아랫줄 부가정보."""
+            return (
+                f'<a href="{link}" target="_blank" style="color:{INK};text-decoration:none;font-size:0.8rem;">'
+                f'{title}</a>{badge}'
+                f'<div style="font-size:0.68rem;color:{GRAY};margin-top:1px;">{sub}</div>'
+            )
+
         rows_html = ""
         for brand in D.ISSUERS:
             info = ch_brands.get(brand, {})
             banners = info.get("배너", [])
+            home = info.get("홈", "#")
             main_b = banners[0] if banners else None
             new_tag = ('<span style="font-size:0.62rem;font-weight:800;color:#fff;background:#D63C48;'
                        'border-radius:4px;padding:1px 5px;margin-left:6px;">NEW</span>'
                        if main_b and main_b.get("NEW") else "")
-            main_html = (
-                f'<a href="{main_b["링크"]}" target="_blank" style="color:{INK};text-decoration:none;">'
-                f'{main_b["제목"][:52]}</a>{new_tag}' if main_b else
-                f'<span style="color:{GRAY};">{info.get("비고", "수집 없음")}</span>'
+            hp_html = (
+                src_cell(main_b["제목"][:44], main_b["링크"], f"배너 {len(banners)}건 수집", new_tag)
+                if main_b else f'<span style="color:{GRAY};font-size:0.78rem;">{info.get("비고", "수집 없음")}</span>'
             )
-            yt_n = sum(1 for v in youtube.get(brand, []) if v.get("published", "") >= _week_ago)
-            bl_n = sum(1 for p in blogs.get(brand, []) if p.get("date", "") >= _week_ago)
+            vids = youtube.get(brand, [])
+            yt_n = sum(1 for v in vids if v.get("published", "") >= _week_ago)
+            yt_html = (
+                src_cell(vids[0]["title"][:44], vids[0]["url"], f"이번 주 {yt_n}건 · 최신 {vids[0]['published']}")
+                if vids else f'<span style="color:{GRAY};font-size:0.78rem;">수집 실패</span>'
+            )
+            posts = blogs.get(brand, [])
+            bl_n = sum(1 for p in posts if p.get("date", "") >= _week_ago)
+            bl_html = (
+                src_cell(posts[0]["title"][:44], posts[0]["link"], f"이번 주 {bl_n}건 · 최신 {posts[0]['date']}")
+                if posts else f'<span style="color:{GRAY};font-size:0.78rem;">수집 실패</span>'
+            )
             rows_html += (
-                f'<tr><td style="font-weight:800;white-space:nowrap;">{brand}</td>'
-                f'<td style="font-size:0.82rem;">{main_html}</td>'
-                f'<td style="text-align:center;">{yt_n or "–"}</td>'
-                f'<td style="text-align:center;">{bl_n or "–"}</td>'
-                f'<td style="font-size:0.78rem;color:#475467;white-space:nowrap;">{brand_themes(brand)}</td></tr>'
+                f'<tr style="border-bottom:1px solid #F0F2F7;vertical-align:top;">'
+                f'<td style="padding:9px 4px;white-space:nowrap;">'
+                f'<a href="{home}" target="_blank" style="font-weight:800;color:{INK};text-decoration:none;">{brand}</a></td>'
+                f'<td style="padding:9px 4px;">{hp_html}</td>'
+                f'<td style="padding:9px 4px;">{yt_html}</td>'
+                f'<td style="padding:9px 4px;">{bl_html}</td>'
+                f'<td style="padding:9px 4px;font-size:0.75rem;color:#475467;white-space:nowrap;">{brand_themes(brand)}</td></tr>'
             )
         st.markdown(
             '<div class="card" style="padding:6px 16px 10px;">'
-            '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">'
-            '<thead><tr style="color:#667085;font-size:0.72rem;border-bottom:1px solid #E4E7EC;">'
-            '<th style="text-align:left;padding:8px 4px;">브랜드</th>'
-            '<th style="text-align:left;padding:8px 4px;">메인 배너 (지금 밀고 있는 캠페인)</th>'
-            '<th style="padding:8px 4px;">유튜브<br>이번 주</th>'
-            '<th style="padding:8px 4px;">블로그<br>이번 주</th>'
-            '<th style="text-align:left;padding:8px 4px;">콘텐츠 테마</th></tr></thead>'
+            '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;table-layout:fixed;">'
+            '<colgroup><col style="width:9%"><col style="width:30%"><col style="width:27%"><col style="width:22%"><col style="width:12%"></colgroup>'
+            '<thead><tr style="color:#667085;font-size:0.72rem;border-bottom:1px solid #E4E7EC;text-align:left;">'
+            '<th style="padding:8px 4px;">브랜드<br><span style="font-weight:600;">클릭=공식홈</span></th>'
+            '<th style="padding:8px 4px;">공식 홈페이지 — 메인 배너</th>'
+            '<th style="padding:8px 4px;">유튜브 — 최신 영상</th>'
+            '<th style="padding:8px 4px;">공식 블로그 — 최신 글</th>'
+            '<th style="padding:8px 4px;">콘텐츠 테마</th></tr></thead>'
             f'<tbody>{rows_html}</tbody></table>'
             f'<div style="font-size:0.7rem;color:{GRAY};margin-top:6px;">'
-            '메인 배너 = 각 사 공식 홈페이지 첫 번째 배너 (클릭 시 해당 페이지). '
-            '유튜브·블로그 수치는 최근 7일 게시물 수. 테마는 배너·영상·글 제목의 키워드 매칭입니다.</div></div>',
+            '열마다 출처가 분리되어 있습니다 — 제목 클릭 시 각각 홈페이지 배너 페이지 / 유튜브 영상 / 블로그 글로 이동. '
+            '"이번 주 N건"은 최근 7일 게시물 수, 테마는 세 출처 제목의 키워드 매칭입니다.</div></div>',
             unsafe_allow_html=True,
         )
         st.write("")
@@ -977,10 +1003,57 @@ with tab_channel:
 
     grp_amc, grp_sec, grp_bank = st.tabs(["운용사 (경쟁사)", "증권 (판매채널)", "은행 (판매채널)"])
 
+    partners = load_partners()
+
+    def partner_group(group: str, note: str):
+        """증권/은행 서브탭 본문 — 회사별 채널 요약 + 통합 피드 (유튜브·블로그 시간순)."""
+        rows = [c for c in D.PARTNER_CHANNELS if c["그룹"] == group]
+        feed = [f for f in partners if f["그룹"] == group]
+        # 회사별 요약 카드
+        cols = st.columns(len(rows), gap="small")
+        for col, ch in zip(cols, rows):
+            n_wk = sum(1 for f in feed if f["회사"] == ch["회사"] and f["date"] >= _week_ago)
+            blog_txt = "블로그 ○" if ch["blog"] else "블로그 미운영"
+            col.markdown(
+                f'<div class="card" style="padding:10px 12px;text-align:center;">'
+                f'<div style="font-weight:800;font-size:0.85rem;">{ch["회사"]}</div>'
+                f'<div style="font-size:0.72rem;color:{GRAY};margin-top:2px;">유튜브 ○ · {blog_txt}</div>'
+                f'<div style="font-size:0.78rem;color:#475467;margin-top:4px;">이번 주 게시물 <b>{n_wk}</b>건</div></div>',
+                unsafe_allow_html=True,
+            )
+        st.write("")
+        etf_feed = [f for f in feed if re.search(D.ETF_CONTENT_PAT, f["title"])]
+        only_etf = st.toggle("ETF 관련 콘텐츠만 보기", value=True, key=f"etf_only_{group}",
+                             help="제목에 ETF·커버드콜·월배당·연금투자·IRP·ISA가 포함된 게시물만 표시")
+        shown = etf_feed if only_etf else feed
+        # ETF 노출 비중 = 판매채널이 ETF를 얼마나 미는지의 지표
+        share = f"{len(etf_feed)}/{len(feed)}" if feed else "0/0"
+        st.caption(f"수집 {len(feed)}건 중 ETF 관련 <b>{len(etf_feed)}건</b> ({share}) — {group} 채널의 ETF 노출 비중입니다."
+                   if feed else "수집된 게시물이 없습니다.", unsafe_allow_html=True)
+        if shown:
+            items = "".join(
+                f'<a class="kw-link" href="{f["link"]}" target="_blank"><div class="kw-row">'
+                f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
+                f'border-radius:5px;padding:2px 7px;margin-right:8px;white-space:nowrap;">{f["회사"]} · {f["소스"]}</span>'
+                f'<span class="kw-name" style="flex:1;font-size:0.83rem;font-weight:600;">{f["title"][:56]}</span>'
+                f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;">{f["date"]}</span>'
+                f'</div></a>'
+                for f in shown[:25]
+            )
+            st.markdown(f'<div class="card" style="padding:8px 16px;">{items}</div>', unsafe_allow_html=True)
+        elif only_etf and feed:
+            st.info(f"최근 수집분에 ETF 관련 게시물이 없습니다 — {group} 채널은 지금 ETF를 거의 노출하지 않는다는 신호입니다. "
+                    "이 수치가 올라가는 시점이 판매채널로의 ETF 확산·제휴 징후입니다. 토글을 끄면 전체 콘텐츠를 볼 수 있습니다.")
+        else:
+            st.info("수집된 게시물이 없습니다.")
+        st.caption(note)
+
     with grp_sec:
-        st.info("증권사 5개 채널(키움·토스증권·미래에셋·삼성·한국투자)의 유튜브·블로그 수집 예정 — 채널 ID 확보 후 제공됩니다. ETF 관련 콘텐츠만 필터링해 통합 피드로 표시할 계획입니다.")
+        st.write("")
+        partner_group("증권", "유튜브 채널 RSS + 네이버 블로그 RSS 실시간 수집 (30분 캐시) · 토스증권·한국투자증권은 네이버 블로그 미운영으로 유튜브만 수집")
     with grp_bank:
-        st.info("은행 4개 채널(KB국민·신한·하나·NH농협)의 유튜브·블로그 수집 예정 — 퇴직연금(IRP)·신탁 맥락의 ETF 콘텐츠를 모니터링합니다.")
+        st.write("")
+        partner_group("은행", "유튜브 채널 RSS + 네이버 블로그 RSS 실시간 수집 (30분 캐시) · 신한은행은 네이버 블로그 미운영으로 유튜브만 수집 · 은행 ETF 콘텐츠는 주로 퇴직연금(IRP) 맥락에서 등장")
 
     with grp_amc:
         st.write("")

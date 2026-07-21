@@ -174,6 +174,19 @@ EXTRACTORS = [
     ("RISE", rise), ("PLUS", plus), ("HANARO", hanaro), ("TIMEFOLIO", timefolio),
 ]
 
+# 공식 홈페이지 메인 — 배너 링크가 자사 도메인 밖(유튜브·블로그 등)이면 홈으로 정규화
+# ('홈페이지' 열 클릭은 항상 홈페이지 계열로 가야 한다는 소스 분리 원칙)
+HOMES = {
+    "KODEX": ("https://www.kodex.com", ["kodex.com", "samsungfund.com"]),
+    "TIGER": ("https://www.tigeretf.com", ["tigeretf.com", "miraeasset.com"]),
+    "ACE": ("https://www.aceetf.co.kr", ["aceetf.co.kr"]),
+    "SOL": ("https://www.soletf.com", ["soletf.com", "soletf.co.kr"]),
+    "RISE": ("https://www.riseetf.co.kr", ["riseetf.co.kr"]),
+    "PLUS": ("https://www.plusetf.co.kr", ["plusetf.co.kr"]),
+    "HANARO": ("https://www.hanaroetf.com", ["hanaroetf.com"]),
+    "TIMEFOLIO": ("https://timeetf.co.kr", ["timeetf.co.kr", "timefolio.co.kr"]),
+}
+
 
 def main():
     prev: dict[str, list] = {}
@@ -186,7 +199,8 @@ def main():
 
     brands = []
     for name, fn in EXTRACTORS:
-        row = {"브랜드": name}
+        home, own_domains = HOMES[name]
+        row = {"브랜드": name, "홈": home}
         try:
             banners = fn()
             if not banners:
@@ -194,6 +208,8 @@ def main():
             prev_titles = {b["제목"] for b in prev.get(name, [])}
             for b in banners:
                 b["NEW"] = bool(prev_titles) and b["제목"] not in prev_titles
+                if not any(d in b["링크"] for d in own_domains):
+                    b["링크"] = home
             row["배너"] = banners
             print(f"  - {name}: {len(banners)}건 (신규 {sum(1 for b in banners if b['NEW'])})")
         except Exception as e:

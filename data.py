@@ -286,8 +286,8 @@ YOUTUBE_CHANNELS = {
     "SOL": "UCZ_aq57IPiAdmNYlxGZ8Pfg",
     "HANARO": "UCnK3ANYTFZnF8pkEh3_cOgg",
     "RISE": "UCZ_xAP42i9KMUKZbomB6JSQ",
-    "PLUS": "UChurqZc7g4AB4XPxWnjzDNA",
-    "TIMEFOLIO": "UC9HqkQ6PeK9bNbf_urnn2yA",
+    "PLUS": "UCEznrN8oroicBCrwjSyvCDA",           # 한화자산운용 (PLUS ETF)
+    "TIMEFOLIO": "UCs7024kj-wa_c9Z5WgXbMFQ",      # TIME 액티브 ETF (타임폴리오)
 }
 
 _YT_NS = {
@@ -393,6 +393,53 @@ def fetch_blogs(n_per_blog: int = 6) -> dict[str, list[dict]]:
             except Exception:
                 out[brand] = []
     return out
+
+
+# ══════════════════════════════════════════════
+# 판매채널 (증권·은행) 유튜브·블로그 — 키 불필요
+# 채널 ID·블로그 ID는 공식 사이트 푸터 + 영상/게시물 제목으로 정체 검증 (2026-07 실측)
+# 블로그가 None인 곳은 네이버 블로그 미운영 (토스증권·신한은행·한국투자증권)
+# ══════════════════════════════════════════════
+PARTNER_CHANNELS = [
+    {"그룹": "증권", "회사": "키움증권",     "yt": "UCsNWZNw6LB9JYjDB1SMdJsw", "blog": "kiwoomhero"},
+    {"그룹": "증권", "회사": "토스증권",     "yt": "UCW_P8DTCnlDcUHRfGFwRRLA", "blog": None},
+    {"그룹": "증권", "회사": "미래에셋증권", "yt": "UCz9kpnQNdgrUTeSIjiyw6Iw", "blog": "how2invest"},
+    {"그룹": "증권", "회사": "삼성증권",     "yt": "UCq7h8qFlHN5FL_T6waKZllw", "blog": "samsung_fn"},
+    {"그룹": "증권", "회사": "한국투자증권", "yt": "UCh_9ffn36zS3HIQCwb3pgSQ", "blog": None},
+    {"그룹": "은행", "회사": "KB국민은행",   "yt": "UCHq8auIJ8ewo7iD2pqX22UA", "blog": "youngkbblog"},
+    {"그룹": "은행", "회사": "신한은행",     "yt": "UC4E394G9WuS9y6SlBZslMsQ", "blog": None},
+    {"그룹": "은행", "회사": "하나은행",     "yt": "UCejh7cdlFSkCh_rqQT6WB8Q", "blog": "kebhana_official"},
+    {"그룹": "은행", "회사": "NH농협은행",   "yt": "UCsR09lr9oy0DMv6gtqh-XCw", "blog": "nhbanksns"},
+]
+
+ETF_CONTENT_PAT = r"ETF|etf|상장지수|이티에프|커버드콜|월배당|연금.?투자|IRP|ISA"
+
+
+def fetch_partners(n_per_source: int = 8) -> list[dict]:
+    """증권·은행 채널의 유튜브 영상 + 블로그 글을 통합 피드로 수집 (날짜 내림차순).
+    항목: {그룹, 회사, 소스, title, link, date, views}"""
+    jobs = []
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        for ch in PARTNER_CHANNELS:
+            jobs.append((ch, "유튜브", ex.submit(_fetch_channel_videos, ch["회사"], ch["yt"], n_per_source)))
+            if ch["blog"]:
+                jobs.append((ch, "블로그", ex.submit(
+                    _fetch_blog, ch["회사"], f"https://blog.rss.naver.com/{ch['blog']}.xml", n_per_source)))
+        feed = []
+        for ch, source, fut in jobs:
+            try:
+                for it in fut.result():
+                    feed.append({
+                        "그룹": ch["그룹"], "회사": ch["회사"], "소스": source,
+                        "title": it["title"],
+                        "link": it.get("url") or it.get("link", ""),
+                        "date": it.get("published") or it.get("date", ""),
+                        "views": it.get("views", 0),
+                    })
+            except Exception:
+                pass
+    feed.sort(key=lambda x: x["date"], reverse=True)
+    return feed
 
 
 # ══════════════════════════════════════════════
