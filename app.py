@@ -1017,7 +1017,8 @@ with tab_channel:
             st.markdown(f'<div class="card" style="padding:8px 16px;">{items}</div>', unsafe_allow_html=True)
         elif only_etf and feed:
             st.info(f"최근 수집분에 ETF 관련 게시물이 없습니다 — {group} 채널은 지금 ETF를 거의 노출하지 않는다는 신호입니다. "
-                    "이 수치가 올라가는 시점이 판매채널로의 ETF 확산·제휴 징후입니다. 토글을 끄면 전체 콘텐츠를 볼 수 있습니다.")
+                    "이 수치가 올라가는 시점이 판매채널로의 ETF 확산·제휴 징후입니다.\n\n"
+                    "토글을 끄면 전체 콘텐츠를 볼 수 있습니다.")
         else:
             st.info("수집된 게시물이 없습니다.")
         st.caption(note)
