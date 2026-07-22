@@ -799,10 +799,11 @@ def _reg_kind(title: str) -> str:
     return "기타"
 
 
-def _fsc_list(path: str, link_pat: str, source: str, limit: int) -> list[dict]:
-    """금융위 게시판 목록 파싱 — 제목/링크/날짜(첨부파일명 YYMMDD)."""
+def _fsc_page(path: str, link_pat: str, source: str, page: int) -> list[dict]:
+    """금융위 게시판 한 페이지 파싱 — 제목/링크/날짜(첨부파일명 YYMMDD 또는 예고기간)."""
     from bs4 import BeautifulSoup
-    r = requests.get(f"{FSC_BASE}{path}", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    r = requests.get(f"{FSC_BASE}{path}", params={"curPage": page},
+                     headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
     out, seen = [], set()
@@ -835,24 +836,45 @@ def _fsc_list(path: str, link_pat: str, source: str, limit: int) -> list[dict]:
             "date": date, "예고기간": period, "출처": source, "유형": _reg_kind(title),
             "관련": rel,
         })
-        if len(out) >= limit:
-            break
     return out
 
 
-def fetch_regulations(limit: int = 12) -> tuple[list[dict], bool]:
-    """금융위 보도자료 + 입법예고/규정변경예고 수집. 반환: (목록, 실데이터 여부)."""
-    items = []
-    for path, pat, src in (
-        ("/no010101", r"/no010101/\d+", "금융위 보도자료"),
-        ("/po040301", r"po040301/view\?noticeId=\d+", "입법예고·규정변경"),
-    ):
-        try:
-            items += _fsc_list(path, pat, src, limit)
-        except Exception:
-            continue
+# 게시판별 스캔 깊이 — 한 페이지 10건.
+# 보도자료는 전 금융 분야가 매일 쌓여 ETF 건이 앞쪽에 몰리지만(3페이지면 충분),
+# 입법예고는 건수가 적고 자본시장 관련이 뒤쪽까지 흩어져 있다 (실측: 1p 1건 → 6p 11건).
+FSC_BOARDS = [
+    ("/no010101", r"/no010101/\d+", "금융위 보도자료", 3),
+    ("/po040301", r"po040301/view\?noticeId=\d+", "입법예고·규정변경", 6),
+]
+
+
+def fetch_regulations(limit: int = 12) -> tuple[list[dict], dict]:
+    """금융위 보도자료 + 입법예고/규정변경예고 수집.
+
+    반환: (목록, 출처별 상태). 상태 = {출처: {"수집": n, "관련": n, "오류": str|None}}
+    수집 실패와 '수집은 됐지만 관련 건이 없음'을 화면에서 구분할 수 있어야 하므로
+    예외를 삼키지 않고 사유를 함께 돌려준다.
+    """
+    items: list[dict] = []
+    status: dict[str, dict] = {}
+    for path, pat, src, pages in FSC_BOARDS:
+        got, err, seen = [], None, set()
+        for pg in range(1, pages + 1):
+            try:
+                rows = _fsc_page(path, pat, src, pg)
+            except Exception as e:
+                err = f"{type(e).__name__}: {e}"
+                break
+            fresh = [r for r in rows if r["제목"] not in seen]
+            if not fresh:          # 페이지네이션이 끝났거나 같은 목록이 반복됨
+                break
+            seen.update(r["제목"] for r in fresh)
+            got += fresh
+        status[src] = {"수집": len(got), "관련": sum(1 for r in got if r["관련"]),
+                       "오류": err if not got else None}
+        items += got
     items.sort(key=lambda x: (x["date"] or "", x["관련"]), reverse=True)
-    return items, bool(items)
+    return items, status
 
 
 # ── 국가법령정보센터 OpenAPI — 근거 법령의 현행 상태·시행일 ─────────────

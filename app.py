@@ -2141,7 +2141,8 @@ with tab_reg:
 
     _rule_sig = (getattr(D, "REG_RELEVANT", None).pattern if hasattr(D, "REG_RELEVANT") else "") \
         + "|" + (getattr(D, "REG_EXCLUDE", None).pattern if hasattr(D, "REG_EXCLUDE") else "")
-    regs, reg_live = load_regulations(_rule_sig)
+    # 반환 형태가 (목록, 출처별 상태)로 바뀌어 캐시 키에 버전을 섞는다
+    regs, reg_status = load_regulations(_rule_sig + "|v2-paged")
     reg_news = load_regulation_news()
     rel = [r for r in regs if r["관련"]]
 
@@ -2166,12 +2167,21 @@ with tab_reg:
     c1, c2 = st.columns([7, 5], gap="large")
     with c1:
         sub_header("01", "금융위 보도자료 · 입법예고")
+        # 수집 실패와 '수집은 됐으나 관련 건 없음'을 구분해서 보여준다
+        _failed = [k for k, v in reg_status.items() if v.get("오류")]
+        _parts = " · ".join(
+            f'{k.replace("·규정변경", "")} {v["수집"]}건'
+            + (f' <span style="color:{RED};">수집 실패</span>' if v.get("오류") else "")
+            for k, v in reg_status.items())
         st.markdown(
             f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
-            f'보도자료 {sum(1 for r in regs if r["출처"] == "금융위 보도자료")}건 · '
-            f'입법예고 {sum(1 for r in regs if r["출처"] == "입법예고·규정변경")}건 수집 → '
-            f'ETF·자본시장 관련 <b style="color:{INK};">{len(rel)}건</b> (정책펀드·기금 등은 제외)</div>',
+            f'{_parts} 수집 → ETF·자본시장 관련 '
+            f'<b style="color:{INK};">{len(rel)}건</b> (정책펀드·기금 등은 제외)</div>',
             unsafe_allow_html=True)
+        for _k in _failed:
+            st.error(f"**{_k} 수집 실패** — {reg_status[_k]['오류']}\n\n"
+                     "금융위 사이트 응답이 없거나 페이지 구조가 바뀐 경우입니다. "
+                     "아래 목록에는 이 게시판 건이 빠져 있습니다.")
         if rel:
             KIND_C = {"법률": "#B5321F", "시행령": "#1B4DE4", "규정·고시": "#6B4FBB",
                       "정책방안": "#B0801F", "기타": "#5C6572"}
@@ -2200,12 +2210,23 @@ with tab_reg:
                     f'<span style="margin-left:8px;">{right}</span></div></a>')
             st.markdown(f'<div class="card" style="padding:8px 16px;">{rows}</div>',
                         unsafe_allow_html=True)
+            # 관련 건이 10건을 넘으면 나머지도 볼 수 있어야 한다 (예전엔 무관 건만 노출됐다)
+            if len(rel) > 10:
+                with st.expander(f"관련 건 나머지 {len(rel) - 10}건 보기"):
+                    for r in rel[10:]:
+                        st.markdown(f"- [{r['제목']}]({r['링크']})  ·  {r['유형']} · "
+                                    f"{r.get('예고기간') or r['date'] or '날짜미상'}")
             with st.expander(f"관련도 낮은 나머지 {len(regs) - len(rel)}건 보기"):
-                for r in [x for x in regs if not x["관련"]][:12]:
+                for r in [x for x in regs if not x["관련"]][:20]:
                     st.markdown(f"- [{r['제목']}]({r['링크']})  ·  {r['출처']}")
+        elif _failed:
+            st.info("수집에 실패해 표시할 항목이 없습니다 — 위 오류를 확인하세요.")
         else:
-            st.info("ETF·자본시장 관련 규제 문서가 수집되지 않았습니다.")
-        st.caption("금융위원회 보도자료·입법예고/규정변경예고 실시간 수집 (1시간 캐시) · "
+            st.info(f"게시판 {sum(v['수집'] for v in reg_status.values())}건을 수집했지만 "
+                    "그중 ETF·자본시장 관련 건이 없습니다 — 수집 실패가 아니라 "
+                    "해당 기간에 관련 발표가 없었다는 뜻입니다.")
+        st.caption("금융위원회 보도자료 3페이지·입법예고/규정변경예고 6페이지 실시간 수집 (1시간 캐시) · "
+                   "입법예고는 건수가 적고 자본시장 관련이 뒤쪽까지 흩어져 있어 더 깊이 봅니다 · "
                    "날짜는 첨부파일명 기준이라 일부는 미상으로 표시됩니다.")
     with c2:
         sub_header("02", "규제 관련 보도")
