@@ -4,3 +4,8 @@ numpy>=1.24
 plotly>=5.20
 requests>=2.31
 openpyxl>=3.1
+# data.py의 금융위 게시판 파싱(_fsc_page)에 필요 — 누락 시 ⑤ 규제 탭만 조용히 빈 목록이 된다
+beautifulsoup4>=4.12
+
+# pykrx는 여기 넣지 말 것 — scripts/ 주간 배치에서만 쓰고 로컬에서 실행한다.
+# 배포 런타임은 배치가 만든 data/*.json만 읽으므로 클라우드 빌드에 불필요하다.
