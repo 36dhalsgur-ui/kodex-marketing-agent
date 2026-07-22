@@ -1928,14 +1928,28 @@ with tab_reg:
             f'<div class="sec-tag">FSC</div>'
             f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">금융위 보도자료 · 입법예고</div>'
             f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
-            f'수집 {len(regs)}건 중 ETF·자본시장 관련 <b>{len(rel)}건</b></div>',
+            f'보도자료 {sum(1 for r in regs if r["출처"] == "금융위 보도자료")}건 · '
+            f'입법예고 {sum(1 for r in regs if r["출처"] == "입법예고·규정변경")}건 수집 → '
+            f'ETF·자본시장 관련 <b>{len(rel)}건</b> (정책펀드·기금 등은 제외)</div>',
             unsafe_allow_html=True)
         if rel:
             KIND_C = {"법률": "#B5321F", "시행령": "#1B4DE4", "규정·고시": "#6B4FBB",
                       "정책방안": "#B0801F", "기타": "#5C6572"}
+            _today_s = dt.date.today().isoformat()
             rows = ""
             for r in rel[:10]:
                 c = KIND_C.get(r["유형"], "#5C6572")
+                # 입법예고는 의견제출 마감일이 핵심 — 진행 중이면 강조
+                per = r.get("예고기간", "")
+                if per:
+                    end = per.split("~")[-1].strip()
+                    open_now = end >= _today_s
+                    right = (f'<span style="font-size:0.68rem;font-weight:700;'
+                             f'color:{"#B5321F" if open_now else GRAY};white-space:nowrap;">'
+                             f'{"의견접수 중" if open_now else "예고 종료"} · ~{end}</span>')
+                else:
+                    right = (f'<span style="font-size:0.7rem;color:{GRAY};white-space:nowrap;">'
+                             f'{r["date"] or "—"}</span>')
                 rows += (
                     f'<a class="kw-link" href="{r["링크"]}" target="_blank">'
                     f'<div class="kw-row" style="align-items:center;">'
@@ -1943,8 +1957,7 @@ with tab_reg:
                     f'border-radius:4px;padding:2px 7px;margin-right:9px;white-space:nowrap;'
                     f'min-width:58px;text-align:center;">{r["유형"]}</span>'
                     f'<span class="kw-name" style="flex:1;font-size:0.83rem;">{r["제목"][:56]}</span>'
-                    f'<span style="font-size:0.7rem;color:{GRAY};white-space:nowrap;margin-left:8px;">'
-                    f'{r["date"] or "—"}</span></div></a>')
+                    f'<span style="margin-left:8px;">{right}</span></div></a>')
             st.markdown(f'<div class="card" style="padding:8px 16px;">{rows}</div>',
                         unsafe_allow_html=True)
             with st.expander(f"관련도 낮은 나머지 {len(regs) - len(rel)}건 보기"):

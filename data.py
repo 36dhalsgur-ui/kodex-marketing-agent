@@ -778,8 +778,11 @@ FSC_BASE = "https://www.fsc.go.kr"
 
 # 우리 사업(ETF·자본시장)에 직접 닿는 주제만 남기기 위한 필터
 REG_RELEVANT = re.compile(
-    r"ETF|ETN|상장지수|자본시장|금융투자|펀드|집합투자|공모|사모|레버리지|파생|"
-    r"인덱스|지수|퇴직연금|IRP|ISA|연금|배당|공시|투자자\s?보호")
+    r"ETF|ETN|상장지수|자본시장|금융투자|집합투자|공모펀드|사모펀드|레버리지|파생|"
+    r"인덱스펀드|퇴직연금|IRP|ISA|자산운용|투자자\s?보호|증권신고서|투자광고")
+# '펀드'·'지수' 단독은 정책펀드(국민성장펀드 등)·물가지수까지 걸려 오탐이 많다(실측).
+# 아래에 걸리면 관련 없음으로 되돌린다.
+REG_EXCLUDE = re.compile(r"국민성장펀드|정책펀드|모태펀드|성장펀드|공적자금|기금")
 # 규제 문서의 성격 분류
 REG_KIND = [
     ("법률", r"법률|법\s?개정|제정법"),
@@ -811,19 +814,26 @@ def _fsc_list(path: str, link_pat: str, source: str, limit: int) -> list[dict]:
         if len(title) < 8 or title in seen:
             continue
         seen.add(title)
-        # 날짜: 같은 카드의 첨부파일명이 'YYMMDD(보도자료)…' 형태
-        date = ""
+        date, period = "", ""
         card = a.find_parent(["li", "tr", "div"])
         scope = card.parent if card else None
         if scope:
-            m = re.search(r"\b(\d{2})(\d{2})(\d{2})\s*[\(\[]", scope.get_text(" ", strip=True))
-            if m:
-                date = f"20{m.group(1)}-{m.group(2)}-{m.group(3)}"
+            txt = scope.get_text(" ", strip=True)
+            # 입법예고·규정변경예고: '예고기간 : 2026-05-22 ~ 2026-07-01'
+            mp = re.search(r"예고기간\s*[:：]\s*(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})", txt)
+            if mp:
+                date, period = mp.group(1), f"{mp.group(1)} ~ {mp.group(2)}"
+            else:
+                # 보도자료: 첨부파일명이 'YYMMDD(보도자료)…' 형태
+                m = re.search(r"\b(\d{2})(\d{2})(\d{2})\s*[\(\[]", txt)
+                if m:
+                    date = f"20{m.group(1)}-{m.group(2)}-{m.group(3)}"
         href = a["href"].lstrip(".")
+        rel = bool(REG_RELEVANT.search(title)) and not REG_EXCLUDE.search(title)
         out.append({
             "제목": title, "링크": href if href.startswith("http") else FSC_BASE + href,
-            "date": date, "출처": source, "유형": _reg_kind(title),
-            "관련": bool(REG_RELEVANT.search(title)),
+            "date": date, "예고기간": period, "출처": source, "유형": _reg_kind(title),
+            "관련": rel,
         })
         if len(out) >= limit:
             break
