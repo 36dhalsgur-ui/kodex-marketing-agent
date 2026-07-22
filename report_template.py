@@ -65,7 +65,8 @@ def build_lead(ctx: dict) -> str:
         parts.append(
             f'반면 검색 수요는 {_esc(names)}로 쏠렸으나 해당 테마는 이미 과열·쇠퇴 국면이어서, '
             f'지금은 신규 진입보다 재매집이 진행 중인 섹터를 다음 사이클 후보로 관찰할 시점이다.')
-    return "<br>".join(parts)
+    # 문장마다 강제 개행하면 끊겨 보인다 — 자연스러운 자동 줄바꿈에 맡긴다
+    return " ".join(parts)
 
 
 _CSS = """
