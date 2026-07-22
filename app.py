@@ -25,6 +25,7 @@ _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score", "detect_marketing_events", "classify_marketing_events",
     "load_etf_flows", "real_netbuy_frame", "lineup_gaps", "classify_etf", "etf_brand_of",
     "review_current_marketing", "gap_competitors", "etf_product_type", "build_recommendations",
+    "fetch_regulations", "fetch_regulation_news", "REG_RELEVANT",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
@@ -333,6 +334,26 @@ def load_partners():
     return D.fetch_partners(n_per_source=10)
 
 
+@st.cache_data(ttl=3600)
+def load_regulations():
+    return D.fetch_regulations()
+
+
+@st.cache_data(ttl=3600)
+def load_regulation_news():
+    return D.fetch_regulation_news()
+
+
+@st.cache_data
+def load_sector_universe():
+    """섹터 구성종목 (scripts/sector_universe.py 산출)."""
+    p = Path(__file__).parent / "data" / "sector_universe.json"
+    try:
+        return json.loads(p.read_text()) if p.exists() else {}
+    except Exception:
+        return {}
+
+
 @st.cache_data
 def load_theme_flows():
     return D.demo_theme_flows()
@@ -489,8 +510,8 @@ st.write("")
 # ══════════════════════════════════════════════
 # 탭 구조 — 모니터링이 먼저, 효과 측정(DiD)은 그 뒤
 # ══════════════════════════════════════════════
-tab_home, tab_trend, tab_channel, tab_did, tab_report = st.tabs(
-    ["홈", "① 시장 트렌드", "② 채널 모니터링", "③ 마케팅 효과 측정", "④ 주간 리포트"]
+tab_home, tab_trend, tab_channel, tab_did, tab_report, tab_reg = st.tabs(
+    ["홈", "① 시장 트렌드", "② 채널 모니터링", "③ 마케팅 효과 측정", "④ 주간 리포트", "⑤ 규제 동향"]
 )
 
 # ──────────────────────────────────────────────
@@ -926,6 +947,64 @@ with tab_trend:
             st.plotly_chart(fig_sc, use_container_width=True)
         elif wk_rows:
             st.info("주간 수급 데이터가 없습니다 — 배치 재실행 후 표시됩니다.")
+
+    # ══════════ 섹터 유니버스 — 국면 판정의 근거가 된 종목 묶음 ══════════
+    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="sec-tag">UNIVERSE</div>'
+        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">섹터 유니버스 — 구성종목</div>'
+        f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
+        f'위 국면 판정과 수급 집계가 <b>어떤 종목 묶음</b>을 근거로 한 것인지 확인합니다. '
+        f'KRX 섹터지수는 지수 구성종목, 테마는 KODEX ETF 구성내역(PDF·비중 포함) 기준입니다.</div>',
+        unsafe_allow_html=True)
+    _uni_data = load_sector_universe()
+    _uni_secs = _uni_data.get("sectors", [])
+    if _uni_secs:
+        _by_name = {s["섹터"]: s for s in _uni_secs}
+        _order = [r["섹터"] for r in rows_all if r["섹터"] in _by_name] or list(_by_name)
+        u1, u2 = st.columns([4, 8], gap="large")
+        with u1:
+            pick_sec = st.selectbox("섹터 선택", _order, key="uni_pick")
+            s = _by_name[pick_sec]
+            stg = next((r.get("단계", "") for r in rows_all if r["섹터"] == pick_sec), "")
+            st.markdown(
+                f'<div class="card" style="padding:12px 15px;">'
+                f'<div style="font-size:0.72rem;color:{GRAY};">현재 국면</div>'
+                f'<div style="font-size:1.1rem;font-weight:800;color:{NAVY};">{stg or "—"}</div>'
+                f'<div style="font-size:0.75rem;color:{GRAY};margin-top:8px;line-height:1.6;">'
+                f'{s.get("기준","")}<br><b style="color:{INK};">{s.get("종목수",0)}종목</b> · {s.get("군","")}</div></div>',
+                unsafe_allow_html=True)
+        with u2:
+            items = s.get("종목", [])
+            if items:
+                has_w = any("비중" in it for it in items)
+                if has_w:
+                    rows_u = "".join(
+                        f'<div class="kw-row"><span class="kw-name">{it["종목명"]}</span>'
+                        f'<span style="flex:1;margin:0 10px;height:6px;background:#EEF1F6;border-radius:3px;'
+                        f'overflow:hidden;display:inline-block;"><span style="display:block;height:100%;'
+                        f'width:{min(100, it.get("비중", 0) * 3):.0f}%;background:{NAVY};"></span></span>'
+                        f'<span class="kw-badge" style="background:#F2F4F7;color:#475467;">'
+                        f'{it.get("비중", 0):.1f}%</span></div>'
+                        for it in items[:20])
+                    cap = "KODEX ETF 구성내역(PDF) · 비중 내림차순 · 막대는 비중 상대 길이"
+                else:
+                    cells = "".join(
+                        f'<span style="display:inline-block;font-size:0.78rem;color:{INK};'
+                        f'background:#F5F6FA;border:1px solid #EAEDF3;border-radius:6px;'
+                        f'padding:4px 10px;margin:0 6px 6px 0;">{it["종목명"]}'
+                        f'<span style="color:{FAINT};font-size:0.68rem;margin-left:5px;">{it["티커"]}</span></span>'
+                        for it in items[:40])
+                    rows_u = f'<div style="padding:4px 0;">{cells}</div>'
+                    cap = "KRX 섹터지수 구성종목 · 지수는 비중을 공개하지 않아 종목명만 표시"
+                st.markdown(f'<div class="card" style="padding:10px 16px;">{rows_u}</div>',
+                            unsafe_allow_html=True)
+                st.caption(cap)
+            else:
+                st.info(s.get("비고", "구성종목을 수집하지 못했습니다."))
+        st.caption(f"수집 {_uni_data.get('asof','')} · 주간 배치 `python scripts/sector_universe.py`")
+    else:
+        st.info("섹터 유니버스 데이터가 없습니다 — 로컬에서 `python scripts/sector_universe.py` 실행 후 커밋하면 표시됩니다.")
 
 
 # ──────────────────────────────────────────────
@@ -1803,9 +1882,99 @@ with tab_report:
     st.caption("ⓘ 시장·자금·캠페인은 실데이터(KRX·네이버·구글·RSS)입니다. 국면별 액션은 규칙 기반 제안이며, "
                "순환/성장 판단과 출시 가능성 검증은 담당자 몫입니다.")
 
+# ──────────────────────────────────────────────
+# ⑤ 규제 동향 — 금융위 보도자료·입법예고 + 규제 뉴스
+# ──────────────────────────────────────────────
+with tab_reg:
+    st.write("")
+    section_header(
+        "STEP 5 · REGULATION",
+        "금융 규제 동향",
+        "금융위원회 보도자료·입법예고와 규제 뉴스를 수집해 ETF·자본시장 관련 건만 추립니다. "
+        "집행 중인 마케팅과 겹치는 규제는 상단에 경고로 띄웁니다.",
+    )
+    st.write("")
+
+    regs, reg_live = load_regulations()
+    reg_news = load_regulation_news()
+    rel = [r for r in regs if r["관련"]]
+
+    # ── 집행 중 마케팅 × 규제 교차 경고
+    _rev_names = [r["표기명"] for r in review] if "review" in dir() else []
+    alerts = []
+    for r in rel:
+        for nm in _rev_names:
+            core = re.sub(r"^KODEX\s*", "", nm)
+            toks = [t for t in re.findall(r"[가-힣A-Za-z0-9]{3,}", core)][:2]
+            if toks and any(t in r["제목"] for t in toks):
+                alerts.append((r, nm))
+                break
+    if alerts:
+        for r, nm in alerts[:3]:
+            st.warning(
+                f"**집행 중 마케팅과 겹치는 규제** — {r['유형']} · {r['date'] or '날짜미상'}\n\n"
+                f"[{r['제목']}]({r['링크']})\n\n"
+                f"현재 **{nm}** 마케팅을 집행 중입니다. 규제 방향을 확인한 뒤 메시지·집행 강도를 재검토하세요.")
+        st.write("")
+
+    c1, c2 = st.columns([7, 5], gap="large")
+    with c1:
+        st.markdown(
+            f'<div class="sec-tag">FSC</div>'
+            f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">금융위 보도자료 · 입법예고</div>'
+            f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
+            f'수집 {len(regs)}건 중 ETF·자본시장 관련 <b>{len(rel)}건</b></div>',
+            unsafe_allow_html=True)
+        if rel:
+            KIND_C = {"법률": "#B5321F", "시행령": "#1B4DE4", "규정·고시": "#6B4FBB",
+                      "정책방안": "#B0801F", "기타": "#5C6572"}
+            rows = ""
+            for r in rel[:10]:
+                c = KIND_C.get(r["유형"], "#5C6572")
+                rows += (
+                    f'<a class="kw-link" href="{r["링크"]}" target="_blank">'
+                    f'<div class="kw-row" style="align-items:center;">'
+                    f'<span style="font-size:0.66rem;font-weight:800;color:#fff;background:{c};'
+                    f'border-radius:4px;padding:2px 7px;margin-right:9px;white-space:nowrap;'
+                    f'min-width:58px;text-align:center;">{r["유형"]}</span>'
+                    f'<span class="kw-name" style="flex:1;font-size:0.83rem;">{r["제목"][:56]}</span>'
+                    f'<span style="font-size:0.7rem;color:{GRAY};white-space:nowrap;margin-left:8px;">'
+                    f'{r["date"] or "—"}</span></div></a>')
+            st.markdown(f'<div class="card" style="padding:8px 16px;">{rows}</div>',
+                        unsafe_allow_html=True)
+            with st.expander(f"관련도 낮은 나머지 {len(regs) - len(rel)}건 보기"):
+                for r in [x for x in regs if not x["관련"]][:12]:
+                    st.markdown(f"- [{r['제목']}]({r['링크']})  ·  {r['출처']}")
+        else:
+            st.info("ETF·자본시장 관련 규제 문서가 수집되지 않았습니다.")
+        st.caption("금융위원회 보도자료·입법예고/규정변경예고 실시간 수집 (1시간 캐시) · "
+                   "날짜는 첨부파일명 기준이라 일부는 미상으로 표시됩니다.")
+    with c2:
+        st.markdown(
+            f'<div class="sec-tag">NEWS</div>'
+            f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">규제 관련 보도</div>',
+            unsafe_allow_html=True)
+        if reg_news:
+            rows = "".join(
+                f'<a class="kw-link" href="{n["링크"]}" target="_blank"><div class="kw-row">'
+                f'<span class="kw-name" style="flex:1;font-size:0.8rem;">{n["제목"][:52]}</span>'
+                f'<span style="font-size:0.7rem;color:{GRAY};white-space:nowrap;">{n["date"]}</span>'
+                f'</div></a>' for n in reg_news[:8])
+            st.markdown(f'<div class="card" style="padding:8px 16px;">{rows}</div>',
+                        unsafe_allow_html=True)
+        else:
+            st.info("규제 뉴스를 불러오지 못했습니다.")
+        st.caption("구글 뉴스 RSS · 보도자료가 놓친 건을 보완합니다.")
+
+    st.write("")
+    st.caption(
+        "ⓘ 이 탭은 **발표된 규제 동향**을 모으는 모니터입니다. 개정 이력·시행일의 완전한 법령 목록은 "
+        "국가법령정보센터 API(OC 키 발급 필요)를 연동해야 하며, 현재는 금융위 발표분과 뉴스의 부분집합입니다. "
+        "법률 해석·컴플라이언스 판단은 담당 부서 확인이 필요합니다.")
+
 st.write("")
 st.caption(
     "ⓘ 시그널 보드·주간 수익률·섹터 수급·ETF 개인 순매수·순자산(KRX), 검색량(네이버 데이터랩), "
-    "뉴스(구글), 채널 콘텐츠(공식 홈페이지·유튜브·블로그 RSS)는 모두 실데이터입니다. "
-    "주간 배치: weekly_batch.py · etf_batch.py · channel_batch.py"
+    "뉴스(구글)·규제(금융위), 채널 콘텐츠(공식 홈페이지·유튜브·블로그 RSS)는 모두 실데이터입니다. "
+    "주간 배치: weekly_batch.py · etf_batch.py · channel_batch.py · sector_universe.py"
 )

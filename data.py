@@ -770,6 +770,104 @@ def fetch_partners(n_per_source: int = 8) -> list[dict]:
 
 
 # ══════════════════════════════════════════════
+# 금융 규제 동향 (금융위 보도자료 · 입법예고 + 구글 뉴스) — 키 불필요
+# ※ '법령 DB'가 아니라 '발표된 규제 동향'의 부분집합이다.
+#    개정 이력·시행일의 완전한 목록은 국가법령정보센터 API(OC 키 발급 필요)가 있어야 한다.
+# ══════════════════════════════════════════════
+FSC_BASE = "https://www.fsc.go.kr"
+
+# 우리 사업(ETF·자본시장)에 직접 닿는 주제만 남기기 위한 필터
+REG_RELEVANT = re.compile(
+    r"ETF|ETN|상장지수|자본시장|금융투자|펀드|집합투자|공모|사모|레버리지|파생|"
+    r"인덱스|지수|퇴직연금|IRP|ISA|연금|배당|공시|투자자\s?보호")
+# 규제 문서의 성격 분류
+REG_KIND = [
+    ("법률", r"법률|법\s?개정|제정법"),
+    ("시행령", r"시행령"),
+    ("규정·고시", r"감독규정|규정|고시|시행규칙"),
+    ("정책방안", r"방안|대책|로드맵|계획"),
+]
+
+
+def _reg_kind(title: str) -> str:
+    for k, pat in REG_KIND:
+        if re.search(pat, title):
+            return k
+    return "기타"
+
+
+def _fsc_list(path: str, link_pat: str, source: str, limit: int) -> list[dict]:
+    """금융위 게시판 목록 파싱 — 제목/링크/날짜(첨부파일명 YYMMDD)."""
+    from bs4 import BeautifulSoup
+    r = requests.get(f"{FSC_BASE}{path}", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    r.raise_for_status()
+    soup = BeautifulSoup(r.text, "html.parser")
+    out, seen = [], set()
+    for a in soup.find_all("a", href=True):
+        if not re.search(link_pat, a["href"]):
+            continue
+        title = " ".join(a.get_text(" ", strip=True).split())
+        title = re.sub(r"\s*\.?\s*금일 등록된 게시글$", "", title)
+        if len(title) < 8 or title in seen:
+            continue
+        seen.add(title)
+        # 날짜: 같은 카드의 첨부파일명이 'YYMMDD(보도자료)…' 형태
+        date = ""
+        card = a.find_parent(["li", "tr", "div"])
+        scope = card.parent if card else None
+        if scope:
+            m = re.search(r"\b(\d{2})(\d{2})(\d{2})\s*[\(\[]", scope.get_text(" ", strip=True))
+            if m:
+                date = f"20{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        href = a["href"].lstrip(".")
+        out.append({
+            "제목": title, "링크": href if href.startswith("http") else FSC_BASE + href,
+            "date": date, "출처": source, "유형": _reg_kind(title),
+            "관련": bool(REG_RELEVANT.search(title)),
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def fetch_regulations(limit: int = 12) -> tuple[list[dict], bool]:
+    """금융위 보도자료 + 입법예고/규정변경예고 수집. 반환: (목록, 실데이터 여부)."""
+    items = []
+    for path, pat, src in (
+        ("/no010101", r"/no010101/\d+", "금융위 보도자료"),
+        ("/po040301", r"po040301/view\?noticeId=\d+", "입법예고·규정변경"),
+    ):
+        try:
+            items += _fsc_list(path, pat, src, limit)
+        except Exception:
+            continue
+    items.sort(key=lambda x: (x["date"] or "", x["관련"]), reverse=True)
+    return items, bool(items)
+
+
+def fetch_regulation_news(query: str = "ETF 규제 자본시장법 개정", limit: int = 10) -> list[dict]:
+    """규제 관련 뉴스 (구글 뉴스 RSS) — 보도자료가 놓친 건을 보완."""
+    try:
+        r = requests.get(
+            f"https://news.google.com/rss/search?q={quote(query)}&hl=ko&gl=KR&ceid=KR:ko",
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+        root = ET.fromstring(r.content)
+        out = []
+        for it in root.iter("item"):
+            t = (it.findtext("title") or "").strip()
+            if not t:
+                continue
+            out.append({"제목": t, "링크": (it.findtext("link") or "").strip(),
+                        "date": _rss_date(it.findtext("pubDate") or ""),
+                        "유형": _reg_kind(t)})
+            if len(out) >= limit:
+                break
+        return out
+    except Exception:
+        return []
+
+
+# ══════════════════════════════════════════════
 # 네이버 데이터랩 검색 트렌드
 # NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 설정 시 실데이터, 미설정 시 데모
 # ══════════════════════════════════════════════
