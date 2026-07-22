@@ -62,14 +62,22 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-INK = "#101828"
-MUTED = "#667085"
-FAINT = "#98A2B3"
-LINE = "#E4E7EC"
-NAVY = "#16244D"
-RED = "#F04452"
-COOL = "#3182F6"
+# ── 컬러 시스템 — 삼성자산운용 브랜드 계열
+# 브랜드 블루를 정체성으로, 구조는 네이비로. 중립색은 푸른기를 살짝 섞어
+# 범용 회색조가 아니라 이 팔레트에서 고른 색으로 읽히게 한다.
+BRAND = "#1428A0"       # 삼성 블루 — 브랜드 앵커(상단 바·강조·활성 탭)
+BRAND_SOFT = "#EAEEF9"  # 브랜드 연배경
+NAVY = "#1F3A6E"        # 구조색 — 제목·표 헤더·규칙선
+INK = "#141B2D"
+MUTED = "#5B6478"
+FAINT = "#93A0B4"
+LINE = "#E3E8EF"
+RED = "#D0342C"         # 상승(한국 관례) — 데이터 전용
+COOL = "#2A62B8"        # 하락 — 데이터 전용
 GRAY = MUTED
+# 표면 위계 — 페이지 / 패널 / 카드를 구분해야 '떠 있는' 느낌이 생긴다
+BG_PAGE = "#F6F8FB"     # 페이지 바탕 (흰 배경에 흰 카드 → 평면적이던 문제)
+BG_PANEL = "#FBFCFE"    # 사이드바
 BG_CARD = "#FFFFFF"
 
 st.markdown(
@@ -77,27 +85,115 @@ st.markdown(
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 
-    html, body, [class*="css"] {{
-        font-family: 'Pretendard', -apple-system, sans-serif;
-        color: {INK};
+    /* 폰트 — Streamlit 기본(Source Sans)이 우선해 앱 전체가 기본 폰트로 렌더되던 문제.
+       .stApp에 지정하고 아이콘을 제외한 전 요소가 상속하도록 강제한다. */
+    .stApp {{
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont,
+                     'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+        color: {INK}; background: {BG_PAGE};
+        font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
     }}
-    .block-container {{ padding-top: 1.5rem; padding-bottom: 3.5rem; max-width: 1280px; }}
+    .stApp *:not([data-testid="stIconMaterial"]):not([class*="material-symbols"]) {{
+        font-family: inherit;
+    }}
+
+    .block-container {{ padding-top: 1.1rem; padding-bottom: 4rem; max-width: 1320px; }}
     #MainMenu, footer {{ visibility: hidden; }}
-    header[data-testid="stHeader"] {{ background: transparent; }}
-    [data-testid="stSidebar"] {{ background: #FAFBFC; border-right: 1px solid {LINE}; }}
+    header[data-testid="stHeader"] {{ background: transparent; height: 0; }}
+
+    /* 사이드바 — 기본 위젯 나열이 아니라 설정 패널로 */
+    [data-testid="stSidebar"] {{ background: {BG_PANEL}; border-right: 1px solid {LINE}; }}
+    [data-testid="stSidebar"] label p {{
+        font-size: 0.75rem !important; font-weight: 700 !important; color: {MUTED} !important;
+    }}
+    [data-testid="stSidebar"] [data-baseweb="select"] > div {{
+        border-radius: 8px; border-color: {LINE}; background: #fff;
+    }}
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {{
+        border-radius: 8px; border: 1px dashed {LINE}; background: #fff;
+    }}
+    [data-testid="stSidebar"] hr {{ margin: 1.1rem 0; border-color: {LINE}; }}
+    /* 슬라이더를 브랜드색으로 (기본 빨강 제거) */
+    [data-testid="stSidebar"] [role="slider"] {{ background: {BRAND} !important; }}
+    [data-testid="stSidebar"] [data-baseweb="slider"] [data-testid="stThumbValue"] {{
+        color: {BRAND} !important;
+    }}
+
+    /* 브랜드 앵커 — 리포트(PDF) 상단 바와 동일한 장치 */
+    .block-container::before {{
+        content: ""; position: fixed; top: 0; left: 0; right: 0; height: 4px;
+        background: {BRAND}; z-index: 999;
+    }}
 
     button[data-baseweb="tab"] {{ font-weight: 700; }}
     button[data-baseweb="tab"] p {{ font-size: 0.92rem !important; }}
+    button[data-baseweb="tab"][aria-selected="true"] p {{ color: {BRAND} !important; }}
+    [data-baseweb="tab-highlight"] {{ background-color: {BRAND} !important; }}
 
+    /* 홈 — 주간 종합 리드 */
+    .home-lead {{
+        background: linear-gradient(135deg, {NAVY} 0%, {BRAND} 140%);
+        border-radius: 12px; padding: 20px 24px; color: #fff;
+    }}
+    .home-lead .hl-k {{
+        font-size: 0.64rem; font-weight: 700; letter-spacing: .16em; opacity: .72;
+    }}
+    .home-lead .hl-t {{ font-size: 1.02rem; font-weight: 600; line-height: 1.7; margin-top: 7px; }}
+    .home-lead b {{ font-weight: 800; }}
+
+    /* 홈 — 지수 스트립 (카드 나열 → 구분선 한 줄) */
+    .mkt-strip {{
+        display: flex; background: {BG_CARD}; border: 1px solid {LINE};
+        border-radius: 10px; overflow: hidden;
+    }}
+    .mkt-cell {{ flex: 1; padding: 11px 14px; border-left: 1px solid {LINE}; }}
+    .mkt-cell:first-child {{ border-left: none; }}
+    .mkt-n {{ font-size: 0.64rem; font-weight: 700; letter-spacing: .07em; color: {FAINT};
+        text-transform: uppercase; }}
+    .mkt-v {{ font-size: 1.02rem; font-weight: 800; margin-top: 3px;
+        font-variant-numeric: tabular-nums; letter-spacing: -.01em; }}
+    .mkt-s {{ font-size: 0.68rem; color: {FAINT}; margin-top: 1px;
+        font-variant-numeric: tabular-nums; }}
+
+    /* 홈 — KPI (하나만 주인공) */
+    .kpi2 {{ background: {BG_CARD}; border: 1px solid {LINE}; border-radius: 10px;
+        padding: 14px 16px; height: 100%; }}
+    .kpi2.lead {{ border-color: {BRAND}; box-shadow: 0 0 0 3px {BRAND_SOFT}; }}
+    .kpi2 .k {{ font-size: 0.64rem; font-weight: 700; letter-spacing: .08em; color: {FAINT};
+        text-transform: uppercase; }}
+    .kpi2 .v {{ font-size: 1.12rem; font-weight: 800; color: {INK}; margin-top: 5px;
+        line-height: 1.3; letter-spacing: -.01em; }}
+    .kpi2 .s {{ font-size: 0.74rem; color: {MUTED}; margin-top: 4px; line-height: 1.5; }}
+
+    /* 홈 — 워크플로 스텝 */
+    .flow {{ display: flex; gap: 8px; flex-wrap: wrap; }}
+    .flow-step {{ flex: 1; min-width: 150px; background: {BG_CARD}; border: 1px solid {LINE};
+        border-radius: 10px; padding: 12px 14px; position: relative; }}
+    .flow-step .no {{ font-size: 0.66rem; font-weight: 800; color: {BRAND}; letter-spacing: .06em; }}
+    .flow-step .nm {{ font-size: 0.86rem; font-weight: 800; color: {INK}; margin: 2px 0 3px; }}
+    .flow-step .ds {{ font-size: 0.71rem; color: {MUTED}; line-height: 1.5; }}
+
+    /* 헤더 — 아이덴티티 + 데이터 신선도 상태를 한 줄에 (모니터링 도구의 기본 정보) */
+    .apphead {{
+        display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+        padding: 2px 0 14px; border-bottom: 1px solid {LINE}; margin-bottom: 2px;
+    }}
     .agent-overline {{
-        font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em;
-        color: {FAINT}; margin-bottom: 6px;
+        font-size: 0.62rem; font-weight: 800; letter-spacing: 0.18em;
+        color: {BRAND}; margin-bottom: 7px;
     }}
     .agent-title {{
-        font-size: 1.5rem; font-weight: 800; color: {INK};
-        letter-spacing: -0.02em; line-height: 1.2;
+        font-size: 1.72rem; font-weight: 800; color: {INK};
+        letter-spacing: -0.035em; line-height: 1.15;
     }}
-    .agent-sub {{ font-size: 0.85rem; color: {MUTED}; margin-top: 5px; }}
+    .agent-sub {{ font-size: 0.82rem; color: {MUTED}; margin-top: 6px; letter-spacing: -0.01em; }}
+    .head-meta {{ display: flex; gap: 18px; white-space: nowrap; }}
+    .hm-item {{ text-align: right; }}
+    .hm-k {{ font-size: 0.6rem; font-weight: 700; letter-spacing: .09em; color: {FAINT};
+        text-transform: uppercase; }}
+    .hm-v {{ font-size: 0.82rem; font-weight: 700; color: {INK}; margin-top: 3px; }}
+    .hm-dot {{ display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+        background: #2E9E62; margin-right: 5px; vertical-align: middle; }}
 
     .idx-strip {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0; }}
     .idx-card {{
@@ -144,18 +240,28 @@ st.markdown(
         font-weight: 500; text-align: right;
     }}
 
+    /* 섹션 헤더 — 좌측 브랜드 룰로 위계를 만든다 */
     .sec-tag {{
-        font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em;
-        color: {NAVY}; margin-bottom: 8px;
+        font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em;
+        color: {BRAND}; margin-bottom: 7px;
     }}
-    .sec-title {{ font-size: 1.3rem; font-weight: 800; color: {INK}; letter-spacing: -0.02em; }}
-    .sec-desc {{ font-size: 0.85rem; color: {MUTED}; margin-top: 4px; }}
+    .sec-title {{
+        font-size: 1.42rem; font-weight: 800; color: {INK}; letter-spacing: -0.032em;
+        line-height: 1.25; padding-left: 12px; border-left: 3px solid {BRAND};
+    }}
+    .sec-desc {{ font-size: 0.83rem; color: {MUTED}; margin-top: 6px; padding-left: 15px;
+        line-height: 1.6; max-width: 74ch; }}
 
+    /* 카드 — 테두리 대신 옅은 그림자로 페이지 바탕 위에 띄운다 */
     .card {{
-        background: {BG_CARD}; border: 1px solid {LINE}; border-radius: 12px;
+        background: {BG_CARD}; border: 1px solid #EDF1F6; border-radius: 12px;
         padding: 18px 20px; height: 100%;
+        box-shadow: 0 1px 2px rgba(20,27,45,.04), 0 4px 12px rgba(20,27,45,.03);
     }}
-    .card-title {{ font-size: 0.92rem; font-weight: 700; color: {INK}; margin-bottom: 10px; }}
+    .card-title {{
+        font-size: 0.9rem; font-weight: 800; color: {INK}; margin-bottom: 11px;
+        letter-spacing: -0.015em;
+    }}
 
     /* KPI */
     .kpi-card {{
@@ -294,15 +400,22 @@ def section_header(tag: str, title: str, desc: str):
 
 
 def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
+    """차트도 타이포와 같은 수준으로 다듬는다 — 옅은 그리드, 축 라벨 축소, 제목 정렬."""
     fig.update_layout(
         height=height,
-        margin=dict(l=10, r=10, t=30, b=10),
+        margin=dict(l=8, r=8, t=44, b=8),
         plot_bgcolor="white",
         paper_bgcolor="white",
-        font=dict(family="Pretendard, sans-serif", size=12.5, color="#344054"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
-        xaxis=dict(showgrid=False, zeroline=False),
-        yaxis=dict(gridcolor="#EEF1F5", zeroline=False),
+        font=dict(family="Pretendard, -apple-system, sans-serif", size=12, color=MUTED),
+        title=dict(x=0, xanchor="left", font=dict(size=14.5, color=INK, weight=800), pad=dict(b=8)),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0,
+                    font=dict(size=11.5), bgcolor="rgba(0,0,0,0)"),
+        xaxis=dict(showgrid=False, zeroline=False, showline=True, linecolor=LINE,
+                   tickfont=dict(size=11, color=FAINT)),
+        yaxis=dict(gridcolor="#F0F3F8", zeroline=False, griddash="dot",
+                   tickfont=dict(size=11, color=FAINT)),
+        hoverlabel=dict(bgcolor="white", bordercolor=LINE,
+                        font=dict(family="Pretendard, sans-serif", size=12, color=INK)),
     )
     return fig
 
@@ -515,10 +628,30 @@ datalab_df, datalab_live = load_datalab(tuple(D.DATALAB_GROUPS))
 # ──────────────────────────────────────────────
 # 헤더 + 지수 스트립 (2줄)
 # ──────────────────────────────────────────────
+def _asof(fname: str) -> str:
+    """배치 산출물의 수집일 — 모니터링 도구는 데이터 신선도가 곧 신뢰도다."""
+    try:
+        return json.loads((Path(__file__).parent / "data" / fname).read_text()).get("asof", "—")
+    except Exception:
+        return "—"
+
+
+_meta = [
+    ("시장·수급", _asof("signal_board.json")),
+    ("ETF 자금", _asof("etf_flows.json")),
+    ("채널", _asof("channel_board.json")),
+]
 st.markdown(
+    '<div class="apphead"><div>'
     '<div class="agent-overline">MARKETING INTELLIGENCE · WEEKLY MONITOR</div>'
     '<div class="agent-title">KODEX ETF 마케팅 AI Agent</div>'
-    '<div class="agent-sub">시장 트렌드 → 채널 모니터링 → 마케팅 효과 측정(DiD) → 주간 리포트</div>',
+    '<div class="agent-sub">시장 트렌드 → 채널 모니터링 → 마케팅 효과 측정(DiD) → 주간 리포트 → 규제 동향</div>'
+    '</div><div class="head-meta">'
+    + "".join(f'<div class="hm-item"><div class="hm-k">{k}</div>'
+              f'<div class="hm-v">{v}</div></div>' for k, v in _meta)
+    + f'<div class="hm-item"><div class="hm-k">데이터</div>'
+      f'<div class="hm-v"><span class="hm-dot"></span>실시간 연동</div></div>'
+    + '</div></div>',
     unsafe_allow_html=True,
 )
 
@@ -537,76 +670,108 @@ tab_home, tab_trend, tab_channel, tab_did, tab_report, tab_reg = st.tabs(
 # ──────────────────────────────────────────────
 with tab_home:
     st.write("")
-    section_header("HOME", f"{sel_week} 요약", "각 탭의 핵심 지표를 한눈에 — 상세 분석은 ①~④ 탭에서.")
+    section_header("HOME", f"{sel_week} 요약", "이번 주 시장과 우리 마케팅의 상태를 한 화면에 — 상세는 ①~⑤ 탭에서.")
+    st.write("")
 
-    # 금주 시장 요약 — 주간(5거래일) 등락률
-    weekly_chips = ""
+    # ── 실데이터 (시그널 보드 · 순매수 · 캠페인)
+    try:
+        _hb = json.loads((Path(__file__).parent / "data" / "signal_board.json").read_text())
+    except Exception:
+        _hb = {}
+    _hrows = _hb.get("board", [])
+    from collections import Counter as _HC
+    _hstage = dict(_HC(r.get("단계", "관망") for r in _hrows))
+    _hdec = _hstage.get("쇠퇴기", 0)
+    _hn = len(_hrows) or 1
+    _hbench = _hb.get("벤치주간수익률")
+    _hret = sorted([r for r in _hrows if r.get("주간수익률") is not None],
+                   key=lambda r: r["주간수익률"])
+    _hup = _hret[-1] if _hret else None
+    _hdn = _hret[0] if _hret else None
+    _hemerge = [r["섹터"] for r in _hrows if r.get("단계") == "태동기"]
+
+    # ── 주간 종합 리드 (실데이터 기반 한 문단)
+    _lead_parts = [
+        f'{_hn}개 섹터 중 <b>{_hdec}개가 쇠퇴 국면</b>입니다.'
+    ]
+    if _hbench is not None:
+        _lead_parts.append(f'시장 대표 지수(KRX300)는 주간 <b>{_hbench:+.1f}%</b>.')
+    if _hdn is not None:
+        _lead_parts.append(f'{_hdn["섹터"]}가 <b>{_hdn["주간수익률"]:+.1f}%</b>로 낙폭이 가장 컸습니다.')
+    if _hemerge:
+        _lead_parts.append(f'태동 국면은 <b>{", ".join(_hemerge)}</b> — 선점 콘텐츠 검토 대상입니다.')
+    st.markdown(
+        f'<div class="home-lead"><div class="hl-k">WEEKLY SNAPSHOT · {sel_week}</div>'
+        f'<div class="hl-t">{" ".join(_lead_parts)}</div></div>',
+        unsafe_allow_html=True)
+    st.write("")
+
+    # ── 시장 지수 (카드 나열 → 구분선 한 줄)
+    _cells = ""
     for m in load_weekly_market():
         up = m["weekly"] >= 0
-        cls = "idx-up" if up else "idx-down"
-        arrow = "▲" if up else "▼"
-        weekly_chips += (
-            f'<div class="idx-card"><div class="idx-name">{m["name"]}</div>'
-            f'<div class="idx-val {cls}">{m["weekly"]:+.1f}%</div>'
-            f'<div class="idx-chg" style="color:{FAINT};">{arrow} 현재 {m["level"]}</div></div>'
-        )
+        _cells += (
+            f'<div class="mkt-cell"><div class="mkt-n">{m["name"]}</div>'
+            f'<div class="mkt-v" style="color:{RED if up else COOL};">{m["weekly"]:+.1f}%</div>'
+            f'<div class="mkt-s">현재 {m["level"]}</div></div>')
     st.markdown(
-        f'<div class="idx-group">금주 시장 요약 · 최근 5거래일 등락률</div>'
-        f'<div class="idx-strip">{weekly_chips}</div>',
-        unsafe_allow_html=True,
-    )
+        f'<div style="font-size:0.7rem;color:{FAINT};font-weight:600;letter-spacing:.06em;'
+        f'margin-bottom:6px;">금주 시장 · 최근 5거래일 등락률</div>'
+        f'<div class="mkt-strip">{_cells}</div>', unsafe_allow_html=True)
     st.write("")
 
-    top_theme = theme_tbl.sort_values("점수", ascending=False).iloc[0]
-    top_flow = wk.nlargest(1, "매수강도").iloc[0]
-    scored = did_board.dropna(subset=["score"]).sort_values("score", ascending=False) if len(did_board) else did_board
-    yt_total = sum(len(v) for v in youtube.values())
+    # ── KPI — 이번 주 주목할 것 하나를 주인공으로
+    _top_flow = wk.nlargest(1, "매수강도").iloc[0] if len(wk) else None
+    _scored = (did_board.dropna(subset=["score"]).sort_values("score", ascending=False)
+               if len(did_board) else did_board)
+    _yt_week = sum(1 for vs in youtube.values() for v in vs
+                   if v.get("published", "") >= (dt.date.today() - dt.timedelta(days=7)).isoformat())
 
     k1, k2, k3, k4 = st.columns(4, gap="medium")
+    # 주인공 — 과열/쇠퇴 국면 요약 (판정의 핵심)
+    _hot = [r["섹터"] for r in _hrows if r.get("단계") == "과열기"]
     k1.markdown(
-        f'<div class="kpi-card"><div class="kpi-label">라이징 테마 · ①</div>'
-        f'<div class="kpi-value">{top_theme["테마"]}</div>'
-        f'<div class="kpi-sub">전주 {top_theme["전주수익률"]:+.1f}% → 금주 {top_theme["수익률"]:+.1f}% · {flow_state(top_theme["전주수익률"], top_theme["수익률"])}</div></div>',
-        unsafe_allow_html=True,
-    )
-    k2.markdown(
-        f'<div class="kpi-card"><div class="kpi-label">순매수강도 1위 · ③</div>'
-        f'<div class="kpi-value" style="font-size:1.02rem;">{top_flow["종목명"]}</div>'
-        f'<div class="kpi-sub">매수강도 {top_flow["매수강도"]:+.2f}%</div></div>',
-        unsafe_allow_html=True,
-    )
-    if len(scored):
-        best = scored.iloc[0]
+        f'<div class="kpi2 lead"><div class="k">시장 국면 · 01</div>'
+        f'<div class="v">쇠퇴 {_hdec} / {_hn}</div>'
+        f'<div class="s">태동 {_hstage.get("태동기",0)} · 확산 {_hstage.get("확산기",0)} · '
+        f'과열 {_hstage.get("과열기",0)}{" (" + ", ".join(_hot) + ")" if _hot else ""}</div></div>',
+        unsafe_allow_html=True)
+    if _hup is not None:
+        k2.markdown(
+            f'<div class="kpi2"><div class="k">주간 최고 섹터 · 01</div>'
+            f'<div class="v">{_hup["섹터"]}</div>'
+            f'<div class="s" style="color:{RED};font-weight:700;">{_hup["주간수익률"]:+.1f}%</div></div>',
+            unsafe_allow_html=True)
+    if _top_flow is not None:
+        _fi = _top_flow["매수강도"]
+        _fnote = "신규상장 유입" if _fi >= 40 else f"매수강도 {_fi:+.2f}%"
         k3.markdown(
-            f'<div class="kpi-card"><div class="kpi-label">KODEX DiD 최고점 · ③</div>'
-            f'<div class="kpi-value" style="font-size:1.02rem;">{best["종목명"]}</div>'
-            f'<div class="kpi-sub">마케팅 효과 {best["score"]:.0f}점 / 100</div></div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        k3.markdown(
-            '<div class="kpi-card"><div class="kpi-label">KODEX DiD · ③</div>'
-            '<div class="kpi-value" style="font-size:1.02rem;">산출 대상 없음</div>'
-            '<div class="kpi-sub">데이터 업로드 후 재계산</div></div>',
-            unsafe_allow_html=True,
-        )
+            f'<div class="kpi2"><div class="k">개인 순매수 1위 · 03</div>'
+            f'<div class="v" style="font-size:0.98rem;">{_top_flow["종목명"]}</div>'
+            f'<div class="s">{_fnote}</div></div>', unsafe_allow_html=True)
     k4.markdown(
-        f'<div class="kpi-card"><div class="kpi-label">유튜브 신규 영상 · ②</div>'
-        f'<div class="kpi-value">{yt_total}건</div>'
-        f'<div class="kpi-sub">8개 브랜드 채널 최근 수집분</div></div>',
-        unsafe_allow_html=True,
-    )
-
+        f'<div class="kpi2"><div class="k">브랜드 신규 영상 · 02</div>'
+        f'<div class="v">{_yt_week}건</div>'
+        f'<div class="s">8개 브랜드 · 최근 7일</div></div>', unsafe_allow_html=True)
     st.write("")
+
+    # ── 워크플로 (문장 나열 → 스텝)
+    # 번호는 원문자(①) 대신 숫자 — 원문자가 아이콘 폰트로 대체돼 깨지는 환경이 있다
+    _steps = [
+        ("01", "시장 트렌드", "섹터 국면·수익률·검색량으로 시장 방향 진단"),
+        ("02", "채널 모니터링", "8개 브랜드 배너·유튜브·블로그로 경쟁 마케팅 감지"),
+        ("03", "효과 측정", "감지된 캠페인의 순매수 효과를 DiD로 검증"),
+        ("04", "주간 리포트", "종합 브리핑·다음 주 액션 도출"),
+        ("05", "규제 동향", "금융위 발표·법령 시행일 점검"),
+    ]
     st.markdown(
-        f'<div class="card"><div class="card-title">워크플로</div>'
-        f'<div style="font-size:0.85rem;color:#475467;line-height:1.8;">'
-        f'<b style="color:{NAVY};">① 시장 트렌드</b> — 뉴스 키워드·테마 수익률·검색량으로 시장 방향 진단 &nbsp;→&nbsp; '
-        f'<b style="color:{NAVY};">② 채널 모니터링</b> — 8개 브랜드 유튜브·뉴스로 경쟁사 마케팅 감지 &nbsp;→&nbsp; '
-        f'<b style="color:{NAVY};">③ 마케팅 효과 측정</b> — 감지된 마케팅의 순매수 효과를 DiD로 검증 &nbsp;→&nbsp; '
-        f'<b style="color:{NAVY};">④ 주간 리포트</b> — 종합 인사이트·차주 액션 도출</div></div>',
-        unsafe_allow_html=True,
-    )
+        f'<div style="font-size:0.7rem;color:{FAINT};font-weight:600;letter-spacing:.06em;'
+        f'margin-bottom:6px;">워크플로</div>'
+        f'<div class="flow">'
+        + "".join(f'<div class="flow-step"><div class="no">{n}</div>'
+                  f'<div class="nm">{t}</div><div class="ds">{d}</div></div>'
+                  for n, t, d in _steps)
+        + '</div>', unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────
 # ① 시장 트렌드
