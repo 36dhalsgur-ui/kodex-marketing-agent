@@ -1457,74 +1457,221 @@ with tab_report:
     st.write("")
     section_header(
         "STEP 4 · REPORT",
-        "주간 리포트 — 종합 인사이트 & 차주 액션",
-        "①~③의 수집·측정 결과를 근거로 자동 도출합니다. 특정 전략 프레임 없이 데이터 신호만 반영 — 규칙 기반이며 LLM 연동 시 이 지점만 교체됩니다.",
+        "주간 마케팅 리포트",
+        "①~③의 실데이터를 종합한 주간 브리핑입니다. 각 탭의 핵심만 요약하고, 마지막에 다음 주 액션(국면별 플레이북)으로 수렴합니다.",
     )
     st.write("")
 
-    ins = D.build_insights(theme_tbl, D.NEWS_KEYWORDS, did_board, youtube)
+    # ── 리포트용 데이터 (실데이터 재수집 — 탭 간 의존 없이 자체 완결)
+    try:
+        _sb = json.loads((Path(__file__).parent / "data" / "signal_board.json").read_text())
+        rep_board = _sb.get("board", [])
+    except Exception:
+        rep_board = []
+    rep_kw, rep_articles, rep_news_live = load_news_mentions()
+    rep_search, rep_search_live = load_theme_search()
+    rep_blogs = load_blogs()
+    try:
+        _ch = json.loads((Path(__file__).parent / "data" / "channel_board.json").read_text())
+    except Exception:
+        _ch = {}
+    _ch_brands = {b["브랜드"]: b for b in _ch.get("brands", [])}
+    _rep_banners = [dict(b, date=_ch.get("asof", "")) for br in _ch.get("brands", [])
+                    if br.get("브랜드") == "KODEX" for b in br.get("배너", [])]
+    rep_events = D.detect_marketing_events(_rep_banners, youtube.get("KODEX", []),
+                                           rep_blogs.get("KODEX", []), universe=kodex_list(netbuy_df))
+    rep_campaigns = [e for e in rep_events if e["유형"] == "캠페인"]
+    _week_ago_r = (dt.date.today() - dt.timedelta(days=7)).isoformat()
 
-    st.markdown(
-        f'<div class="card" style="background:{NAVY};border:none;color:white;">'
-        f'<div class="did-result-label" style="margin-bottom:10px;">EXECUTIVE SUMMARY · {event_week}</div>'
-        + "".join(
-            f'<div style="font-size:0.92rem;font-weight:600;line-height:1.7;">{i+1}. {s}</div>'
-            for i, s in enumerate(ins["summary"])
-        )
-        + "</div>",
-        unsafe_allow_html=True,
-    )
+    def stage_of(sector: str) -> str:
+        return next((r.get("단계", "") for r in rep_board if r["섹터"] == sector), "")
+
+    def card(title: str, body: str, tag: str = "") -> str:
+        head = f'<div class="sec-tag">{tag}</div>' if tag else ""
+        return f'<div class="card">{head}<div class="card-title">{title}</div>{body}</div>'
+
+    # ══════════ 1. 금주 시장 요약 ══════════
+    st.markdown('<div class="sec-tag">1 · MARKET</div><div style="font-size:1.05rem;font-weight:800;margin-bottom:10px;">금주 시장 요약</div>', unsafe_allow_html=True)
+    from collections import Counter as _C
+    stage_ct = _C(r.get("단계", "관망") for r in rep_board)
+    ret_rows = sorted([r for r in rep_board if r.get("주간수익률") is not None],
+                      key=lambda r: r["주간수익률"])
+    top_up = ret_rows[-3:][::-1]
+    top_dn = ret_rows[:3]
+    m1, m2, m3 = st.columns(3, gap="medium")
+    with m1:
+        chips = " · ".join(f"{s} {stage_ct.get(s, 0)}" for s in ["태동기", "확산기", "과열기", "쇠퇴기"])
+        st.markdown(card("섹터 국면 분포",
+            f'<div style="font-size:0.9rem;font-weight:700;color:{INK};line-height:1.9;">{chips}</div>'
+            f'<div style="font-size:0.72rem;color:{GRAY};margin-top:6px;">22개 섹터 · KRX 상대강도(RRG) 기준</div>'),
+            unsafe_allow_html=True)
+    with m2:
+        up = "".join(f'<div class="kw-row"><span class="kw-name">{r["섹터"]}</span><span class="kw-badge kw-rise">{r["주간수익률"]:+.1f}%</span></div>' for r in top_up)
+        dn = "".join(f'<div class="kw-row"><span class="kw-name">{r["섹터"]}</span><span class="kw-badge kw-fall">{r["주간수익률"]:+.1f}%</span></div>' for r in top_dn)
+        st.markdown(card("주간 수익률 상·하위", up + dn), unsafe_allow_html=True)
+    with m3:
+        kws = "".join(f'<div class="kw-row"><span class="kw-name">{k["키워드"]}</span><span class="kw-badge" style="background:#F2F4F7;color:#475467;">기사 {k["언급량"]}</span></div>' for k in rep_kw[:3])
+        srt = sorted(rep_search.items(), key=lambda x: -x[1])[:3]
+        srch = "".join(f'<div class="kw-row"><span class="kw-name">{k}</span><span class="kw-badge {("kw-rise" if v>=0 else "kw-fall")}">검색 {v:+.0f}%</span></div>' for k, v in srt)
+        st.markdown(card("뉴스·검색 키워드", kws + srch), unsafe_allow_html=True)
     st.write("")
 
-    r1, r2 = st.columns(2, gap="medium")
-    with r1:
-        rows = "".join(
-            f'<div class="kw-row"><span class="kw-name">'
-            f'<span style="color:{RED if s["type"] == "라이징" else COOL};">{"▲" if s["type"] == "라이징" else "▼"}</span> '
-            f'{s["text"]}</span></div>'
-            for s in ins["signals"]
+    # ══════════ 2. 경쟁사 마케팅 동향 ══════════
+    st.markdown('<div class="sec-tag">2 · COMPETITORS</div><div style="font-size:1.05rem;font-weight:800;margin-bottom:10px;">경쟁사 마케팅 동향</div>', unsafe_allow_html=True)
+    c1, c2 = st.columns([6, 6], gap="medium")
+    with c1:
+        if rep_campaigns:
+            rows = "".join(
+                f'<div class="kw-row" style="align-items:center;">'
+                f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;border-radius:5px;padding:2px 7px;margin-right:8px;white-space:nowrap;">{e["채널"]}</span>'
+                f'<span class="kw-name" style="flex:1;">{e["표기명"]}</span>'
+                f'<span style="font-size:0.72rem;color:{GRAY};">{e["주차"]}</span></div>'
+                for e in rep_campaigns[:5])
+            body = rows
+        else:
+            body = f'<div style="font-size:0.82rem;color:{GRAY};">이번 주 감지된 KODEX 캠페인 없음</div>'
+        st.markdown(card("KODEX 감지 캠페인", body, "OUR"), unsafe_allow_html=True)
+    with c2:
+        act = []
+        for brand in D.ISSUERS:
+            n = sum(1 for v in youtube.get(brand, []) if v.get("published", "") >= _week_ago_r) \
+                + sum(1 for p in rep_blogs.get(brand, []) if p.get("date", "") >= _week_ago_r)
+            act.append((brand, n))
+        act.sort(key=lambda x: -x[1])
+        rows = "".join(f'<div class="kw-row"><span class="kw-name">{b}</span><span class="kw-badge" style="background:#F2F4F7;color:#475467;">이번 주 {n}건</span></div>' for b, n in act[:5])
+        st.markdown(card("브랜드 콘텐츠 발행량", rows, "PEERS"), unsafe_allow_html=True)
+    st.write("")
+
+    # ══════════ 3. 자금·성과 ══════════
+    st.markdown('<div class="sec-tag">3 · FLOWS</div><div style="font-size:1.05rem;font-weight:800;margin-bottom:10px;">자금·성과 — 개인 순매수 강도</div>', unsafe_allow_html=True)
+    if netbuy_live:
+        w_now = netbuy_df[netbuy_df["주차"] == event_week].dropna(subset=["매수강도"])
+        f1, f2 = st.columns(2, gap="medium")
+        with f1:
+            top = w_now.nlargest(6, "매수강도")
+            rows = "".join(f'<div class="kw-row"><span class="kw-name">{r["종목명"]}</span><span class="kw-badge kw-rise">{r["매수강도"]:+.2f}%</span></div>' for _, r in top.iterrows())
+            st.markdown(card(f"개인 순매수 강도 상위 · {event_week}", rows or "데이터 없음"), unsafe_allow_html=True)
+        with f2:
+            bot = w_now.nsmallest(6, "매수강도")
+            rows = "".join(f'<div class="kw-row"><span class="kw-name">{r["종목명"]}</span><span class="kw-badge kw-fall">{r["매수강도"]:+.2f}%</span></div>' for _, r in bot.iterrows())
+            st.markdown(card(f"개인 순매수 강도 하위 · {event_week}", rows or "데이터 없음"), unsafe_allow_html=True)
+        st.caption("매수강도 = 개인 주간 순매수 ÷ 순자산 × 100 · KRX 실데이터")
+    else:
+        st.info("순매수 실데이터가 없습니다 — `python scripts/etf_batch.py` 실행 후 표시됩니다.")
+    st.write("")
+
+    # ══════════ 4. KODEX 캠페인 효과 (DiD 설명형) ══════════
+    st.markdown('<div class="sec-tag">4 · DiD</div><div style="font-size:1.05rem;font-weight:800;margin-bottom:2px;">KODEX 캠페인 효과 — DiD로 읽는 법</div><div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">가장 최근 측정 가능한 캠페인 하나를 단계별로 풀어, DiD가 무엇을 재는지 보여줍니다.</div>', unsafe_allow_html=True)
+    _uni_r = universe_frame(netbuy_df)
+    example = None
+    for e in rep_events:   # 최근순 — 실제 DiD가 산출되는 첫 사례(A안)
+        if not e["분석가능"]:
+            continue
+        ctrls = D.control_group(e["ETF"], _uni_r)
+        wk = e["주차"] if e["주차"] in weeks else weeks[-1]
+        s = D.did_series(netbuy_df, e["ETF"], ctrls)
+        scx = D.did_score(s, wk)
+        if scx.get("did") is not None and scx.get("score") is not None:
+            example = (e, ctrls, wk, scx)
+            break
+    if example:
+        e, ctrls, wk, scx = example
+        step = ('<div style="flex:1;min-width:150px;background:#F8FAFC;border:1px solid #EAEEF3;'
+                'border-radius:10px;padding:12px 14px;">'
+                '<div style="font-size:0.66rem;font-weight:700;color:#94A3B8;letter-spacing:.08em;">{no}</div>'
+                '<div style="font-size:0.82rem;font-weight:700;color:#0F172A;margin:2px 0 4px;">{t}</div>'
+                '<div style="font-size:1.15rem;font-weight:800;color:{c};">{v}</div>'
+                '<div style="font-size:0.72rem;color:#64748B;margin-top:3px;line-height:1.5;">{d}</div></div>')
+        steps = (
+            step.format(no="STEP 1 · 처치", t="Δ처치", c=INK, v=f'{scx["delta_treat"]:+.2f}%p',
+                        d=f'{e["ETF"]}의 {wk} 개인 순매수 강도가 직전 8주 평균보다 이만큼 움직였습니다.')
+            + step.format(no="STEP 2 · 대조군", t="Δ대조군 평균", c=INK, v=f'{scx["delta_ctrl"]:+.2f}%p',
+                        d=f'같은 테마·시장 경쟁 ETF {len(ctrls)}개의 평균 변화 = 시장이 원래 움직인 몫.')
+            + step.format(no="STEP 3 · 차분", t="DiD = 처치 − 대조군", c=(RED if scx["did"] >= 0 else COOL),
+                        v=f'{scx["did"]:+.2f}%p', d="시장 몫을 뺀 나머지 = 이 캠페인의 순효과.")
         )
-        st.markdown(f'<div class="card"><div class="card-title">시장 시그널</div>{rows}</div>', unsafe_allow_html=True)
-    with r2:
-        rows = "".join(
-            f'<div class="kw-row"><span class="kw-name" style="font-weight:500;">{c}</span></div>'
-            for c in ins["channel_eval"]
-        )
-        st.markdown(f'<div class="card"><div class="card-title">채널 평가</div>{rows}</div>', unsafe_allow_html=True)
+        z = scx["z"]
+        verdict = ("이례적으로 강함" if z >= 1.65 else "평소보다 강함" if z >= 1.0 else
+                   "다소 강함" if z >= 0.5 else "평소와 차이 없음" if z > -0.5 else "평소보다 부진")
+        st.markdown(
+            f'<div class="card"><div style="font-size:0.82rem;color:#475467;margin-bottom:10px;">'
+            f'예시 캠페인: <b>{e["표기명"]}</b> · {e["채널"]} · {wk}</div>'
+            f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{steps}</div>'
+            f'<div style="margin-top:14px;padding-top:12px;border-top:1px solid #EEF1F5;">'
+            f'<span style="font-size:0.82rem;color:#475467;">DiD를 이 ETF 평소 분포로 표준화한 점수 → </span>'
+            f'<b style="font-size:1.05rem;color:{NAVY};">{scx["score"]:.0f}점 / 100 · {verdict}</b>'
+            f'<span style="font-size:0.75rem;color:{GRAY};"> (50점=평소와 같음 · 평소 DiD {scx["base_mean"]:+.2f}±{scx["base_std"]:.2f}%p)</span></div></div>',
+            unsafe_allow_html=True)
+    else:
+        st.info("최근 측정 가능한 캠페인이 없습니다 — 감지된 캠페인이 모두 신규상장(베이스라인 부재)이라 DiD 예시를 만들 수 없습니다.")
+    # 왜 못 재는가 — 교육용 사이드바
+    unmeasurable = [e for e in rep_campaigns if e["분석가능"]]
+    st.caption("ⓘ 신규상장 캠페인은 상장 이전 순매수가 없어 '평소'가 존재하지 않으므로 DiD로 측정하지 않습니다 — 첫 주 유입은 마케팅 효과가 아니라 상품 출시 그 자체입니다.")
+    st.write("")
+
+    # ══════════ 5. 다음 주 액션 — 국면별 플레이북 ══════════
+    st.markdown('<div class="sec-tag">5 · NEXT WEEK</div><div style="font-size:1.05rem;font-weight:800;margin-bottom:2px;">국면별 마케팅 플레이북</div><div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">섹터가 어느 국면이냐에 따라 마케팅 액션이 달라집니다. 신규 상품 출시는 태동기(선점) 액션입니다.</div>', unsafe_allow_html=True)
+    PLAYBOOK = [
+        ("태동기", "#7C3AED", "#F5F1FE", "신규 상품 출시 · 선점 콘텐츠", "대중화 전 라인업 확보 → 확산기 유입을 받을 그릇 마련"),
+        ("확산기", "#2E9E62", "#EAF7EF", "적극적 광고·캠페인 (기존 상품)", "관심이 오르는 국면 — 유입 극대화"),
+        ("과열기", "#D97706", "#FEF6E9", "신중 · 방어형(커버드콜) 변형", "고점 리스크 — 신규 대량 출시 자제"),
+        ("쇠퇴기", "#64748B", "#F1F5F9", "마케팅 축소 · 출시 준비 워치리스트", "자금 이탈. 단, 재매집 섹터는 다음 사이클 대비 준비"),
+    ]
+    pb_cells = ""
+    for stage, col, bg, action, why in PLAYBOOK:
+        secs = [r["섹터"] for r in rep_board if r.get("단계") == stage]
+        sec_txt = ", ".join(secs[:6]) + (" …" if len(secs) > 6 else "") if secs else "해당 섹터 없음"
+        pb_cells += (
+            f'<div style="flex:1;min-width:200px;background:{bg};border-radius:10px;padding:13px 15px;">'
+            f'<div style="font-size:0.85rem;font-weight:800;color:{col};">{stage}</div>'
+            f'<div style="font-size:0.82rem;font-weight:700;color:#0F172A;margin:3px 0;">{action}</div>'
+            f'<div style="font-size:0.72rem;color:#64748B;line-height:1.5;">{why}</div>'
+            f'<div style="font-size:0.72rem;color:#334155;margin-top:6px;"><b>해당 섹터</b> — {sec_txt}</div></div>')
+    st.markdown(f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{pb_cells}</div>', unsafe_allow_html=True)
+    st.write("")
+
+    # 5-a 쇠퇴기 출시 준비 워치리스트 (재매집 필터)
+    decline = []
+    for r in rep_board:
+        if r.get("단계") == "쇠퇴기":
+            smart = (r.get("외국인13주억") or 0) + (r.get("연기금13주억") or 0)
+            if smart > 0:
+                decline.append((r["섹터"], smart, r.get("KODEX", "")))
+    decline.sort(key=lambda x: -x[1])
+    w1, w2 = st.columns([7, 5], gap="large")
+    with w1:
+        if decline:
+            rows = "".join(
+                f'<div class="kw-row" style="align-items:center;">'
+                f'<span class="kw-name" style="flex:1;">{s}</span>'
+                f'<span style="font-size:0.72rem;color:{GRAY};margin-right:10px;">{kodex or "-"}</span>'
+                f'<span class="kw-badge kw-rise">재매집 +{sm:,}억</span></div>'
+                for s, sm, kodex in decline[:6])
+            st.markdown(card("출시 준비 워치리스트 — 쇠퇴기 × 재매집",
+                rows + '<div style="font-size:0.72rem;color:#64748B;margin-top:8px;line-height:1.6;">'
+                '가격은 쇠퇴기지만 외국인·연기금이 순매수 중 = 다음 사이클 재진입 후보. '
+                '<b>출시 리드타임(수개월)을 벌기 위한 준비 착수 대상</b>이지, 즉시 출시가 아닙니다. '
+                '순환형인지 구조적 쇠퇴인지는 사람이 판단해야 합니다.</div>'),
+                unsafe_allow_html=True)
+        else:
+            st.markdown(card("출시 준비 워치리스트", f'<div style="font-size:0.82rem;color:{GRAY};">재매집 신호가 잡히는 쇠퇴기 섹터가 없습니다.</div>'), unsafe_allow_html=True)
+    with w2:
+        gaps = D.lineup_gaps()
+        if gaps:
+            rows = "".join(
+                f'<div class="kw-row"><span class="kw-name">{g["테마"]} × {g["시장"]}</span>'
+                f'<span style="font-size:0.72rem;color:{GRAY};">경쟁 {g["경쟁사수"]}종 · <span style="color:#94A3B8;">{stage_of(g["테마"]) or "국면 미상"}</span></span></div>'
+                for g in gaps[:5])
+            st.markdown(card("KODEX 라인업 공백",
+                rows + '<div style="font-size:0.72rem;color:#64748B;margin-top:8px;line-height:1.6;">'
+                '경쟁사는 보유, KODEX는 미보유한 테마×시장. 국면이 태동기일 때가 출시 적기입니다. '
+                '추종 지수·규제 요건은 별도 검증이 필요합니다.</div>'),
+                unsafe_allow_html=True)
+        else:
+            st.markdown(card("KODEX 라인업 공백", f'<div style="font-size:0.82rem;color:{GRAY};">`etf_names.json`이 없어 계산 불가 — 배치 실행 후 표시됩니다.</div>'), unsafe_allow_html=True)
 
     st.write("")
-    st.markdown('<div class="sec-tag">NEXT WEEK</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">차주 액션 제안</div>', unsafe_allow_html=True)
-    a_cols = st.columns(2, gap="medium")
-    for i, act in enumerate(ins["actions"]):
-        a_cols[i % 2].markdown(
-            f'<div class="act-card"><span class="act-prio prio-{act["priority"]}">{act["priority"]}</span>'
-            f'<div class="act-title">{act["title"]}</div>'
-            f'<div class="act-row"><b>왜</b> — {act["why"]}</div>'
-            f'<div class="act-row"><b>어떻게</b> — {act["how"]}</div></div>',
-            unsafe_allow_html=True,
-        )
-
-    st.write("")
-    # 마크다운 리포트 다운로드
-    md_lines = [f"# KODEX 마케팅 주간 리포트 — {sel_week}", "", "## 핵심 요약"]
-    md_lines += [f"{i+1}. {s}" for i, s in enumerate(ins["summary"])]
-    md_lines += ["", "## 시장 시그널"] + [f"- [{s['type']}] {s['text']}" for s in ins["signals"]]
-    md_lines += ["", "## 채널 평가"] + [f"- {c}" for c in ins["channel_eval"]]
-    md_lines += ["", "## 차주 액션"]
-    for act in ins["actions"]:
-        md_lines += [f"### [{act['priority']}] {act['title']}", f"- 왜: {act['why']}", f"- 어떻게: {act['how']}"]
-    if len(did_board):
-        cols_md = list(did_board.columns)
-        table = ["| " + " | ".join(cols_md) + " |", "| " + " | ".join(["---"] * len(cols_md)) + " |"]
-        table += ["| " + " | ".join(str(v) for v in row) + " |" for row in did_board.itertuples(index=False)]
-        md_lines += ["", "## KODEX DiD 점수 보드"] + table
-    st.download_button(
-        "리포트 다운로드 (Markdown)",
-        "\n".join(md_lines),
-        file_name=f"kodex_weekly_report_{dt.date.today().isoformat()}.md",
-        mime="text/markdown",
-    )
-    st.caption("ⓘ 인사이트는 수집 데이터 기반 규칙 엔진으로 생성됩니다. LLM API 연동 시 data.py의 build_insights()만 교체하면 됩니다.")
+    st.caption("ⓘ 시장·자금·캠페인은 실데이터(KRX·네이버·구글·RSS)입니다. 국면별 플레이북은 규칙 기반 제안이며, 순환/성장 판단과 출시 가능성 검증은 사람 몫입니다. PDF 내보내기는 다음 단계에서 추가됩니다.")
 
 st.write("")
 st.caption(

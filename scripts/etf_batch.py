@@ -32,53 +32,22 @@ warnings.filterwarnings("ignore")
 import requests
 from pykrx import stock
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import data as D  # 분류 기준을 앱과 공유 (drift 방지)
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "etf_flows.json"
 NAME_CACHE = ROOT / "data" / "etf_names.json"
 UA = {"User-Agent": "Mozilla/5.0"}
 
-BRANDS = ["KODEX", "TIGER", "ACE", "SOL", "HANARO", "RISE", "PLUS", "TIMEFOLIO", "TIME"]
 N_WEEKS = 10          # DiD 베이스라인 8주 + 여유
 MAX_PEERS_PER_THEME = 4   # 테마별 경쟁사 ETF 수집 상한 (배치 시간 관리)
 
-# ── 테마 · 기초시장 분류 (ETF명 키워드) ────────────────────────────
+# 분류·브랜드 판별은 data.py의 단일 기준을 재사용한다 (앱과 drift 방지).
 # 기초시장을 분리하는 이유: '반도체' 하나로 묶으면 미국반도체 처치군에
 # 한국반도체가 대조군으로 붙어 DiD의 평행추세 가정이 깨진다.
-MARKETS = [
-    ("미국", r"미국|나스닥|S&P|필라델피아|다우|러셀"),
-    ("중국", r"차이나|중국|항셍|홍콩"),
-    ("일본", r"일본|닛케이"),
-    ("인도", r"인도|니프티"),
-    ("글로벌", r"글로벌|선진국|신흥국|월드|해외"),
-]
-THEMES = [
-    ("반도체", r"반도체|SEMI|메모리|파운드리"),
-    ("AI·전력", r"AI|인공지능|전력|광통신|데이터센터"),
-    ("2차전지", r"2차전지|배터리|전고체|리튬"),
-    ("방산", r"방산|우주항공|K-?방산"),
-    ("조선", r"조선|해운"),
-    ("원자력", r"원자력|SMR|원전"),
-    ("바이오", r"바이오|헬스케어|제약"),
-    ("커버드콜", r"커버드콜"),
-    ("배당", r"배당|고배당|리츠"),
-    ("채권", r"채권|국채|금리|CD|단기자금|통안"),
-    ("금·원자재", r"금현물|골드|은|원유|구리|원자재"),
-    ("빅테크", r"빅테크|테크|나스닥100|매그니피센트|M7"),
-    ("시장대표", r"200|코스피|코스닥|S&P500|MSCI"),
-]
-
-
-def classify(name: str) -> tuple[str, str]:
-    market = next((m for m, pat in MARKETS if re.search(pat, name, re.I)), "한국")
-    theme = next((t for t, pat in THEMES if re.search(pat, name, re.I)), "기타")
-    return theme, market
-
-
-def brand_of(name: str) -> str | None:
-    for b in BRANDS:
-        if name.startswith(b + " ") or name.startswith(b):
-            return "TIMEFOLIO" if b == "TIME" else b
-    return None
+classify = D.classify_etf
+brand_of = D.etf_brand_of
 
 
 def week_ranges(n: int) -> list[tuple[str, date, date]]:

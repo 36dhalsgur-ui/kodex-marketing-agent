@@ -94,6 +94,73 @@ def load_etf_flows() -> dict | None:
     return None
 
 
+# ── ETF 분류 (테마·기초시장·브랜드) — 배치와 리포트가 공유하는 단일 기준 ──────
+ETF_BRANDS = ["KODEX", "TIGER", "ACE", "SOL", "HANARO", "RISE", "PLUS", "TIMEFOLIO", "TIME"]
+ETF_MARKETS = [
+    ("미국", r"미국|나스닥|S&P|필라델피아|다우|러셀"),
+    ("중국", r"차이나|중국|항셍|홍콩"),
+    ("일본", r"일본|닛케이"),
+    ("인도", r"인도|니프티"),
+    ("글로벌", r"글로벌|선진국|신흥국|월드|해외"),
+]
+ETF_THEMES = [
+    ("반도체", r"반도체|SEMI|메모리|파운드리"),
+    ("AI·전력", r"AI|인공지능|전력|광통신|데이터센터"),
+    ("2차전지", r"2차전지|배터리|전고체|리튬"),
+    ("방산", r"방산|우주항공|K-?방산"),
+    ("조선", r"조선|해운"),
+    ("원자력", r"원자력|SMR|원전"),
+    ("바이오", r"바이오|헬스케어|제약"),
+    ("커버드콜", r"커버드콜"),
+    ("배당", r"배당|고배당|리츠"),
+    ("채권", r"채권|국채|금리|CD|단기자금|통안"),
+    ("금·원자재", r"금현물|골드|은|원유|구리|원자재"),
+    ("빅테크", r"빅테크|테크|나스닥100|매그니피센트|M7"),
+    ("시장대표", r"200|코스피|코스닥|S&P500|MSCI"),
+]
+
+
+def classify_etf(name: str) -> tuple[str, str]:
+    market = next((m for m, pat in ETF_MARKETS if re.search(pat, name, re.I)), "한국")
+    theme = next((t for t, pat in ETF_THEMES if re.search(pat, name, re.I)), "기타")
+    return theme, market
+
+
+def etf_brand_of(name: str) -> str | None:
+    for b in ETF_BRANDS:
+        if name.startswith(b):
+            return "TIMEFOLIO" if b == "TIME" else b
+    return None
+
+
+_ETF_NAMES_PATH = Path(__file__).parent / "data" / "etf_names.json"
+_LINEUP_EXCLUDE = re.compile(r"인버스|레버리지|2X|3X|곱버스|선물\(H\)|합성")
+
+
+def lineup_gaps(min_competitors: int = 3) -> list[dict]:
+    """전체 ETF 명단(배치 캐시)에서 'KODEX 미보유 + 경쟁사 다수 보유' 테마×시장 공백.
+    반환: [{테마, 시장, 경쟁사수, 브랜드}] 경쟁사 많은 순. 캐시 없으면 빈 리스트."""
+    try:
+        names = json.loads(_ETF_NAMES_PATH.read_text())
+    except Exception:
+        return []
+    from collections import defaultdict
+    cov: dict = defaultdict(lambda: defaultdict(int))
+    for nm in names.values():
+        b = etf_brand_of(nm)
+        if not b or _LINEUP_EXCLUDE.search(nm):
+            continue
+        cov[classify_etf(nm)][b] += 1
+    gaps = []
+    for (theme, market), brands in cov.items():
+        if brands.get("KODEX", 0) == 0 and sum(brands.values()) >= min_competitors:
+            gaps.append({"테마": theme, "시장": market,
+                         "경쟁사수": sum(brands.values()),
+                         "브랜드": dict(brands)})
+    gaps.sort(key=lambda g: -g["경쟁사수"])
+    return gaps
+
+
 def real_netbuy_frame(flows: dict) -> pd.DataFrame:
     """배치 산출물 → 순매수 분석용 데이터프레임.
     컬럼: 주차·종목명·테마·기초시장·운용사·순매수액(개인, 억)·순자산(억)"""
