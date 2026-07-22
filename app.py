@@ -22,7 +22,7 @@ import data as D
 # 앱 전체가 죽는다 — 필수 속성 누락 시 강제 재로드로 자가 복구한다.
 _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score", "detect_marketing_events", "classify_marketing_events",
-    "load_etf_flows", "real_netbuy_frame",
+    "load_etf_flows", "real_netbuy_frame", "lineup_gaps", "classify_etf", "etf_brand_of",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
@@ -1656,7 +1656,7 @@ with tab_report:
         else:
             st.markdown(card("출시 준비 워치리스트", f'<div style="font-size:0.82rem;color:{GRAY};">재매집 신호가 잡히는 쇠퇴기 섹터가 없습니다.</div>'), unsafe_allow_html=True)
     with w2:
-        gaps = D.lineup_gaps()
+        gaps = D.lineup_gaps() if hasattr(D, "lineup_gaps") else []
         if gaps:
             rows = "".join(
                 f'<div class="kw-row"><span class="kw-name">{g["테마"]} × {g["시장"]}</span>'
