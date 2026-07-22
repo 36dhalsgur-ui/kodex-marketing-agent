@@ -161,6 +161,225 @@ def lineup_gaps(min_competitors: int = 3) -> list[dict]:
     return gaps
 
 
+def etf_product_type(name: str) -> str:
+    """ETF명으로 상품 유형 추론 — 공백 영역의 경쟁 구도 분석용."""
+    if re.search(r"커버드콜", name):
+        return "커버드콜"
+    if re.search(r"액티브", name):
+        return "액티브"
+    if re.search(r"TOP\s?\d+", name):
+        return "집중(TOP)"
+    return "지수추종"
+
+
+def gap_competitors(theme: str, market: str, limit: int = 6) -> list[str]:
+    """해당 테마×시장의 비(非)KODEX 경쟁 상품 실제 목록."""
+    try:
+        names = json.loads(_ETF_NAMES_PATH.read_text())
+    except Exception:
+        return []
+    out = []
+    for nm in names.values():
+        b = etf_brand_of(nm)
+        if not b or b == "KODEX" or _LINEUP_EXCLUDE.search(nm):
+            continue
+        if classify_etf(nm) == (theme, market):
+            out.append(nm)
+    return out[:limit]
+
+
+def _intensity_at(netbuy_df, name: str, week: str):
+    """특정 ETF의 해당 주 개인 매수강도. 없으면 None."""
+    if netbuy_df is None or not len(netbuy_df):
+        return None
+    r = netbuy_df[(netbuy_df["종목명"] == name) & (netbuy_df["주차"] == week)]
+    if len(r) and pd.notna(r.iloc[0].get("매수강도")):
+        return float(r.iloc[0]["매수강도"])
+    return None
+
+
+_NEWLISTING_INTENSITY = 40.0   # 이 이상은 신규상장 첫 주 유입 왜곡으로 본다
+
+
+def _has_jong(word: str) -> int | None:
+    """마지막 글자의 받침 코드(0=없음). 한글 아니면 None."""
+    if not word:
+        return None
+    c = ord(word[-1])
+    return (c - 0xAC00) % 28 if 0xAC00 <= c <= 0xD7A3 else None
+
+
+def _eun(w: str) -> str:      # 은/는
+    j = _has_jong(w)
+    return f"{w}은" if j else f"{w}는"
+
+
+def _euro(w: str) -> str:    # 으로/로 (ㄹ받침은 '로')
+    j = _has_jong(w)
+    return f"{w}로" if j in (None, 0, 8) else f"{w}으로"
+
+
+# 국면(RRG 22섹터)에 매핑되는 ETF 테마만 국면 판정 대상 — 나머지는 전략상품(레짐 로직)
+_THEME_TO_SECTOR = {"반도체": "반도체", "AI·전력": "AI·전력", "2차전지": "2차전지",
+                    "방산": "방산", "조선": "조선", "원자력": "원자력"}
+_STRATEGY_THEMES = {"커버드콜", "채권", "시장대표", "배당", "금·원자재", "빅테크", "바이오"}
+
+
+def review_current_marketing(events: list, board: list, netbuy_df, week: str) -> list[dict]:
+    """지금 집행 중인 KODEX 마케팅을 국면·자금 근거로 지속/확대/축소 판정.
+
+    반환: [{ETF, 표기명, 판정, rank, 국면, 개인강도, 근거}] — 확대>지속류>축소 순.
+    규칙:
+      섹터 테마 상품 — 태동·확산→확대 / 과열→지속·신중(자금 이탈 시 축소) /
+                      쇠퇴→축소(재매집+자금유입이면 지속·관찰)
+      전략 상품(커버드콜·채권·코어) — 국면 대신 시장 레짐. 하락·변동성 장이면 방어 수요→지속
+      신규상장 유입은 확대 근거에서 제외.
+    """
+    stage = {r["섹터"]: r.get("단계", "") for r in board}
+    smart = {r["섹터"]: (r.get("외국인13주억") or 0) + (r.get("연기금13주억") or 0) for r in board}
+    falling = sum(1 for r in board if r.get("단계") == "쇠퇴기") >= max(1, len(board) // 2)
+
+    out, seen = [], set()
+    for e in events:
+        if e.get("유형") == "정기":         # 주간·분기 리포트는 상품 푸시가 아님
+            continue
+        name = e.get("표기명", "")
+        if name in seen:
+            continue
+        seen.add(name)
+        etf = e.get("ETF", name)
+        theme, _ = classify_etf(etf if e.get("분석가능") else name)
+        inten = _intensity_at(netbuy_df, etf, week)
+        newlisting = inten is not None and inten >= _NEWLISTING_INTENSITY
+        sector = _THEME_TO_SECTOR.get(theme)
+        phase = stage.get(sector) if sector else None
+
+        if phase is None or theme in _STRATEGY_THEMES:
+            verdict, rank, ph = "지속", 1, "전략상품"
+            if newlisting:
+                why = f"{theme} 신규상장 — 하락장 방어 수요와 맞물린 초기 모멘텀. 확산기 진입까지 집행 유지."
+            elif falling:
+                why = f"{theme} 계열 방어·코어 상품. 하락·변동성 국면이라 방어 수요가 유지됩니다."
+            else:
+                why = f"{theme} 계열 코어 상품 — 꾸준한 집행 유지."
+        elif phase in ("태동기", "확산기"):
+            verdict, rank, ph = "확대", 0, phase
+            why = f"{sector} {phase} — 관심이 오르는 테마라 마케팅 확대 적기."
+            if inten is not None and 0 < inten < _NEWLISTING_INTENSITY:
+                why += f" 개인 순매수 {inten:+.2f}% 동반."
+        elif phase == "과열기":
+            if inten is not None and inten < 0:
+                verdict, rank, ph = "축소", 3, phase
+                why = f"{sector} 과열기에 개인 순매수 {inten:+.2f}%로 이탈 — 고점 리스크. 마케팅 축소 검토."
+            else:
+                verdict, rank, ph = "지속·신중", 2, phase
+                why = f"{sector} 과열기 — 고점 리스크로 확대는 자제하고 현 수준 유지."
+        else:  # 쇠퇴기
+            if smart.get(sector, 0) > 0 and (inten is None or inten >= 0):
+                verdict, rank, ph = "지속·관찰", 2, phase
+                why = f"{sector} 쇠퇴기이나 외국인·연기금 재매집(+{smart[sector]:,}억) 진행 — 조기 반등 가능성, 축소 보류하고 관찰."
+            else:
+                verdict, rank, ph = "축소", 3, phase
+                why = f"{sector} 쇠퇴기 + 자금 이탈 — 마케팅 축소 검토."
+
+        out.append({"ETF": etf, "표기명": name, "판정": verdict, "rank": rank,
+                    "국면": ph, "개인강도": inten, "근거": why})
+    out.sort(key=lambda x: x["rank"])
+    return out
+
+
+def build_recommendations(board: list, netbuy_df, week: str,
+                          search_deltas: dict | None = None,
+                          campaigns: list | None = None) -> list[dict]:
+    """국면 × 자금 × 검색 × 재매집 × 캠페인을 교차해 다음 주 마케팅 권고를 생성.
+
+    각 권고: {우선순위, rank, 분류, 제목, 근거}. rank가 낮을수록 상단(적극>선점>유지>관찰>주의).
+    규칙:
+      - 확산기 섹터 + 보유 KODEX 상품 → 적극 마케팅 (자금 유입 동반 시 근거 강화)
+      - 현재 집행 중 캠페인 + 개인 순매수 반응 → 유지 (신규상장 왜곡은 분리 표기)
+      - 태동기 섹터 → 선점 콘텐츠
+      - 쇠퇴기 + 외국인·연기금 재매집(+) → 출시 준비 관찰
+      - 검색 급등하나 과열·쇠퇴 국면 → 신규 대량 출시 주의
+    """
+    recs = []
+    search_deltas = search_deltas or {}
+
+    # 1) 확산기 적극 마케팅
+    for r in board:
+        if r.get("단계") != "확산기":
+            continue
+        prod = r.get("KODEX", "")
+        wr = r.get("주간수익률")
+        inten = _intensity_at(netbuy_df, prod, week)
+        why = f"{_eun(r['섹터'])} 확산 국면(상대강도 {r.get('RS수준')}) — 관심이 오르는 구간이라 보유 상품 마케팅 집중이 정석입니다."
+        if inten is not None and 0 < inten < _NEWLISTING_INTENSITY:
+            why += f" 개인 순매수 강도 {inten:+.2f}%로 자금이 이미 유입 중이라 증폭 효과가 큽니다."
+        if wr is not None and wr < -3:
+            why += f" 단, 이번 주 {wr:+.1f}% 조정 중이라 방어 메시지 병행이 안전합니다."
+        recs.append({"우선순위": "적극", "rank": 0, "분류": "확산기",
+                     "제목": f"{r['섹터']} — {prod or 'KODEX 보유 상품'} 광고 집중", "근거": why})
+
+    # 2) 집행 중 캠페인 유지 (자금 반응 확인)
+    seen = set()
+    for e in (campaigns or []):
+        etf = e.get("ETF", "")
+        if etf in seen:
+            continue
+        seen.add(etf)
+        inten = _intensity_at(netbuy_df, etf, week)
+        if inten is not None and inten >= _NEWLISTING_INTENSITY:
+            why = f"신규상장 첫 주 유입(개인 강도 {inten:+.0f}%는 상장 효과 포함). 초기 모멘텀을 확산기 진입까지 이어가는 집행 유지가 필요합니다."
+        elif inten is not None and inten > 0:
+            why = f"현재 3채널 집행 중이며 개인 순매수 강도 {inten:+.2f}%로 실제 자금 반응이 확인됩니다 — 감이 아닌 데이터 근거로 유지 가치가 있습니다."
+        else:
+            why = "현재 집행 중인 캠페인. 다음 주 개인 순매수 반응을 보고 지속 여부를 판단합니다."
+        recs.append({"우선순위": "유지", "rank": 2, "분류": "캠페인",
+                     "제목": f"{e.get('표기명', etf)} 캠페인 유지", "근거": why})
+
+    # 3) 태동기 선점
+    for r in board:
+        if r.get("단계") != "태동기":
+            continue
+        prod = r.get("KODEX", "")
+        recs.append({"우선순위": "선점", "rank": 1, "분류": "태동기",
+                     "제목": f"{r['섹터']} 선점 콘텐츠 검토",
+                     "근거": f"{_eun(r['섹터'])} 유일한 태동 국면. {_euro(prod or 'KODEX 보유 상품')} 확산 전환 전 인지도를 미리 확보하는 것이 태동기 액션입니다."})
+
+    # 4) 쇠퇴기 재매집 → 출시 준비 관찰
+    decl = []
+    for r in board:
+        if r.get("단계") == "쇠퇴기":
+            smart = (r.get("외국인13주억") or 0) + (r.get("연기금13주억") or 0)
+            if smart > 0:
+                decl.append((r["섹터"], smart, r.get("KODEX", "")))
+    decl.sort(key=lambda x: -x[1])
+    if decl:
+        names = " · ".join(f"{s}(+{sm:,}억)" for s, sm, _ in decl[:2])
+        recs.append({"우선순위": "관찰", "rank": 3, "분류": "재매집",
+                     "제목": "쇠퇴기 재매집 섹터 출시 준비 모니터링",
+                     "근거": f"{names} 등은 가격은 쇠퇴기지만 외국인·연기금이 순매수 전환 중 — 출시 리드타임(수개월)을 벌기 위한 파이프라인 후보입니다. 순환/구조 성격은 담당자 판단이 필요합니다."})
+
+    # 5) 검색 급등 × 국면 부적기 → 주의
+    stage_map = {r["섹터"]: r.get("단계", "") for r in board}
+    _theme_sector = {"조선": "조선", "AI반도체": "반도체", "반도체": "반도체",
+                     "2차전지": "2차전지", "방산": "방산", "원자력": "원자력", "K-방산": "방산"}
+    hot = []
+    for kw, v in sorted(search_deltas.items(), key=lambda x: -x[1])[:4]:
+        if v < 15:
+            continue
+        sec = _theme_sector.get(kw)
+        stg = stage_map.get(sec, "") if sec else ""
+        if stg in ("과열기", "쇠퇴기"):
+            hot.append(f"{kw}(검색 +{v:.0f}%·{stg})")
+    if hot:
+        recs.append({"우선순위": "주의", "rank": 4, "분류": "국면불일치",
+                     "제목": "검색 급등 테마 — 신규 대량 출시 주의",
+                     "근거": f"{' · '.join(hot)}. 관심은 최고조이나 국면상 고점/쇠퇴 구간이라, 신규 대량 출시보다 기존 상품 방어적 마케팅이 적합합니다."})
+
+    recs.sort(key=lambda x: x["rank"])
+    return recs
+
+
 def real_netbuy_frame(flows: dict) -> pd.DataFrame:
     """배치 산출물 → 순매수 분석용 데이터프레임.
     컬럼: 주차·종목명·테마·기초시장·운용사·순매수액(개인, 억)·순자산(억)"""
