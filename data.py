@@ -845,6 +845,75 @@ def fetch_regulations(limit: int = 12) -> tuple[list[dict], bool]:
     return items, bool(items)
 
 
+# ── 국가법령정보센터 OpenAPI — 근거 법령의 현행 상태·시행일 ─────────────
+# OC는 이메일 앞부분(무료 발급). 미설정 시 공개 테스트 계정으로 동작한다.
+LAW_API = "https://www.law.go.kr/DRF/lawSearch.do"
+# ETF 마케팅에 직접 닿는 근거 법령·규정
+LAW_TARGETS = [
+    ("자본시장과 금융투자업에 관한 법률", "법률"),
+    ("자본시장과 금융투자업에 관한 법률 시행령", "시행령"),
+    ("금융투자업규정", "행정규칙"),
+    ("금융소비자 보호에 관한 법률", "법률"),
+]
+
+
+def _law_query(name: str, kind: str, oc: str) -> dict | None:
+    """법령명으로 현행 법령 1건 조회 — 공포일자·시행일자·제개정구분."""
+    target = "admrul" if kind == "행정규칙" else "law"
+    try:
+        r = requests.get(LAW_API, params={
+            "OC": oc, "target": target, "type": "XML", "query": name, "display": "5",
+        }, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        root = ET.fromstring(r.content)
+        if root.findtext("resultCode") not in (None, "00"):
+            return None
+        node = root.find("law") if target == "law" else root.find("admrul")
+        if node is None:
+            return None
+
+        def g(*tags):
+            for t in tags:
+                v = node.findtext(t)
+                if v and v.strip():
+                    return v.strip()
+            return ""
+
+        def fmt(d):
+            return f"{d[:4]}-{d[4:6]}-{d[6:8]}" if d and len(d) == 8 and d.isdigit() else d
+
+        return {
+            "법령명": g("법령명한글", "행정규칙명"),
+            "약칭": g("법령약칭명"),
+            "구분": g("법령구분명", "행정규칙종류") or kind,
+            "제개정": g("제개정구분명"),
+            "공포일": fmt(g("공포일자", "발령일자")),
+            "시행일": fmt(g("시행일자")),
+            "소관": g("소관부처명"),
+            "현행": g("현행연혁코드") or "현행",
+            "링크": "https://www.law.go.kr" + g("법령상세링크", "행정규칙상세링크"),
+        }
+    except Exception:
+        return None
+
+
+def fetch_laws() -> tuple[list[dict], bool]:
+    """ETF 마케팅 근거 법령의 현행 상태. 반환: (목록, 실데이터 여부).
+
+    보도자료는 '발표'를 보여주지만 실제 규제는 **시행일**부터 적용된다.
+    시행 전후로 상품 메시지가 달라져야 하므로 시행일을 함께 본다."""
+    oc = os.environ.get("LAW_OC") or "test"
+    out = []
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {ex.submit(_law_query, n, k, oc): (n, k) for n, k in LAW_TARGETS}
+        for fut in futs:
+            r = fut.result()
+            if r and r.get("법령명"):
+                out.append(r)
+    # 시행일 임박·최신 개정 순
+    out.sort(key=lambda x: x.get("시행일") or "", reverse=True)
+    return out, bool(out)
+
+
 def fetch_regulation_news(query: str = "ETF 규제 자본시장법 개정", limit: int = 10) -> list[dict]:
     """규제 관련 뉴스 (구글 뉴스 RSS) — 보도자료가 놓친 건을 보완."""
     try:

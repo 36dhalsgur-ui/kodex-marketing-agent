@@ -25,7 +25,7 @@ _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score", "detect_marketing_events", "classify_marketing_events",
     "load_etf_flows", "real_netbuy_frame", "lineup_gaps", "classify_etf", "etf_brand_of",
     "review_current_marketing", "gap_competitors", "etf_product_type", "build_recommendations",
-    "fetch_regulations", "fetch_regulation_news", "REG_RELEVANT",
+    "fetch_regulations", "fetch_regulation_news", "REG_RELEVANT", "fetch_laws", "LAW_TARGETS",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
@@ -342,6 +342,11 @@ def load_regulations():
 @st.cache_data(ttl=3600)
 def load_regulation_news():
     return D.fetch_regulation_news()
+
+
+@st.cache_data(ttl=86400)
+def load_laws():
+    return D.fetch_laws()
 
 
 @st.cache_data
@@ -1966,11 +1971,51 @@ with tab_reg:
             st.info("규제 뉴스를 불러오지 못했습니다.")
         st.caption("구글 뉴스 RSS · 보도자료가 놓친 건을 보완합니다.")
 
+    # ── 근거 법령 현황 (국가법령정보센터 OpenAPI)
+    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="sec-tag">LAW</div>'
+        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">근거 법령 현황</div>'
+        f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
+        f'보도자료는 <b>발표</b>를 보여주지만, 규제는 <b>시행일</b>부터 적용됩니다 — '
+        f'시행 전후로 상품 메시지가 달라져야 하므로 시행일을 함께 봅니다. (국가법령정보센터)</div>',
+        unsafe_allow_html=True)
+    laws, laws_live = load_laws()
+    if laws:
+        _today = dt.date.today().isoformat()
+        rows = ""
+        for l in laws:
+            시행 = l.get("시행일") or "—"
+            future = 시행 > _today
+            badge = ('<span style="font-size:0.64rem;font-weight:800;color:#fff;background:#B5321F;'
+                     'border-radius:4px;padding:2px 7px;margin-left:7px;">시행 예정</span>' if future else "")
+            rows += (
+                f'<a class="kw-link" href="{l["링크"]}" target="_blank">'
+                f'<div class="kw-row" style="align-items:center;">'
+                f'<span style="font-size:0.66rem;font-weight:700;color:#475467;background:#F2F4F7;'
+                f'border-radius:4px;padding:2px 7px;margin-right:9px;white-space:nowrap;'
+                f'min-width:60px;text-align:center;">{l["구분"]}</span>'
+                f'<span class="kw-name" style="flex:1;font-size:0.84rem;">'
+                f'{l.get("약칭") or l["법령명"]}{badge}</span>'
+                f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;margin-left:8px;">'
+                f'{l["제개정"]} · 공포 {l["공포일"]}</span>'
+                f'<span style="font-size:0.78rem;font-weight:700;color:{NAVY};white-space:nowrap;'
+                f'margin-left:12px;">시행 {시행}</span></div></a>')
+        st.markdown(f'<div class="card" style="padding:8px 16px;">{rows}</div>', unsafe_allow_html=True)
+        _future = [l for l in laws if (l.get("시행일") or "") > _today]
+        if _future:
+            st.info("**시행 예정 법령이 있습니다** — "
+                    + " · ".join(f'{l.get("약칭") or l["법령명"]}({l["시행일"]} 시행)' for l in _future)
+                    + "\n\n시행일 전후로 상품 설명·광고 문구 검토가 필요할 수 있습니다.")
+        st.caption("국가법령정보센터 OpenAPI · 현행 법령 기준 (1일 캐시) · "
+                   "LAW_OC 환경변수에 본인 OC를 넣으면 공개 테스트 계정 대신 사용됩니다.")
+    else:
+        st.info("법령 정보를 불러오지 못했습니다 — 국가법령정보센터 응답을 확인해주세요.")
+
     st.write("")
     st.caption(
-        "ⓘ 이 탭은 **발표된 규제 동향**을 모으는 모니터입니다. 개정 이력·시행일의 완전한 법령 목록은 "
-        "국가법령정보센터 API(OC 키 발급 필요)를 연동해야 하며, 현재는 금융위 발표분과 뉴스의 부분집합입니다. "
-        "법률 해석·컴플라이언스 판단은 담당 부서 확인이 필요합니다.")
+        "ⓘ 이 탭은 **발표된 규제 동향(금융위)**과 **근거 법령의 현행 상태(국가법령정보센터)**를 함께 봅니다. "
+        "다만 개별 조문이 우리 상품에 갖는 의미와 컴플라이언스 판단은 담당 부서 확인이 필요합니다.")
 
 st.write("")
 st.caption(
