@@ -25,7 +25,8 @@ _REQUIRED_ATTRS = (
     "kodex_etfs", "control_group", "did_series", "did_score", "detect_marketing_events", "classify_marketing_events",
     "load_etf_flows", "real_netbuy_frame", "lineup_gaps", "classify_etf", "etf_brand_of",
     "review_current_marketing", "gap_competitors", "etf_product_type", "build_recommendations",
-    "fetch_regulations", "fetch_regulation_news", "REG_RELEVANT", "fetch_laws", "LAW_TARGETS",
+    "fetch_regulations", "fetch_regulation_news", "REG_RELEVANT", "REG_EXCLUDE",
+    "fetch_laws", "LAW_TARGETS",
     "build_insights", "fetch_youtube", "fetch_datalab", "fetch_weekly_market", "fetch_news_mentions",
     "NEWS_KW_PATTERNS", "fetch_blogs", "BRAND_BLOGS", "fetch_partners", "PARTNER_CHANNELS", "ETF_CONTENT_PAT",
     "theme_signal_board", "demo_theme_flows", "signal_label",
@@ -33,6 +34,17 @@ _REQUIRED_ATTRS = (
 )
 if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
     D = importlib.reload(D)
+
+# 위 목록은 사람이 관리해서 새 함수를 추가할 때 빠뜨리기 쉽다(실제로 반복 발생).
+# 소스 파일의 실제 정의와 대조해, 목록에 없더라도 누락이 있으면 재로드한다.
+try:
+    _src = (Path(__file__).parent / "data.py").read_text()
+    _defined = set(re.findall(r"^(?:def\s+([a-zA-Z]\w*)|([A-Z][A-Z0-9_]{2,})\s*=)", _src, re.M))
+    _names = {a or b for a, b in _defined if (a or b)}
+    if any(not hasattr(D, n) for n in _names):
+        D = importlib.reload(D)
+except Exception:
+    pass
 
 
 def news_link(query: str) -> str:
@@ -335,7 +347,8 @@ def load_partners():
 
 
 @st.cache_data(ttl=3600)
-def load_regulations():
+def load_regulations(rule_sig: str = ""):
+    # rule_sig는 캐시 키 전용 — 필터 규칙이 바뀌면 낡은 결과를 자동 폐기한다
     return D.fetch_regulations()
 
 
@@ -1900,7 +1913,9 @@ with tab_reg:
     )
     st.write("")
 
-    regs, reg_live = load_regulations()
+    _rule_sig = (getattr(D, "REG_RELEVANT", None).pattern if hasattr(D, "REG_RELEVANT") else "") \
+        + "|" + (getattr(D, "REG_EXCLUDE", None).pattern if hasattr(D, "REG_EXCLUDE") else "")
+    regs, reg_live = load_regulations(_rule_sig)
     reg_news = load_regulation_news()
     rel = [r for r in regs if r["관련"]]
 
