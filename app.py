@@ -219,22 +219,21 @@ st.markdown(
         color: {FAINT}; margin: 14px 0 6px;
     }}
 
-    /* 시그널 보드 */
-    table.sig-table {{ width: 100%; border-collapse: collapse; }}
+    /* 시그널 보드 — 단일 표(헤더 1회) · 행 높이를 낮춰 정보밀도를 올린다 */
+    table.sig-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
     table.sig-table th {{
-        font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; color: #475467;
-        text-transform: uppercase; text-align: right; padding: 6px 10px;
-        border-bottom: 1px solid {LINE};
+        font-size: 0.62rem; font-weight: 800; letter-spacing: 0.1em; color: {MUTED};
+        text-transform: uppercase; text-align: left; padding: 0 10px 7px;
+        border: none; border-bottom: 1.5px solid {NAVY}; white-space: nowrap;
     }}
-    table.sig-table th:first-child {{ text-align: left; }}
+    table.sig-table th.num, table.sig-table td.num {{ text-align: right; }}
     table.sig-table td {{
-        font-size: 0.87rem; padding: 10px; border-bottom: 1px solid #F2F4F7;
-        text-align: right; font-variant-numeric: tabular-nums; color: #1F2937;
+        font-size: 0.85rem; padding: 9px 10px; text-align: left; border: none;
+        font-variant-numeric: tabular-nums; color: {INK}; vertical-align: top;
     }}
-    table.sig-table td:first-child {{ text-align: left; font-weight: 700; color: {INK}; }}
-    table.sig-table tr:last-child td {{ border-bottom: none; }}
-    .sig-pos {{ color: #D63C48; font-weight: 600; }}
-    .sig-neg {{ color: #2A6FDB; font-weight: 600; }}
+    table.sig-table tbody tr:hover td {{ background: #FAFBFD; }}
+    .sig-pos {{ color: {RED}; font-weight: 700; }}
+    .sig-neg {{ color: {COOL}; font-weight: 700; }}
     table.sig-table td.flow-cell {{
         font-size: 0.74rem; color: {MUTED}; line-height: 1.7;
         font-weight: 500; text-align: right;
@@ -395,6 +394,18 @@ def section_header(tag: str, title: str, desc: str):
         f'<div class="sec-tag">{tag}</div>'
         f'<div class="sec-title">{title}</div>'
         f'<div class="sec-desc">{desc}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def sub_header(no: str, title: str, desc: str = ""):
+    """탭 내부 소제목 — 번호 + 제목 + 한 줄 설명으로 문서 위계를 만든다."""
+    st.markdown(
+        f'<div style="display:flex;align-items:baseline;gap:9px;margin:2px 0 9px;">'
+        f'<span style="font-size:0.66rem;font-weight:800;color:{BRAND};'
+        f'background:{BRAND_SOFT};border-radius:5px;padding:3px 8px;letter-spacing:.06em;">{no}</span>'
+        f'<span style="font-size:0.98rem;font-weight:800;color:{INK};">{title}</span>'
+        f'<span style="font-size:0.74rem;color:{FAINT};">{desc}</span></div>',
         unsafe_allow_html=True,
     )
 
@@ -781,6 +792,8 @@ with tab_trend:
     section_header("STEP 1 · MONITOR", "시장 트렌드", "섹터 단계 진단·테마 수익률·검색량으로 시장이 어디로 움직이는지 파악합니다.")
     st.write("")
 
+    sub_header("01", "진단 프레임", "테마 수명주기 4단계와 단계별 마케터 행동")
+
     # ── 테마 단계 진단 배너 — 단계 정의(수급·주가·검색량) + 단계별 마케터 행동
     cycle_svg = (
         '<svg viewBox="0 0 760 224" style="width:100%;max-width:920px;display:block;margin:6px auto 0;">'
@@ -796,15 +809,15 @@ with tab_trend:
         '<line x1="420" y1="14" x2="420" y2="118" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
         '<line x1="560" y1="14" x2="560" y2="118" stroke="#E4E7EC" stroke-dasharray="4 4"/>'
         # 관심도·주가 곡선 — 4색 구간 (시그널 보드 진단 색과 동일)
-        '<path d="M 40 108 C 100 104, 155 90, 210 70" fill="none" stroke="#B3730A" stroke-width="5" stroke-linecap="round"/>'
-        '<path d="M 210 70 C 280 44, 350 24, 420 20" fill="none" stroke="#D63C48" stroke-width="5" stroke-linecap="round"/>'
-        '<path d="M 420 20 C 470 18, 520 34, 560 54" fill="none" stroke="#2A6FDB" stroke-width="5" stroke-linecap="round"/>'
-        '<path d="M 560 54 C 610 76, 680 98, 740 108" fill="none" stroke="#98A2B3" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 40 108 C 100 104, 155 90, 210 70" fill="none" stroke="#6E4CA6" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 210 70 C 280 44, 350 24, 420 20" fill="none" stroke="#2E7D5B" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 420 20 C 470 18, 520 34, 560 54" fill="none" stroke="#D0342C" stroke-width="5" stroke-linecap="round"/>'
+        '<path d="M 560 54 C 610 76, 680 98, 740 108" fill="none" stroke="#5B6478" stroke-width="5" stroke-linecap="round"/>'
         # 단계명
-        '<text x="120" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#B3730A">① 태동기</text>'
-        '<text x="315" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#D63C48">② 확산기</text>'
-        '<text x="490" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#2A6FDB">③ 과열기</text>'
-        '<text x="650" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#98A2B3">④ 쇠퇴기</text>'
+        '<text x="120" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#6E4CA6">01 태동기</text>'
+        '<text x="315" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#2E7D5B">02 확산기</text>'
+        '<text x="490" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#D0342C">03 과열기</text>'
+        '<text x="650" y="142" text-anchor="middle" font-size="13.5" font-weight="800" fill="#5B6478">04 쇠퇴기</text>'
         # 단계 정의 — 수급 / 주가·검색량
         '<text x="120" y="160" text-anchor="middle" font-size="10" fill="#667085">외국인·기관 유입 · 개인 잠잠</text>'
         '<text x="120" y="174" text-anchor="middle" font-size="10" fill="#667085">주가 바닥권 · 검색량 낮음</text>'
@@ -815,25 +828,37 @@ with tab_trend:
         '<text x="650" y="160" text-anchor="middle" font-size="10" fill="#667085">매수 주체 소멸</text>'
         '<text x="650" y="174" text-anchor="middle" font-size="10" fill="#667085">주가 하락 · 검색량 감소</text>'
         # 마케터 행동 (볼드)
-        '<text x="120" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">콘텐츠 기획 착수 · 소재 선점</text>'
-        '<text x="120" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">관련 ETF 라인업 점검</text>'
-        '<text x="315" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">광고 · 콘텐츠 집중 집행</text>'
-        '<text x="315" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">푸시 상품 전면 배치</text>'
-        '<text x="490" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">마케팅 수확 지속 (수요 정점)</text>'
-        '<text x="490" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">적립식 · 분산 소구 병행</text>'
-        '<text x="650" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">노출 최소화</text>'
-        '<text x="650" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#101828">수급 재유입 모니터링</text>'
+        '<text x="120" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#141B2D">콘텐츠 기획 착수 · 소재 선점</text>'
+        '<text x="120" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#141B2D">관련 ETF 라인업 점검</text>'
+        '<text x="315" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#141B2D">광고 · 콘텐츠 집중 집행</text>'
+        '<text x="315" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#141B2D">푸시 상품 전면 배치</text>'
+        '<text x="490" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#141B2D">마케팅 수확 지속 (수요 정점)</text>'
+        '<text x="490" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#141B2D">적립식 · 분산 소구 병행</text>'
+        '<text x="650" y="196" text-anchor="middle" font-size="11" font-weight="800" fill="#141B2D">노출 최소화</text>'
+        '<text x="650" y="211" text-anchor="middle" font-size="11" font-weight="800" fill="#141B2D">수급 재유입 모니터링</text>'
         "</svg>"
     )
     st.markdown(
-        f'<div class="card"><div class="card-title">ETF 테마 단계 진단</div>'
-        f'<div style="font-size:0.84rem;color:#475467;line-height:1.7;">'
+        f'<div class="card">'
+        f'<div style="font-size:0.84rem;color:{MUTED};line-height:1.7;">'
         f'테마에는 수명주기가 있고, <b style="color:{NAVY};">단계마다 마케터가 해야 할 행동이 다릅니다.</b> '
         f'아래 시그널 보드가 각 테마의 현재 단계를 매주 진단합니다.</div>'
         f"{cycle_svg}</div>",
         unsafe_allow_html=True,
     )
     st.write("")
+
+    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    sub_header("02", "섹터 시그널 보드", "22개 섹터의 현재 단계 판정 — 주 1회 갱신")
+
+    # 단계별 색·행동 — 시그널 보드와 섹터 유니버스가 같은 팔레트를 쓰도록 탭 상단에 둔다
+    STAGE_META = {
+        "태동기": ("#6E4CA6", "#F3EFFA", "콘텐츠 기획 착수 · 소재 선점"),
+        "확산기": ("#2E7D5B", "#EAF7EF", "광고·콘텐츠 집중 집행"),
+        "과열기": (RED, "#FDECEB", "수확 지속 + 적립식·분산 소구 병행"),
+        "쇠퇴기": (MUTED, "#F2F4F7", "집행 축소 · 재매집 신호만 관찰"),
+        "관망": (FAINT, "#F7F9FC", "판정 유보 (이력 부족)"),
+    }
 
     # ── 섹터 시그널 보드 — 주간 배치 실데이터 (data/signal_board.json)
     board_file = Path(__file__).parent / "data" / "signal_board.json"
@@ -872,6 +897,10 @@ with tab_trend:
                 f'<span style="color:{color};font-weight:600;">{amt} {word}</span>'
             )
 
+        def eok(v):
+            """억 단위 축약 — 1조 이상은 조로."""
+            return f"{v / 1e4:+,.1f}조" if abs(v) >= 1e4 else f"{v:+,.0f}억"
+
         def flow_cell(r):
             if r.get("외국인13주억") is None and r.get("큰손13주억") is None:
                 return "—"
@@ -886,76 +915,103 @@ with tab_trend:
             """외국인+연기금 13주 순매수 합 — 재매집 정렬 기준."""
             return (r.get("외국인13주억") or 0) + (r.get("연기금13주억") or 0)
 
-        def stage_rows(rows, decline_order=False):
-            # 기본: RS모멘텀 내림차순 / 쇠퇴기: 외국인·연기금 매수 금액 내림차순 (재매집 후보 상단)
+        def flow_inline(r):
+            """수급 3주체를 한 줄로 — 세로 3줄이라 행이 과하게 높아지던 문제."""
+            if r.get("외국인13주억") is None and r.get("큰손13주억") is None:
+                return f'<span style="color:{FAINT};">—</span>'
+            parts = []
+            for nm, v in (("외", r.get("외국인13주억")), ("연", r.get("연기금13주억")),
+                          ("개", r.get("개인13주억"))):
+                if v is None:
+                    continue
+                c = RED if v > 0 else (COOL if v < 0 else FAINT)
+                parts.append(f'<span style="color:{FAINT};">{nm}</span> '
+                             f'<span style="color:{c};font-weight:700;">{eok(v)}</span>')
+            return '<span style="white-space:nowrap;">' + '<span style="color:#D7DCE5;"> · </span>'.join(parts) + '</span>'
+
+        def stage_rows(rows, stage, decline_order=False):
+            """단계 배지를 첫 행에만 두고 나머지는 비워, 그룹이 시각적으로 묶이게 한다."""
             if decline_order:
                 rows = sorted(rows, key=lambda x: -smart_buy(x))
             else:
                 rows = sorted(rows, key=lambda x: -(x.get("RS모멘텀") or -99))
+            col, bg, action = STAGE_META.get(stage, (MUTED, "#F2F4F7", ""))
             out = ""
-            for r in rows:
-                has_rrg = r.get("RS수준") is not None
+            for i, r in enumerate(rows):
+                has = r.get("RS수준") is not None
                 note = r.get("비고") or r.get("수급비고") or ""
-                note_html = f'<br><span style="font-size:0.66rem;color:{FAINT};">{note}</span>' if note else ""
+                first = i == 0
+                badge = (f'<span style="display:inline-block;font-size:0.68rem;font-weight:800;'
+                         f'color:{col};background:{bg};border-radius:5px;padding:3px 9px;">{stage}</span>'
+                         f'<div style="font-size:0.64rem;color:{FAINT};margin-top:4px;line-height:1.4;">{action}</div>'
+                         if first else "")
                 out += (
-                    f'<tr><td>{r["섹터"]}<br><span style="font-size:0.68rem;color:{FAINT};font-weight:500;">{r.get("KODEX", "")}</span>{note_html}</td>'
+                    f'<tr style="border-top:{"1px solid " + LINE if first and i == 0 else "1px solid #F2F5F9"};">'
+                    f'<td style="width:96px;vertical-align:top;padding-top:11px;">{badge}</td>'
+                    f'<td><b style="font-size:0.88rem;">{r["섹터"]}</b>'
+                    f'<div style="font-size:0.68rem;color:{FAINT};">{r.get("KODEX", "")}'
+                    + (f' · {note}' if note else "") + '</div></td>'
                     + (
-                        f'<td><span style="font-size:1rem;font-weight:800;">{signed(r["RS수준"])}</span><br>{lvl_word(r["RS수준"])}</td>'
-                        f'<td><span style="font-size:1rem;font-weight:800;">{signed(r["RS모멘텀"])}</span><br>{mom_word(r["RS모멘텀"])}</td>'
-                        if has_rrg else '<td>—</td><td>—</td>'
+                        f'<td class="num"><b style="font-size:0.98rem;">{signed(r["RS수준"])}</b>'
+                        f'<div style="font-size:0.66rem;color:{FAINT};">{"강세" if r["RS수준"] >= 0 else "약세"}</div></td>'
+                        f'<td class="num"><b style="font-size:0.98rem;">{signed(r["RS모멘텀"])}</b>'
+                        f'<div style="font-size:0.66rem;color:{FAINT};">{"강해지는 중" if r["RS모멘텀"] >= 0 else "약해지는 중"}</div></td>'
+                        if has else f'<td class="num" style="color:{FAINT};">—</td><td class="num" style="color:{FAINT};">—</td>'
                     )
-                    + f'<td class="flow-cell">{flow_cell(r)}</td></tr>'
+                    + f'<td style="text-align:right;font-size:0.76rem;">{flow_inline(r)}</td></tr>'
                 )
             return out
 
+        # 헤더 1회 — 이전엔 단계마다 표를 따로 만들어 헤더가 3번 반복됐다
         TABLE_HEAD = (
-            f'<table class="sig-table"><thead>'
-            # 위계를 보여주는 그룹 헤더 — 단계는 가격이 정하고, 수급은 확인용
-            f'<tr><th style="border-bottom:none;"></th>'
-            f'<th colspan="2" style="text-align:center;background:#F8F5FF;color:{NAVY};">단계 판정 근거 — 가격 (상대강도)</th>'
-            f'<th style="border-bottom:none;"></th></tr>'
-            f'<tr><th>섹터<br><span style="font-weight:500;">관련 KODEX 상품</span></th>'
-            f'<th>RS수준<br><span style="font-weight:500;">시장 대비 강도 (반년 평균=0)</span></th>'
-            f'<th>RS모멘텀<br><span style="font-weight:500;">강도의 방향 (+ 강해짐)</span></th>'
-            f'<th style="color:{FAINT};">수급 참고<br><span style="font-weight:500;">13주(분기) 순매수</span></th></tr></thead><tbody>'
+            f'<table class="sig-table"><colgroup><col style="width:96px"><col>'
+            f'<col style="width:104px"><col style="width:112px"><col style="width:31%"></colgroup>'
+            f'<thead><tr>'
+            f'<th>단계</th><th>섹터 · KODEX 상품</th>'
+            f'<th class="num">RS수준</th><th class="num">RS모멘텀</th>'
+            f'<th style="text-align:right;">수급 참고 · 13주 순매수</th>'
+            f'</tr></thead><tbody>'
         )
-
-        STAGES = [
-            ("태동기", "kw-warn", "콘텐츠 기획 착수 · 소재 선점"),
-            ("확산기", "kw-rise", "광고·콘텐츠 집중 집행"),
-            ("과열기", "kw-fall", "마케팅 수확 지속 + 적립식·분산 소구 병행"),
-        ]
-        groups_html = ""
-        for stage, badge, action in STAGES:
+        groups_html = TABLE_HEAD
+        for stage in ("태동기", "확산기", "과열기"):
             rows = by_stage.get(stage, [])
-            groups_html += (
-                f'<div style="margin:16px 0 6px;">'
-                f'<span class="kw-badge {badge}">{stage}</span> '
-                f'<span style="font-size:0.78rem;color:#475467;font-weight:600;">({len(rows)}) → {action}</span></div>'
-            )
             if rows:
-                groups_html += TABLE_HEAD + stage_rows(rows) + "</tbody></table>"
-            else:
-                groups_html += f'<div style="font-size:0.76rem;color:{FAINT};padding:4px 2px;">해당 섹터 없음</div>'
+                groups_html += stage_rows(rows, stage)
+        groups_html += "</tbody></table>"
+
+        # 단계별 개수를 칩으로 — "태동기 3 · 확산기 2" 텍스트보다 한눈에 들어온다
+        _chips = ""
+        for _s in ("태동기", "확산기", "과열기", "쇠퇴기", "관망"):
+            _n = len(by_stage.get(_s, []))
+            if not _n and _s == "관망":
+                continue
+            _c, _bg, _ = STAGE_META.get(_s, (MUTED, "#F2F4F7", ""))
+            _chips += (f'<span style="display:inline-flex;align-items:center;gap:6px;'
+                       f'font-size:0.72rem;font-weight:700;color:{_c};background:{_bg};'
+                       f'border-radius:6px;padding:4px 10px;margin-right:6px;">{_s}'
+                       f'<b style="font-size:0.82rem;">{_n}</b></span>')
 
         st.markdown(
-            f'<div class="card"><div class="card-title">섹터 시그널 보드 '
-            f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">'
-            f'{sb.get("asof", "")} 기준 · 벤치마크 {sb.get("benchmark", "KRX 300")} · 주 1회 갱신</span></div>'
-            f'<div style="font-size:0.9rem;font-weight:700;color:{INK};margin-bottom:4px;">{summary}</div>'
-            f'<div style="font-size:0.78rem;color:#475467;margin-bottom:6px;line-height:1.6;">'
+            f'<div class="card">'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;'
+            f'flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+            f'<div>{_chips}</div>'
+            f'<div style="font-size:0.68rem;color:{FAINT};font-weight:600;">'
+            f'{sb.get("asof", "")} 기준 · 벤치마크 {sb.get("benchmark", "KRX 300")}</div></div>'
+            f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
+            f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
+            f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:14px;">'
             f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다. '
-            f'수급(최근 13주 순매수)은 <b>판정과 별개로 자금이 실제로 어디로 움직였는지 보여주는 보조 지표</b>입니다. '
-            f'쇠퇴기에선 <b>외국인·연기금 매수 강도가 높은 섹터가 상단에 배치됩니다.</b></div>'
+            f'수급(13주 순매수)은 판정과 별개로 <b>자금이 실제로 어디로 움직였는지</b> 보여주는 보조 지표입니다.</div>'
             f"{groups_html}</div>",
             unsafe_allow_html=True,
         )
 
         decline = by_stage.get("쇠퇴기", []) + by_stage.get("관망", [])
         n_watch = sum(1 for r in decline if smart_buy(r) > 0)
-        with st.expander(f"⚪ 쇠퇴기·관망 ({len(decline)}) — 외국인·연기금이 매수 중인 재매집 후보 {n_watch}개를 상단 배치"):
+        with st.expander(f"쇠퇴기·관망 ({len(decline)}) — 외국인·연기금이 매수 중인 재매집 후보 {n_watch}개를 상단 배치"):
             st.markdown(
-                TABLE_HEAD + stage_rows(decline, decline_order=True) + "</tbody></table>",
+                TABLE_HEAD + stage_rows(decline, "쇠퇴기", decline_order=True) + "</tbody></table>",
                 unsafe_allow_html=True,
             )
 
@@ -1003,6 +1059,9 @@ with tab_trend:
 """
             )
     st.write("")
+
+    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    sub_header("03", "관심과 화제", "대중 검색량(수요) · 언론 언급량(화제성) — 콘텐츠 소재의 근거")
 
     # ── 실시간 뉴스 키워드 언급량 + 시장 트렌드 브리핑 (구글 뉴스 RSS · 실데이터)
     kw_counts, articles, news_live = load_news_mentions()
@@ -1075,6 +1134,9 @@ with tab_trend:
                 st.markdown("\n".join(f"- [{a['title']}]({a['link']})" for a in articles))
     st.write("")
 
+    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    sub_header("04", "금주 성과와 수급", "섹터별 실제 주간 수익률과 외국인·연기금 자금 흐름")
+
     # 섹터별 실제 주간 수익률 · 주간 수급 — 주간 배치 실데이터 (data/signal_board.json)
     try:
         _sb_wk = json.loads(board_file.read_text()) if board_file.exists() else {}
@@ -1133,12 +1195,11 @@ with tab_trend:
 
     # ══════════ 섹터 유니버스 — 국면 판정의 근거가 된 종목 묶음 ══════════
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    sub_header("05", "섹터 유니버스", "위 판정이 어떤 종목 묶음을 근거로 했는지 확인")
     st.markdown(
-        f'<div class="sec-tag">UNIVERSE</div>'
-        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">섹터 유니버스 — 구성종목</div>'
-        f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
-        f'위 국면 판정과 수급 집계가 <b>어떤 종목 묶음</b>을 근거로 한 것인지 확인합니다. '
-        f'KRX 섹터지수는 지수 구성종목, 테마는 KODEX ETF 구성내역(PDF·비중 포함) 기준입니다.</div>',
+        f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:12px;">'
+        f'KRX 섹터지수는 <b>지수 구성종목</b>, 테마는 <b>KODEX ETF 구성내역(PDF·비중 포함)</b> 기준입니다 — '
+        f'자의적 종목 선별 없이 공식 공시 명부를 그대로 사용합니다.</div>',
         unsafe_allow_html=True)
     _uni_data = load_sector_universe()
     _uni_secs = _uni_data.get("sectors", [])
@@ -1150,11 +1211,12 @@ with tab_trend:
             pick_sec = st.selectbox("섹터 선택", _order, key="uni_pick")
             s = _by_name[pick_sec]
             stg = next((r.get("단계", "") for r in rows_all if r["섹터"] == pick_sec), "")
+            _sc, _sbg, _ = STAGE_META.get(stg, (NAVY, BRAND_SOFT, ""))
             st.markdown(
-                f'<div class="card" style="padding:12px 15px;">'
-                f'<div style="font-size:0.72rem;color:{GRAY};">현재 국면</div>'
-                f'<div style="font-size:1.1rem;font-weight:800;color:{NAVY};">{stg or "—"}</div>'
-                f'<div style="font-size:0.75rem;color:{GRAY};margin-top:8px;line-height:1.6;">'
+                f'<div class="card" style="padding:12px 15px;border-left:3px solid {_sc};">'
+                f'<div style="font-size:0.68rem;color:{FAINT};font-weight:700;letter-spacing:.06em;">현재 국면</div>'
+                f'<div style="font-size:1.1rem;font-weight:800;color:{_sc};margin-top:2px;">{stg or "—"}</div>'
+                f'<div style="font-size:0.74rem;color:{MUTED};margin-top:9px;line-height:1.6;">'
                 f'{s.get("기준","")}<br><b style="color:{INK};">{s.get("종목수",0)}종목</b> · {s.get("군","")}</div></div>',
                 unsafe_allow_html=True)
         with u2:
