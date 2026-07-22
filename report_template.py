@@ -25,6 +25,16 @@ def _ga(word: str) -> str:
     return f"{word}가"
 
 
+def _reul(word: str) -> str:
+    """을/를 조사만 반환 — 태그 뒤에 붙일 때 사용."""
+    if not word:
+        return "를"
+    c = ord(word[-1])
+    if 0xAC00 <= c <= 0xD7A3:
+        return "을" if (c - 0xAC00) % 28 else "를"
+    return "를"
+
+
 def build_lead(ctx: dict) -> str:
     """리드 문단 — 국면·캠페인·검색을 엮은 한 단락 종합 (규칙 기반)."""
     n_dec = ctx["stage_counts"].get("쇠퇴기", 0)
@@ -36,13 +46,18 @@ def build_lead(ctx: dict) -> str:
     ]
     if bench is not None:
         worst = ctx["top_dn"][0] if ctx["top_dn"] else None
-        w = (f' {_ga(_esc(worst[0]))} <b>{worst[1]:+.1f}%</b>로 낙폭이 가장 컸고,' if worst else "")
-        parts.append(f'{w} 시장 대표 지수(KRX300)도 <b>{bench:+.1f}%</b> 동반 하락했다.')
+        w = (f'{_ga(_esc(worst[0]))} <b>{worst[1]:+.1f}%</b>로 낙폭이 가장 컸고, ' if worst else "")
+        parts.append(f'{w}시장 대표 지수(KRX300)도 <b>{bench:+.1f}%</b> 동반 하락했다.')
     camps = ctx.get("campaigns", [])
     if camps:
+        c0 = camps[0]
+        nm = c0.get("표기명", "")
+        # 신규상장 캠페인이면 그 사실을 문장에 드러낸다
+        pre = "신규상장된 " if "신규" in (c0.get("제목") or "") else ""
         parts.append(
-            f'이런 하락장에서 KODEX는 <b>{_esc(camps[0]["표기명"])}</b>를 중심으로 집행하며 '
-            f'방어형 수요를 겨냥했다 — <span class="hl">국면에 부합하는 선택</span>이다.')
+            f'이런 하락장에서 삼성자산운용은 {pre}<b>{_esc(nm)}</b>{_reul(nm)} 중심으로 '
+            f'마케팅 집행하며 방어형 수요를 겨냥했다.')
+        parts.append(f'— <span class="hl">국면에 부합하는 선택</span>이다.')
     ups = sorted([(k, v) for k, v in ctx.get("search", {}).items() if v > 15],
                  key=lambda x: -x[1])[:2]
     if ups:
@@ -50,7 +65,7 @@ def build_lead(ctx: dict) -> str:
         parts.append(
             f'반면 검색 수요는 {_esc(names)}로 쏠렸으나 해당 테마는 이미 과열·쇠퇴 국면이어서, '
             f'지금은 신규 진입보다 재매집이 진행 중인 섹터를 다음 사이클 후보로 관찰할 시점이다.')
-    return " ".join(parts)
+    return "<br>".join(parts)
 
 
 _CSS = """
