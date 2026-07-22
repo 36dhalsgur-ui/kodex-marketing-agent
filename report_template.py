@@ -105,9 +105,11 @@ td.num{text-align:right;} .up{color:var(--up); font-weight:700;} .down{color:var
 .blk-label i{font-style:normal; display:inline-flex; align-items:center; justify-content:center;
   width:19px; height:19px; border-radius:4px; font-size:10.5px; font-weight:800; color:#fff;}
 .blk-a{background:var(--navy);} .blk-b{background:var(--brand);} .blk-c{background:var(--keep);}
-.vd{display:inline-block; font-size:10.5px; font-weight:800; border-radius:20px; padding:3px 10px; color:#fff;}
+.vd{display:inline-block; font-size:10.5px; font-weight:800; border-radius:20px; padding:3px 9px;
+  color:#fff; white-space:nowrap; word-break:keep-all; line-height:1.35; text-align:center;}
 .vd-keep{background:var(--keep);} .vd-watch{background:var(--watch);} .vd-cut{background:var(--cut);}
 .rz{font-size:11.5px; color:var(--muted); line-height:1.5;}
+.revtbl{table-layout:fixed;} .revtbl td{word-break:keep-all; overflow-wrap:break-word;}
 .ph{font-size:11.5px; color:var(--muted); white-space:nowrap;}
 .review-read{margin-top:10px; padding:11px 14px; background:var(--brand-soft); border-radius:7px;
   font-size:12.5px; line-height:1.65;}
@@ -220,9 +222,11 @@ def render_report(ctx: dict) -> str:
             flow, cls = f"{v:+.2f}%", ("up" if v > 0 else "down")
         name = r.get("표기명", "").replace("KODEX ", "")
         cls_vd = vd_cls.get(r.get("판정"), "vd-keep")
+        # '지속·관찰'이 음절 중간에서 잘리지 않도록 가운뎃점 뒤에만 줄바꿈 기회를 준다
+        verdict = _esc(r.get("판정")).replace("·", "·<wbr>")
         return (f'<tr><td>{_esc(name)}</td><td class="ph">{_esc(r.get("국면"))}</td>'
                 f'<td class="num {cls}">{_esc(flow)}</td>'
-                f'<td><span class="vd {cls_vd}">{_esc(r.get("판정"))}</span></td>'
+                f'<td><span class="vd {cls_vd}">{verdict}</span></td>'
                 f'<td class="rz">{_esc(r.get("근거"))}</td></tr>')
 
     rows_rev = "".join(_rev_row(r) for r in ctx["review"])
@@ -317,7 +321,9 @@ def render_report(ctx: dict) -> str:
   <div class="sec"><div class="sec-h"><span class="sec-no">05</span><span class="sec-t">다음 주 액션</span>
     <span class="sec-tag">현재 마케팅 · 국면 근거</span></div>
     <div class="blk-label"><i class="blk-a">A</i> 현재 마케팅 점검 — 국면·자금 근거로 지속·확대·축소</div>
-    <table><thead><tr><th>집행 중 ETF</th><th>테마 국면</th><th class="num">개인 자금</th>
+    <table class="revtbl"><colgroup><col style="width:22%"><col style="width:13%">
+      <col style="width:10%"><col style="width:17%"><col></colgroup>
+      <thead><tr><th>집행 중 ETF</th><th>테마 국면</th><th class="num">개인 자금</th>
       <th>판정</th><th>근거</th></tr></thead><tbody>{rows_rev}</tbody></table>
     <div class="review-read">{_esc(ctx['review_read'])}</div>
     <div style="margin-top:20px;">{em_html}</div>
