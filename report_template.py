@@ -40,33 +40,41 @@ def build_lead(ctx: dict) -> str:
     n_dec = ctx["stage_counts"].get("쇠퇴기", 0)
     n_tot = ctx["n_sectors"]
     bench = ctx.get("bench_ret")
-    parts = [
+    # 앞단 — 시장 상황
+    market = [
         f'이번 주 국내 증시는 {n_tot}개 섹터 중 <span class="hl">{n_dec}개가 쇠퇴 국면</span>에 '
         f'진입하며 광범위한 조정을 겪었다.'
     ]
     if bench is not None:
         worst = ctx["top_dn"][0] if ctx["top_dn"] else None
         w = (f'{_ga(_esc(worst[0]))} <b>{worst[1]:+.1f}%</b>로 낙폭이 가장 컸고, ' if worst else "")
-        parts.append(f'{w}시장 대표 지수(KRX300)도 <b>{bench:+.1f}%</b> 동반 하락했다.')
+        market.append(f'{w}시장 대표 지수(KRX300)도 <b>{bench:+.1f}%</b> 동반 하락했다.')
+
+    # 뒷단 — 우리 마케팅 해석
+    tail = []
     camps = ctx.get("campaigns", [])
     if camps:
         c0 = camps[0]
         nm = c0.get("표기명", "")
         # 신규상장 캠페인이면 그 사실을 문장에 드러낸다
         pre = "신규상장된 " if "신규" in (c0.get("제목") or "") else ""
-        parts.append(
+        tail.append(
             f'이런 하락장에서 삼성자산운용은 {pre}<b>{_esc(nm)}</b>{_reul(nm)} 중심으로 '
             f'마케팅 집행하며 방어형 수요를 겨냥했다.')
-        parts.append(f'— <span class="hl">국면에 부합하는 선택</span>이다.')
+        tail.append(f'— <span class="hl">국면에 부합하는 선택</span>이다.')
     ups = sorted([(k, v) for k, v in ctx.get("search", {}).items() if v > 15],
                  key=lambda x: -x[1])[:2]
     if ups:
         names = "·".join(k for k, _ in ups)
-        parts.append(
+        tail.append(
             f'반면 검색 수요는 {_esc(names)}로 쏠렸으나 해당 테마는 이미 과열·쇠퇴 국면이어서, '
             f'지금은 신규 진입보다 재매집이 진행 중인 섹터를 다음 사이클 후보로 관찰할 시점이다.')
-    # 문장마다 강제 개행하면 끊겨 보인다 — 자연스러운 자동 줄바꿈에 맡긴다
-    return " ".join(parts)
+
+    # 시장 상황(앞) / 우리 해석(뒤) 사이에서만 한 번 줄을 바꾼다
+    out = " ".join(market)
+    if tail:
+        out += "<br>" + " ".join(tail)
+    return out
 
 
 _CSS = """
