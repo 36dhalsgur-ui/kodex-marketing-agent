@@ -1,5 +1,5 @@
 {
-  "asof": "2026-07-21",
+  "asof": "2026-07-22",
   "brands": [
     {
       "브랜드": "KODEX",
@@ -90,22 +90,22 @@
         },
         {
           "제목": "미국30년국채커버드콜(합성)",
-          "링크": "https://www.soletf.com/fund/etf/211044",
+          "링크": "https://www.soletf.com/ko/fund/etf/211044",
           "NEW": false
         },
         {
           "제목": "미국500타겟데일리커버드콜액티브",
-          "링크": "https://www.soletf.com/fund/etf/211064",
+          "링크": "https://www.soletf.com/ko/fund/etf/211064",
           "NEW": false
         },
         {
           "제목": "팔란티어미국채커버드콜혼합",
-          "링크": "https://www.soletf.com/fund/etf/211089",
+          "링크": "https://www.soletf.com/ko/fund/etf/211089",
           "NEW": false
         },
         {
           "제목": "팔란티어커버드콜OTM채권혼합",
-          "링크": "https://www.soletf.com/fund/etf/211088",
+          "링크": "https://www.soletf.com/ko/fund/etf/211088",
           "NEW": false
         }
       ]
@@ -113,6 +113,10 @@
     {
       "브랜드": "RISE",
       "홈": "https://www.riseetf.co.kr",
+      "이벤트": {
+        "라벨": "이벤트",
+        "링크": "https://www.riseetf.co.kr/cust/event"
+      },
       "배너": [
         {
           "제목": "RISE미국 우주&로봇TOP2 미국채혼합50 스페이스X 25% + 테슬라 25% + 미국단기채로 미국 우주&로봇 투자의 새로운 판이 열린다",
@@ -175,6 +179,10 @@
     {
       "브랜드": "HANARO",
       "홈": "https://www.hanaroetf.com",
+      "이벤트": {
+        "라벨": "공지/이벤트",
+        "링크": "https://www.hanaroetf.com/customer/notice"
+      },
       "배너": [
         {
           "제목": "HANARO 미국AI광통신TOP10 미국 AI광통신 인프라의 핵심 기업 TOP10에 투자하는 ETF",
@@ -201,6 +209,10 @@
     {
       "브랜드": "TIMEFOLIO",
       "홈": "https://timeetf.co.kr",
+      "이벤트": {
+        "라벨": "이벤트",
+        "링크": "https://timeetf.co.kr/board/board.php?bbsid=event"
+      },
       "배너": [
         {
           "제목": "TIME 코스닥액티브 포트폴리오 구성 설명",

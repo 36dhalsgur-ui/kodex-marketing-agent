@@ -107,7 +107,11 @@ def sol():
         a = slide if slide.name == "a" and slide.get("href") else slide.find("a", href=True)
         if len(txt) > 10 and txt not in seen:
             seen.add(txt)
-            items.append({"제목": txt, "링크": absol(base, a["href"] if a else "")})
+            link = absol(base, a["href"] if a else "")
+            # SOL은 로케일 프리픽스(/ko)가 있어야 상품 페이지가 열린다.
+            # 일부 앵커에 /ko가 빠져 있어 그대로 쓰면 404 (실측 확인)
+            link = re.sub(r"^(https://www\.soletf\.com)/fund/", r"\1/ko/fund/", link)
+            items.append({"제목": txt, "링크": link})
     return items[:MAX_BANNERS]
 
 
@@ -188,6 +192,31 @@ HOMES = {
 }
 
 
+_EVENT_PAT = re.compile(r"이벤트|EVENT", re.I)
+
+
+def find_event_link(home: str) -> dict | None:
+    """사이트에 별도 이벤트/프로모션 페이지가 있으면 그 링크를 찾는다.
+
+    메인 배너는 대부분 상품 상세로 연결되므로(상품 홍보가 목적),
+    '이벤트'는 별도 메뉴로 운영되는 곳(RISE·TIMEFOLIO 등)만 존재한다."""
+    try:
+        soup = get_soup(home)
+    except Exception:
+        return None
+    best = None
+    for a in soup.find_all("a", href=True):
+        txt = " ".join(a.get_text(" ", strip=True).split())
+        href = a["href"]
+        if not _EVENT_PAT.search(txt + href):
+            continue
+        # 공지 겸용 메뉴('공지/이벤트')보다 순수 이벤트 메뉴를 우선
+        score = (2 if _EVENT_PAT.search(txt) and "공지" not in txt else 1)
+        if best is None or score > best[0]:
+            best = (score, txt or "이벤트", absol(home, href))
+    return {"라벨": best[1], "링크": best[2]} if best else None
+
+
 def main():
     prev: dict[str, list] = {}
     if OUT.exists():
@@ -201,6 +230,9 @@ def main():
     for name, fn in EXTRACTORS:
         home, own_domains = HOMES[name]
         row = {"브랜드": name, "홈": home}
+        ev = find_event_link(home)
+        if ev:
+            row["이벤트"] = ev
         try:
             banners = fn()
             if not banners:

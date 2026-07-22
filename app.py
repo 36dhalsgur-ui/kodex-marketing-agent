@@ -1035,8 +1035,10 @@ with tab_channel:
         st.markdown(
             '<div class="sec-tag">HOMEPAGE</div>'
             '<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">공식 홈페이지 — 메인 배너</div>'
-            f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">각 사 홈페이지 첫 배너 = 지금 가장 미는 캠페인 · 클릭 시 배너 페이지 · '
-            f'<span style="color:#C2333F;font-weight:700;">NEW</span> = 전주에 없던 배너</div>',
+            f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">각 사 홈페이지 첫 배너 = 지금 가장 미는 캠페인 · '
+            f'<span style="color:#C2333F;font-weight:700;">NEW</span> = 전주에 없던 배너<br>'
+            f'ETF 사이트 배너는 대부분 <b>해당 상품 상세 페이지</b>로 연결됩니다(배너 목적이 상품 홍보). '
+            f'별도 이벤트 페이지를 운영하는 곳은 아래에 따로 표시합니다.</div>',
             unsafe_allow_html=True,
         )
         if ch_brands:
@@ -1053,6 +1055,23 @@ with tab_channel:
                         brand, f'<span style="color:{GRAY};">{info.get("비고", "수집된 배너 없음")}</span>',
                         "", info.get("홈", "#"))
             st.markdown(f'<div class="card" style="padding:8px 16px;">{hp_rows}</div>', unsafe_allow_html=True)
+
+            # 별도 이벤트 페이지를 운영하는 브랜드만 노출 (배너=상품상세와 구분)
+            ev_items = [(b, ch_brands[b]["이벤트"]) for b in D.ISSUERS
+                        if ch_brands.get(b, {}).get("이벤트")]
+            if ev_items:
+                chips = "".join(
+                    f'<a href="{e["링크"]}" target="_blank" style="text-decoration:none;'
+                    f'font-size:0.75rem;color:#475467;background:#F2F4F7;border:1px solid #E4E7EC;'
+                    f'border-radius:20px;padding:4px 11px;margin:0 6px 6px 0;display:inline-block;">'
+                    f'<b style="color:{INK};">{b}</b> · {e["라벨"][:10]} ↗</a>'
+                    for b, e in ev_items)
+                st.markdown(
+                    f'<div style="margin-top:10px;"><div style="font-size:0.72rem;color:{GRAY};'
+                    f'margin-bottom:6px;">별도 이벤트·프로모션 페이지 운영 브랜드 '
+                    f'({len(ev_items)}/{len(D.ISSUERS)})</div>{chips}</div>',
+                    unsafe_allow_html=True)
+
             with st.expander("브랜드별 전체 배너 보기"):
                 bcols = st.columns(2, gap="large")
                 for i, brand in enumerate(D.ISSUERS):
