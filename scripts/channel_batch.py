@@ -22,6 +22,7 @@ NEW 판정: 직전 산출물에 없던 배너 제목이면 True (전주 대비 �
 해당 브랜드는 직전 산출물의 배너를 유지한다 (비고에 표시).
 """
 
+import datetime as dt
 import json
 import re
 from datetime import date
@@ -85,14 +86,31 @@ def tiger():
 
 
 def ace():
+    """ACE는 API가 실제 노출 우선순위(rank·bannerOrder)와 게재기간을 제공한다.
+    다른 사이트는 DOM 순서뿐이라 이런 근거가 없다 — 있는 곳은 반드시 쓴다."""
     h = dict(UA, Origin="https://www.aceetf.co.kr", Referer="https://www.aceetf.co.kr/")
     d = requests.get("https://papi.aceetf.co.kr/api/main/keyvisual", headers=h, timeout=15).json()
-    items = []
+    now = dt.datetime.now()
+    rows = []
     for b in d.get("data", []):
+        if b.get("viewYn") == "N":
+            continue
+        # 게재기간이 지난/시작 전 배너 제외
+        try:
+            st_ = b.get("noticeStartDate")
+            en_ = b.get("noticeEndDate")
+            if st_ and dt.datetime.strptime(st_, "%Y-%m-%d %H:%M:%S") > now:
+                continue
+            if en_ and dt.datetime.strptime(en_, "%Y-%m-%d %H:%M:%S") < now:
+                continue
+        except Exception:
+            pass
         title = clean(f"{b.get('bannerTitle', '')} — {b.get('subtitle', '')}".strip(" —"))
         if title:
-            items.append({"제목": title, "링크": b.get("pcUrl") or "https://www.aceetf.co.kr"})
-    return items[:MAX_BANNERS]
+            rows.append((b.get("rank", 99), b.get("bannerOrder", 99), title,
+                         b.get("pcUrl") or "https://www.aceetf.co.kr"))
+    rows.sort(key=lambda r: (r[0], r[1]))          # 운용사가 매긴 우선순위대로
+    return [{"제목": t, "링크": u, "순위근거": f"rank {r}-{o}"} for r, o, t, u in rows[:MAX_BANNERS]]
 
 
 def sol():
@@ -226,6 +244,19 @@ def main():
         except Exception:
             pass
 
+    def slot_share(banners: list[dict]) -> list[dict]:
+        """같은 상품이 배너 슬롯을 몇 개 차지하는지 — '미는 강도'의 실측 근거.
+        배너 순서(DOM)는 우선순위 근거가 못 되지만, 슬롯 점유 수는 근거가 된다."""
+        def key(t: str) -> str:
+            m = re.search(r"[A-Z]{3,}\s*[가-힣A-Za-z0-9&\+\.]+", t)
+            return (m.group(0) if m else t)[:18]
+        cnt: dict = {}
+        for b in banners:
+            cnt[key(b["제목"])] = cnt.get(key(b["제목"]), 0) + 1
+        for b in banners:
+            b["슬롯수"] = cnt[key(b["제목"])]
+        return banners
+
     brands = []
     for name, fn in EXTRACTORS:
         home, own_domains = HOMES[name]
@@ -242,7 +273,9 @@ def main():
                 b["NEW"] = bool(prev_titles) and b["제목"] not in prev_titles
                 if not any(d in b["링크"] for d in own_domains):
                     b["링크"] = home
-            row["배너"] = banners
+            row["배너"] = slot_share(banners)
+            # 배너 순서의 성격을 명시 — ACE만 운용사가 매긴 실제 우선순위
+            row["순서근거"] = "운용사 지정 우선순위" if any("순위근거" in b for b in banners) else "사이트 노출 순서"
             print(f"  - {name}: {len(banners)}건 (신규 {sum(1 for b in banners if b['NEW'])})")
         except Exception as e:
             row["배너"] = prev.get(name, [])

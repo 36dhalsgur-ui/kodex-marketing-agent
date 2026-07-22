@@ -1034,21 +1034,52 @@ with tab_channel:
         # ── ① 공식 홈페이지 — 메인 배너 (브랜드별 1행, 우측=콘텐츠 테마)
         st.markdown(
             '<div class="sec-tag">HOMEPAGE</div>'
-            '<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">공식 홈페이지 — 메인 배너</div>'
-            f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">각 사 홈페이지 첫 배너 = 지금 가장 미는 캠페인 · '
-            f'<span style="color:#C2333F;font-weight:700;">NEW</span> = 전주에 없던 배너<br>'
-            f'ETF 사이트 배너는 대부분 <b>해당 상품 상세 페이지</b>로 연결됩니다(배너 목적이 상품 홍보). '
-            f'별도 이벤트 페이지를 운영하는 곳은 아래에 따로 표시합니다.</div>',
+            '<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">공식 홈페이지 — 메인 배너 (첫 번째 슬롯)</div>'
+            f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
+            f'배너는 <b>자동 회전 캐러셀</b>이라 노출 순서만으로는 우선순위를 알 수 없습니다 — '
+            f'ACE만 운용사가 매긴 실제 순위(rank)를 제공하고, 나머지는 사이트 노출 순서입니다.<br>'
+            f'대신 <b>슬롯 점유 수</b>와 <b>동시 집행 채널 수</b>를 "미는 강도"의 근거로 우측에 표시합니다. '
+            f'<span style="color:#C2333F;font-weight:700;">NEW</span> = 전주에 없던 배너 · '
+            f'배너 링크는 대부분 해당 <b>상품 상세 페이지</b>로 연결됩니다.</div>',
             unsafe_allow_html=True,
         )
         if ch_brands:
+            def push_chips(brand: str, banner: dict, info: dict) -> str:
+                """미는 강도의 실측 근거 — 슬롯 점유 수 · 동시 집행 채널 수 · 순위 제공 여부."""
+                chips = []
+                slots = banner.get("슬롯수", 1)
+                if slots > 1:
+                    chips.append(("슬롯 " + str(slots), "#6B4FBB"))
+                # 배너 상품이 같은 브랜드 유튜브·블로그에도 등장하면 멀티채널 집행
+                key = re.sub(r"[^가-힣A-Za-z0-9]", "", banner.get("제목", ""))[:10]
+                extra = 0
+                if key:
+                    for v in youtube.get(brand, [])[:8]:
+                        if key[:6] and key[:6] in re.sub(r"[^가-힣A-Za-z0-9]", "", v.get("title", "")):
+                            extra += 1
+                            break
+                    for p in blogs.get(brand, [])[:6]:
+                        if key[:6] and key[:6] in re.sub(r"[^가-힣A-Za-z0-9]", "", p.get("title", "")):
+                            extra += 1
+                            break
+                if extra:
+                    chips.append((f"{1 + extra}채널 동시", "#C2333F"))
+                if banner.get("순위근거"):
+                    chips.append(("운용사 순위", "#1E7A55"))
+                if not chips:
+                    return f'<span style="font-size:0.7rem;color:{FAINT};">단일 슬롯</span>'
+                return "".join(
+                    f'<span style="font-size:0.66rem;font-weight:700;color:{c};background:#F5F6FA;'
+                    f'border-radius:4px;padding:2px 7px;margin-left:4px;white-space:nowrap;">{t}</span>'
+                    for t, c in chips)
+
             hp_rows = ""
             for brand in D.ISSUERS:
                 info = ch_brands.get(brand, {})
                 banners = info.get("배너", [])
                 if banners:
                     b = banners[0]
-                    hp_rows += feed_row(brand, b["제목"][:52], brand_themes(brand), b["링크"],
+                    hp_rows += feed_row(brand, b["제목"][:52], push_chips(brand, b, info), b["링크"],
                                         NEW_BADGE if b.get("NEW") else "")
                 else:
                     hp_rows += feed_row(
@@ -1087,7 +1118,12 @@ with tab_channel:
                         f'<div style="margin-bottom:14px;"><div style="font-weight:800;font-size:0.88rem;margin-bottom:2px;">{brand}</div>{items}</div>',
                         unsafe_allow_html=True,
                     )
-            st.caption(f'공식 홈페이지 배너 주간 배치 수집 ({ch_data.get("asof", "")}) · 우측 = 배너·영상·글 제목에서 매칭된 콘텐츠 테마')
+            _ord = {b: ch_brands.get(b, {}).get("순서근거", "-") for b in D.ISSUERS}
+            _n_rank = sum(1 for v in _ord.values() if v == "운용사 지정 우선순위")
+            st.caption(
+                f'공식 홈페이지 배너 주간 배치 수집 ({ch_data.get("asof", "")}) · '
+                f'운용사가 매긴 실제 순위를 제공하는 곳 {_n_rank}/{len(D.ISSUERS)}개사 — 나머지는 사이트 노출 순서라 '
+                f'"첫 배너 = 최우선"이라고 단정할 수 없습니다. 우측 배지가 강도의 실제 근거입니다.')
         else:
             st.info("배너 데이터가 없습니다 — 로컬에서 `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
 
