@@ -1357,14 +1357,15 @@ with tab_channel:
     with grp_amc:
         st.write("")
         # ── ① 공식 홈페이지 — 메인 배너 (브랜드별 1행, 우측=콘텐츠 테마)
+        sub_header("01", "공식 홈페이지 — 메인 배너", "브랜드별 첫 번째 슬롯 · 주 1회 배치 수집")
         st.markdown(
-            '<div class="sec-tag">HOMEPAGE</div>'
-            '<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">공식 홈페이지 — 메인 배너 (첫 번째 슬롯)</div>'
-            f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
+            f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
+            f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
+            f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:12px;">'
             f'배너는 <b>자동 회전 캐러셀</b>이라 노출 순서만으로는 우선순위를 알 수 없습니다 — '
-            f'ACE만 운용사가 매긴 실제 순위(rank)를 제공하고, 나머지는 사이트 노출 순서입니다.<br>'
+            f'ACE만 운용사가 매긴 실제 순위(rank)를 제공하고, 나머지는 사이트 노출 순서입니다. '
             f'대신 <b>슬롯 점유 수</b>와 <b>동시 집행 채널 수</b>를 "미는 강도"의 근거로 우측에 표시합니다. '
-            f'<span style="color:#C2333F;font-weight:700;">NEW</span> = 전주에 없던 배너 · '
+            f'<span style="color:{RED};font-weight:700;">NEW</span> = 전주에 없던 배너 · '
             f'배너 링크는 대부분 해당 <b>상품 상세 페이지</b>로 연결됩니다.</div>',
             unsafe_allow_html=True,
         )
@@ -1454,7 +1455,7 @@ with tab_channel:
 
         # ── ② 공식 유튜브 — 최신 영상 (썸네일 그리드)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-        st.markdown('<div class="sec-tag">YOUTUBE · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">공식 유튜브 — 최신 영상</div>', unsafe_allow_html=True)
+        sub_header("02", "공식 유튜브 — 최신 영상", "8개 브랜드 채널 RSS 실시간 · 브랜드별 최신 1건")
 
         def yt_video_card(v: dict) -> str:
             views = f"{v['views']:,}회" if v["views"] else "조회수 비공개"
@@ -1486,7 +1487,7 @@ with tab_channel:
 
         # ── ③ 공식 블로그 — 최신 글 (브랜드별 묶음)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-        st.markdown('<div class="sec-tag">BLOG · LIVE</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">공식 블로그 — 최신 글</div>', unsafe_allow_html=True)
+        sub_header("03", "공식 블로그 — 최신 글", "브랜드별 최신 4건 · 네이버 블로그 RSS 실시간")
         if any(blogs.values()):
             bcols = st.columns(2, gap="large")
             for i, brand in enumerate(D.ISSUERS):
@@ -1509,7 +1510,7 @@ with tab_channel:
 
         # ── ④ 운용사 뉴스 이슈 (외부 언론)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-        st.markdown('<div class="sec-tag">NEWS</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">운용사 뉴스 이슈</div>', unsafe_allow_html=True)
+        sub_header("04", "운용사 뉴스 이슈", "자체 채널이 아닌 외부 언론이 다룬 브랜드 이슈")
 
         BRAND_STYLE = {
             "KODEX": "linear-gradient(135deg,#16244D 0%,#3B5BA5 100%)",
@@ -1555,11 +1556,8 @@ with tab_channel:
         # ── ⑤ 브랜드 검색량 (캠페인 → 관심 반응 확인)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
         live_badge = "실데이터" if datalab_live else "데모 — NAVER_CLIENT_ID/SECRET 설정 시 실데이터"
-        st.markdown(
-            f'<div class="sec-tag">NAVER DATALAB</div>'
-            f'<div style="font-size:1.02rem;font-weight:800;">브랜드 검색량 트렌드 <span style="font-size:0.7rem;color:{FAINT};font-weight:600;">({live_badge}) — 위 캠페인·콘텐츠가 실제 관심으로 이어졌는지 확인</span></div>',
-            unsafe_allow_html=True,
-        )
+        sub_header("05", "브랜드 검색량 트렌드",
+                   f"위 캠페인·콘텐츠가 실제 관심으로 이어졌는지 확인 · {live_badge}")
         fig_dl = go.Figure()
         palette = {
             "KODEX": NAVY, "TIGER": "#E88D2A", "ACE": "#C0392B", "SOL": "#2E86C1",
@@ -1624,12 +1622,11 @@ with tab_did:
             f'{right}</div></a>'
         )
 
+    sub_header("01", "감지된 캠페인", "특정 ETF를 미는 일회성 집행만 = DiD의 처치")
     st.markdown(
-        f'<div class="sec-tag">DETECTED CAMPAIGNS</div>'
-        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">감지된 캠페인 '
-        f'<span style="font-size:0.7rem;color:{FAINT};font-weight:600;">특정 ETF를 미는 일회성 집행만 = DiD의 처치</span></div>'
-        f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
-        f'캠페인 {len(campaigns)}건 (분석 가능 {len(usable)}건) · 정기물·단발 언급 {len(others)}건은 개입으로 보지 않아 제외</div>',
+        f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
+        f'캠페인 <b style="color:{INK};">{len(campaigns)}건</b> (분석 가능 {len(usable)}건) · '
+        f'정기물·단발 언급 {len(others)}건은 개입으로 보지 않아 제외</div>',
         unsafe_allow_html=True,
     )
     if campaigns:
@@ -1646,6 +1643,9 @@ with tab_did:
             st.caption("정기 리포트는 평소 반복되는 베이스라인이라 개입이 아니고, 단발 언급은 "
                        "교육 콘텐츠에 예시로 등장한 경우가 많아 해당 ETF를 위한 마케팅으로 보기 어렵습니다.")
     st.write("")
+
+    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    sub_header("02", "분석 대상 지정", "처치군 ETF와 개입 주차 · 비교할 대조군")
 
     # ── 분석할 캠페인 선택 (처치 ETF + 개입 주차가 함께 결정된다)
     manual_mode = False
@@ -1684,6 +1684,9 @@ with tab_did:
     series = D.did_series(netbuy_df, treat, controls)
     sc = D.did_score(series, event_week)
 
+    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    sub_header("03", "진단 결과", "좌: 금주 순매수강도 맥락 · 우: 처치−대조 이중차분")
+
     d1, d2 = st.columns([7, 5], gap="large")
     with d1:
         # 순매수강도 TOP N (참고 맥락)
@@ -1703,7 +1706,10 @@ with tab_did:
         st.caption(f"진한 남색 = KODEX 상품 · 분석 대상 {len(wk)}개 ETF")
 
     with d2:
-        st.markdown('<div class="card-title" style="font-size:1.02rem;">DiD 진단 — 8주 베이스라인 대비</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="font-size:0.9rem;font-weight:800;color:{INK};margin-bottom:8px;">'
+            f'DiD 진단 <span style="font-size:0.72rem;color:{FAINT};font-weight:600;">'
+            f'8주 베이스라인 대비</span></div>', unsafe_allow_html=True)
         # 신규 상장 등으로 베이스라인이 없으면 단계 카드 대신 사유를 명확히 알린다
         no_baseline = sc.get("did") is None and sc.get("delta_treat") is None and sc.get("fallback")
         if no_baseline:
@@ -1726,7 +1732,10 @@ with tab_did:
             f'<div class="did-step-name">Δ처치 (베이스라인 대비)</div>'
             f'<div class="did-step-val">{dt_v:+.2f}%p</div>'
             f'<div class="did-step-desc">{treat[:20]}<br>금주 강도 − 직전 8주 평균</div></div>'
-            if dt_v is not None else '<div class="did-step">산출 불가</div>',
+            if dt_v is not None else
+            ('<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
+             '<div class="did-step-name">산출 불가</div>'
+             f'<div class="did-step-desc">{treat[:20]}<br>비교할 직전 8주 베이스라인이 없습니다</div></div>'),
             unsafe_allow_html=True,
         )
         s2c.markdown(
@@ -1822,7 +1831,7 @@ with tab_did:
         st.plotly_chart(fig_did, use_container_width=True)
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    st.markdown('<div class="sec-tag">SCOREBOARD</div><div style="font-size:1.02rem;font-weight:800;margin-bottom:8px;">전체 KODEX ETF — 금주 DiD 점수 보드</div>', unsafe_allow_html=True)
+    sub_header("04", "전체 KODEX ETF 점수 보드", "캠페인 유무와 무관하게 전 종목의 금주 DiD를 나열")
     if len(did_board):
         st.dataframe(
             did_board.sort_values("score", ascending=False, na_position="last").rename(columns={"score": "효과점수(0~100)"}),
@@ -2005,11 +2014,7 @@ with tab_report:
     st.write("")
 
     # ══════════ A. 현재 마케팅 점검 (핵심) ══════════
-    st.markdown(
-        f'<div class="sec-tag">ACTION · A</div>'
-        f'<div style="font-size:1.05rem;font-weight:800;margin-bottom:2px;">현재 마케팅 점검</div>'
-        f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
-        f'집행 중인 상품을 국면·자금 근거로 지속·확대·축소 판정합니다.</div>', unsafe_allow_html=True)
+    sub_header("A", "현재 마케팅 점검", "집행 중인 상품을 국면·자금 근거로 지속·확대·축소 판정")
     if review:
         _vc = {"지속": ("#2E7D5B", "#EAF7EF"), "확대": ("#2E7D5B", "#EAF7EF"),
                "지속·관찰": ("#B0801F", "#FDF6E7"), "지속·신중": ("#B0801F", "#FDF6E7"),
@@ -2046,9 +2051,7 @@ with tab_report:
     # ══════════ B · C ══════════
     b1, b2 = st.columns(2, gap="large")
     with b1:
-        st.markdown(f'<div class="sec-tag">ACTION · B</div>'
-                    f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">태동기 착수</div>',
-                    unsafe_allow_html=True)
+        sub_header("B", "태동기 착수")
         if emerging:
             st.markdown(
                 f'<div class="card"><div style="font-size:1rem;font-weight:800;">{emerging["섹터"]} '
@@ -2062,9 +2065,7 @@ with tab_report:
             st.markdown(f'<div class="card"><div style="font-size:0.82rem;color:{GRAY};">'
                         f'이번 주 태동 국면 섹터가 없습니다.</div></div>', unsafe_allow_html=True)
     with b2:
-        st.markdown(f'<div class="sec-tag">ACTION · C</div>'
-                    f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">신규 출시 후보</div>',
-                    unsafe_allow_html=True)
+        sub_header("C", "신규 출시 후보")
         if gap_ctx:
             st.markdown(
                 f'<div class="card"><div style="font-size:1rem;font-weight:800;">'
@@ -2083,8 +2084,8 @@ with tab_report:
 
     # ══════════ DiD 요약 ══════════
     if did_ctx:
+        sub_header("D", "마케팅 효과 검증", "③에서 측정한 이번 주 대표 사례")
         st.markdown(
-            f'<div class="sec-tag">EFFECT · DiD</div>'
             f'<div class="card" style="padding:14px 18px;">'
             f'<div style="font-size:0.82rem;color:{GRAY};margin-bottom:8px;">'
             f'측정 사례 <b style="color:{INK};">{did_ctx["name"]}</b> · {did_ctx["channel"]} · {did_ctx["week"]}</div>'
@@ -2103,12 +2104,10 @@ with tab_report:
 
     # ══════════ PDF 내보내기 ══════════
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    sub_header("PDF", "전체 리포트 내려받기", "화면 요약보다 자세한 5개 섹션 전체 리포트")
     st.markdown(
-        f'<div class="sec-tag">EXPORT</div>'
-        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">전체 리포트 내려받기</div>'
-        f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
-        f'화면 요약보다 자세한 5개 섹션 전체 리포트입니다. 내려받은 파일을 열어 '
-        f'<b>인쇄(⌘/Ctrl+P) → PDF로 저장</b>하면 A4 리포트가 만들어집니다.</div>',
+        f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
+        f'내려받은 파일을 열어 <b>인쇄(⌘/Ctrl+P) → PDF로 저장</b>하면 A4 리포트가 만들어집니다.</div>',
         unsafe_allow_html=True)
     try:
         _html = RT.render_report(ctx)
@@ -2166,13 +2165,12 @@ with tab_reg:
 
     c1, c2 = st.columns([7, 5], gap="large")
     with c1:
+        sub_header("01", "금융위 보도자료 · 입법예고")
         st.markdown(
-            f'<div class="sec-tag">FSC</div>'
-            f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">금융위 보도자료 · 입법예고</div>'
-            f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
+            f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
             f'보도자료 {sum(1 for r in regs if r["출처"] == "금융위 보도자료")}건 · '
             f'입법예고 {sum(1 for r in regs if r["출처"] == "입법예고·규정변경")}건 수집 → '
-            f'ETF·자본시장 관련 <b>{len(rel)}건</b> (정책펀드·기금 등은 제외)</div>',
+            f'ETF·자본시장 관련 <b style="color:{INK};">{len(rel)}건</b> (정책펀드·기금 등은 제외)</div>',
             unsafe_allow_html=True)
         if rel:
             KIND_C = {"법률": "#B5321F", "시행령": "#1B4DE4", "규정·고시": "#6B4FBB",
@@ -2210,10 +2208,7 @@ with tab_reg:
         st.caption("금융위원회 보도자료·입법예고/규정변경예고 실시간 수집 (1시간 캐시) · "
                    "날짜는 첨부파일명 기준이라 일부는 미상으로 표시됩니다.")
     with c2:
-        st.markdown(
-            f'<div class="sec-tag">NEWS</div>'
-            f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:10px;">규제 관련 보도</div>',
-            unsafe_allow_html=True)
+        sub_header("02", "규제 관련 보도")
         if reg_news:
             rows = "".join(
                 f'<a class="kw-link" href="{n["링크"]}" target="_blank"><div class="kw-row">'
@@ -2228,12 +2223,13 @@ with tab_reg:
 
     # ── 근거 법령 현황 (국가법령정보센터 OpenAPI)
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+    sub_header("03", "근거 법령 현황", "국가법령정보센터 · 발표가 아니라 시행일 기준")
     st.markdown(
-        f'<div class="sec-tag">LAW</div>'
-        f'<div style="font-size:1.02rem;font-weight:800;margin-bottom:2px;">근거 법령 현황</div>'
-        f'<div style="font-size:0.72rem;color:#98A2B3;margin-bottom:10px;">'
+        f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
+        f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
+        f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:12px;">'
         f'보도자료는 <b>발표</b>를 보여주지만, 규제는 <b>시행일</b>부터 적용됩니다 — '
-        f'시행 전후로 상품 메시지가 달라져야 하므로 시행일을 함께 봅니다. (국가법령정보센터)</div>',
+        f'시행 전후로 상품 메시지가 달라져야 하므로 시행일을 함께 봅니다.</div>',
         unsafe_allow_html=True)
     laws, laws_live = load_laws()
     if laws:

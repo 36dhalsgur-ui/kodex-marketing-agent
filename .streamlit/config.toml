@@ -1,0 +1,6 @@
+[theme]
+# 삼성자산운용 브랜드 블루 — 기본 primary(레드)가 데이터 색(상승=빨강)과 충돌해서 교체
+primaryColor = "#1428A0"
+backgroundColor = "#F6F8FB"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#141B2D"
