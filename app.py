@@ -1401,92 +1401,30 @@ with tab_channel:
             f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
             f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:12px;">'
-            f'배너는 <b>자동 회전 캐러셀</b>이라 노출 순서만으로는 우선순위를 알 수 없습니다 — '
-            f'ACE만 운용사가 매긴 실제 순위(rank)를 제공하고, 나머지는 사이트 노출 순서입니다. '
-            f'대신 <b>슬롯 점유 수</b>와 <b>동시 집행 채널 수</b>를 "미는 강도"의 근거로 우측에 표시합니다. '
-            f'<span style="color:{RED};font-weight:700;">NEW</span> = 전주에 없던 배너 · '
-            f'좌측 배지는 <b>그 배너가 실제로 어디로 연결되는지</b>입니다 — '
-            f'브랜드마다 목적지가 달라(TIGER는 유튜브, TIMEFOLIO는 블로그) '
-            f'누르기 전에 알 수 있게 표기합니다.</div>',
+            f'배너는 <b>자동 회전 캐러셀</b>이라 노출 순서만으로는 우선순위를 알 수 없습니다. '
+            f'우측은 그 배너가 <b>무엇을 주목하고 있는지</b> — 상품명이 있으면 상품명, '
+            f'없으면 테마입니다. 링크는 모두 <b>해당 운용사 공식 홈페이지</b>로 연결됩니다. '
+            f'<span style="color:{RED};font-weight:700;">NEW</span> = 전주에 없던 배너.</div>',
             unsafe_allow_html=True,
         )
         if ch_brands:
-            def push_chips(brand: str, banner: dict, info: dict) -> str:
-                """미는 강도의 실측 근거 — 슬롯 점유 수 · 동시 집행 채널 수 · 순위 제공 여부."""
-                chips = []
-                slots = banner.get("슬롯수", 1)
-                if slots > 1:
-                    chips.append(("슬롯 " + str(slots), "#6B4FBB"))
-                # 배너 상품이 같은 브랜드 유튜브·블로그에도 등장하면 멀티채널 집행
-                key = re.sub(r"[^가-힣A-Za-z0-9]", "", banner.get("제목", ""))[:10]
-                extra = 0
-                if key:
-                    for v in youtube.get(brand, [])[:8]:
-                        if key[:6] and key[:6] in re.sub(r"[^가-힣A-Za-z0-9]", "", v.get("title", "")):
-                            extra += 1
-                            break
-                    for p in blogs.get(brand, [])[:6]:
-                        if key[:6] and key[:6] in re.sub(r"[^가-힣A-Za-z0-9]", "", p.get("title", "")):
-                            extra += 1
-                            break
-                if extra:
-                    chips.append((f"{1 + extra}채널 동시", "#C2333F"))
-                if banner.get("순위근거"):
-                    chips.append(("운용사 순위", "#1E7A55"))
-                if not chips:
-                    return f'<span style="font-size:0.7rem;color:{FAINT};">단일 슬롯</span>'
-                return "".join(
-                    f'<span style="font-size:0.66rem;font-weight:700;color:{c};background:#F5F6FA;'
-                    f'border-radius:4px;padding:2px 7px;margin-left:4px;white-space:nowrap;">{t}</span>'
-                    for t, c in chips)
-
-            # 배너가 실제로 어디로 가는지 — 브랜드마다 목적지 성격이 달라서
-            # (TIGER는 전부 유튜브, TIMEFOLIO는 블로그) 누르기 전에 알 수 있어야 한다
-            KIND_STYLE = {"상품": (BRAND, BRAND_SOFT), "영상": ("#C2333F", "#FDECEB"),
-                          "블로그": ("#1E7A55", "#EAF7EF"), "뉴스": ("#B0801F", "#FDF6E7"),
-                          "공지": ("#6B4FBB", "#F3EFFA"), "자료": ("#5B6478", "#F2F4F7"),
-                          "홈페이지": ("#5B6478", "#F2F4F7"), "홈": (FAINT, "#F7F9FC"),
-                          "외부": (FAINT, "#F7F9FC")}
-
-            def kind_chip(k: str) -> str:
-                if not k:
-                    return ""
-                c, bg = KIND_STYLE.get(k, (FAINT, "#F7F9FC"))
-                label = "링크 없음" if k == "홈" else k
-                return (f'<span style="font-size:0.64rem;font-weight:700;color:{c};'
-                        f'background:{bg};border-radius:4px;padding:2px 7px;'
-                        f'margin-right:6px;white-space:nowrap;">{label}</span>')
-
             hp_rows = ""
             for brand in D.ISSUERS:
                 info = ch_brands.get(brand, {})
                 banners = info.get("배너", [])
                 if banners:
                     b = banners[0]
-                    hp_rows += feed_row(brand, b["제목"][:52],
-                                        kind_chip(b.get("링크유형", "")) + push_chips(brand, b, info),
-                                        b["링크"], NEW_BADGE if b.get("NEW") else "")
+                    _focus = D.banner_focus(b["제목"])
+                    _right = (f'<span style="font-size:0.78rem;font-weight:700;color:{NAVY};'
+                              f'white-space:nowrap;">{_focus}</span>' if _focus else
+                              f'<span style="font-size:0.74rem;color:{FAINT};">—</span>')
+                    hp_rows += feed_row(brand, b["제목"][:52], _right,
+                                        info.get("홈", "#"), NEW_BADGE if b.get("NEW") else "")
                 else:
                     hp_rows += feed_row(
                         brand, f'<span style="color:{GRAY};">{info.get("비고", "수집된 배너 없음")}</span>',
                         "", info.get("홈", "#"))
             st.markdown(f'<div class="card" style="padding:8px 16px;">{hp_rows}</div>', unsafe_allow_html=True)
-
-            # 별도 이벤트 페이지를 운영하는 브랜드만 노출 (배너=상품상세와 구분)
-            ev_items = [(b, ch_brands[b]["이벤트"]) for b in D.ISSUERS
-                        if ch_brands.get(b, {}).get("이벤트")]
-            if ev_items:
-                chips = "".join(
-                    f'<a href="{e["링크"]}" target="_blank" style="text-decoration:none;'
-                    f'font-size:0.75rem;color:#475467;background:#F2F4F7;border:1px solid #E4E7EC;'
-                    f'border-radius:20px;padding:4px 11px;margin:0 6px 6px 0;display:inline-block;">'
-                    f'<b style="color:{INK};">{b}</b> · {e["라벨"][:10]} ↗</a>'
-                    for b, e in ev_items)
-                st.markdown(
-                    f'<div style="margin-top:10px;"><div style="font-size:0.72rem;color:{GRAY};'
-                    f'margin-bottom:6px;">별도 이벤트·프로모션 페이지 운영 브랜드 '
-                    f'({len(ev_items)}/{len(D.ISSUERS)})</div>{chips}</div>',
-                    unsafe_allow_html=True)
 
             with st.expander("브랜드별 전체 배너 보기"):
                 bcols = st.columns(2, gap="large")
@@ -1507,8 +1445,9 @@ with tab_channel:
             _n_rank = sum(1 for v in _ord.values() if v == "운용사 지정 우선순위")
             st.caption(
                 f'공식 홈페이지 배너 주간 배치 수집 ({ch_data.get("asof", "")}) · '
-                f'운용사가 매긴 실제 순위를 제공하는 곳 {_n_rank}/{len(D.ISSUERS)}개사 — 나머지는 사이트 노출 순서라 '
-                f'"첫 배너 = 최우선"이라고 단정할 수 없습니다. 우측 배지가 강도의 실제 근거입니다.')
+                f'운용사가 매긴 실제 순위를 제공하는 곳은 {_n_rank}/{len(D.ISSUERS)}개사뿐이라 '
+                f'"첫 배너 = 최우선"이라고 단정할 수 없습니다 — 슬롯 점유 수·동시 집행 채널 수는 '
+                f'수집해두고 ③ 효과 측정의 캠페인 판정에만 사용합니다.')
         else:
             st.info("배너 데이터가 없습니다 — 로컬에서 `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
 
@@ -1558,6 +1497,23 @@ with tab_channel:
             st.caption("운용사 이벤트 보드 주간 배치 수집 · D-n은 종료까지 남은 일수 (14일 이내 강조)")
         else:
             st.info("이벤트 데이터가 없습니다 — `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
+
+        # 개별 이벤트까지는 못 긁지만 이벤트 메뉴는 운영하는 브랜드 — 수동 확인용 링크
+        _ev_menu = [(b, ch_brands[b]["이벤트"]) for b in D.ISSUERS
+                    if ch_brands.get(b, {}).get("이벤트")
+                    and not ch_brands.get(b, {}).get("이벤트목록")]
+        if _ev_menu:
+            _chips = "".join(
+                f'<a href="{e["링크"]}" target="_blank" style="text-decoration:none;'
+                f'font-size:0.75rem;color:{MUTED};background:#F2F4F7;border:1px solid {LINE};'
+                f'border-radius:20px;padding:4px 11px;margin:0 6px 6px 0;display:inline-block;">'
+                f'<b style="color:{INK};">{b}</b> · {e["라벨"][:10]} ↗</a>'
+                for b, e in _ev_menu)
+            st.markdown(
+                f'<div style="margin-top:14px;"><div style="font-size:0.72rem;color:{FAINT};'
+                f'margin-bottom:6px;">이벤트 메뉴는 있으나 목록 자동 수집이 안 되는 브랜드 '
+                f'({len(_ev_menu)}개) — 링크로 직접 확인</div>{_chips}</div>',
+                unsafe_allow_html=True)
 
         # ── ③ 공식 유튜브 — 최신 영상 (썸네일 그리드)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)

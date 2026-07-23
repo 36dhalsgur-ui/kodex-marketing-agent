@@ -1081,6 +1081,33 @@ ZSCORE_WINDOW = 15     # 권장 15주 (데이터 부족 시 가용 주차 사용
 # 배너·유튜브·블로그 제목이 특정 ETF를 지목하면 그 주차를 개입 시점으로 본다.
 # ETF명 매칭은 '정확일치'만 허용 — 부분일치를 허용하면
 # 'KODEX 200커버드콜액티브'가 별개 상품인 'KODEX 200'에 붙어 분석이 오염된다(실측 확인).
+# 브랜드 접두 상품명 — 배너가 '무엇을' 주목하는지 뽑는 데 쓴다.
+# TIME은 TIMEFOLIO의 리브랜딩 표기라 함께 받는다.
+# 브랜드 + (붙어 있는 수식어) + 공백 + 한 토큰.
+# 두 토큰을 받으면 'HANARO 미국AI광통신TOP10 미국'처럼 뒤 설명문까지 삼킨다.
+# 대신 'RISE미국 우주&로봇TOP2'처럼 브랜드에 글자가 붙는 표기를 흡수한다.
+_BRAND_PROD = re.compile(
+    r"(?:KODEX|TIGER|ACE|SOL|HANARO|RISE|PLUS|TIMEFOLIO|TIME)"
+    r"[가-힣A-Za-z0-9&\+\.]*\s?[가-힣A-Za-z0-9&\+\.]+")
+
+
+def banner_focus(title: str) -> str:
+    """배너가 주목하는 대상 — 상품명이 있으면 상품명, 없으면 테마 키워드.
+
+    'TIGER ETF'처럼 브랜드 일반 언급은 상품이 아니므로 테마로 넘긴다."""
+    m = _BRAND_PROD.search(title or "")
+    if m:
+        raw = re.sub(r"\s*ETF\s*$", "", m.group(0).strip())
+        # 브랜드명만 남거나 'TIGER ETF' 꼴이면 상품 지목이 아니다
+        tail = re.sub(r"^(?:KODEX|TIGER|ACE|SOL|HANARO|RISE|PLUS|TIMEFOLIO|TIME)", "", raw).strip()
+        if len(tail) >= 2 and not tail.upper().startswith("ETF"):
+            return raw
+    for kw, pat in NEWS_KW_PATTERNS:
+        if re.search(pat, title or ""):
+            return kw
+    return ""
+
+
 _ETF_MENTION = re.compile(r"KODEX\s+[가-힣A-Za-z0-9&\+\.]+(?:\s*[가-힣A-Za-z0-9&\+\.]+)?")
 
 
