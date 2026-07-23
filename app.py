@@ -1821,9 +1821,9 @@ with tab_did:
                 f'</tr></thead><tbody>{_rows}</tbody></table>',
                 unsafe_allow_html=True)
             if _n_untested == len(_diag):
-                st.info(f"개입 이전 관측이 {int(_diag['공통주'].max())}주뿐이라 평행추세를 검증할 수 없습니다 "
-                        f"(최소 {D.PARALLEL_MIN_WEEKS}주 필요). 아래 DiD 값은 "
-                        "**가정이 확인되지 않은 상태**의 참고치입니다.")
+                _why = next((r for r in _diag.get("사유", pd.Series(dtype=str)) if r), "")
+                st.info(f"평행추세를 검증할 수 없습니다 — {_why}\n\n"
+                        "아래 DiD 값은 **가정이 확인되지 않은 상태**의 참고치입니다.")
 
     _w = (_uni.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
           if _uni is not None and "순자산" in _uni.columns else None)

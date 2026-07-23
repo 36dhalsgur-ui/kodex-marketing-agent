@@ -1380,10 +1380,18 @@ def control_diagnostics(df: pd.DataFrame, treat: str, candidates: list[str],
             # 처치군이 개입 전 내내 0이면(신규상장) 분산이 없어 상관을 낼 수 없다
             if t[m].std() > 0 and b[m].std() > 0:
                 corr = float(np.corrcoef(t[m], b[m])[0, 1])
+        # 검증 불가는 원인이 두 가지다 — 관측이 짧은 것과, 값이 아예 안 움직인 것.
+        # 둘을 뭉치면 "7주인데 최소 4주 필요"처럼 앞뒤가 안 맞는 안내가 나간다.
+        reason = ""
         if n_pre < PARALLEL_MIN_WEEKS:
-            verdict = "검증 불가"
+            verdict, reason = "검증 불가", f"개입 이전 관측 {n_pre}주 (최소 {PARALLEL_MIN_WEEKS}주 필요)"
         elif np.isnan(corr):
-            verdict = "검증 불가"
+            if n_pre >= 2 and float(t[m].std() or 0) == 0:
+                verdict, reason = "검증 불가", "처치군이 개입 이전 내내 순매수 0 (신규 상장) — 변화가 없어 상관 계산 불가"
+            elif n_pre >= 2 and float(b[m].std() or 0) == 0:
+                verdict, reason = "검증 불가", "대조군 후보가 개입 이전 내내 순매수 0"
+            else:
+                verdict, reason = "검증 불가", "상관 계산 불가"
         elif corr < 0:
             verdict = "부적합"
         elif corr < PARALLEL_GOOD:
@@ -1392,7 +1400,7 @@ def control_diagnostics(df: pd.DataFrame, treat: str, candidates: list[str],
             verdict = "양호"
         rows.append({"종목명": c, "공통주": n_pre, "상관": corr,
                      "평행오차": err, "순자산": float(aum.get(c, 0) or 0),
-                     "판정": verdict})
+                     "판정": verdict, "사유": reason})
     out = pd.DataFrame(rows)
     if len(out):
         out = out.sort_values(["판정", "상관"], ascending=[True, False],
