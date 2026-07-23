@@ -152,18 +152,42 @@
       ],
       "배너": [
         {
-          "제목": "TIGER 글로벌반도체 ETF 매수 인증 이벤트",
-          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=180",
-          "노출": "팝업",
-          "NEW": false,
+          "제목": "[ETF 포트폴리오] 2026년 3분기 ETF 포트폴리오",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/insight/etf-insight/view.do?listCnt=8&pageIndex=1&detailsKey=705&q=",
+          "노출": "메인 배너",
+          "NEW": true,
+          "링크유형": "상품",
+          "슬롯수": 1
+        },
+        {
+          "제목": "[New ETF] TIGER 미국테크 NYSE100액티브",
+          "링크": "https://investments.miraeasset.com",
+          "노출": "메인 배너",
+          "NEW": true,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
         {
-          "제목": "TIGER 패밀리클럽 친구 인증 이벤트",
-          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=181",
-          "노출": "팝업",
-          "NEW": false,
+          "제목": "[액티브 ETF] TIGER 코스닥액티브",
+          "링크": "https://investments.miraeasset.com",
+          "노출": "메인 배너",
+          "NEW": true,
+          "링크유형": "홈페이지",
+          "슬롯수": 1
+        },
+        {
+          "제목": "[월배당 ETF] TIGER 배당커버드콜액티브",
+          "링크": "https://investments.miraeasset.com",
+          "노출": "메인 배너",
+          "NEW": true,
+          "링크유형": "홈페이지",
+          "슬롯수": 1
+        },
+        {
+          "제목": "[이벤트] 글로벌 반도체 ETF 매수인증 이벤트",
+          "링크": "https://investments.miraeasset.com",
+          "노출": "메인 배너",
+          "NEW": true,
           "링크유형": "홈페이지",
           "슬롯수": 1
         }

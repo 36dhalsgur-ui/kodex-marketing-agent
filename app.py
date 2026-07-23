@@ -1396,17 +1396,15 @@ with tab_channel:
     with grp_amc:
         st.write("")
         # ── ① 공식 홈페이지 — 메인 배너 (브랜드별 1행, 우측=콘텐츠 테마)
-        sub_header("01", "공식 홈페이지 — 최전면 노출", "브랜드가 홈에 가장 먼저 거는 것 · 주 1회 배치 수집")
+        sub_header("01", "공식 홈페이지 — 메인 배너", "브랜드별 메인 영역 노출 · 주 1회 배치 수집")
         st.markdown(
             f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
             f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:12px;">'
-            f'브랜드가 홈에서 <b>가장 먼저 보여주는 것</b>을 봅니다 — 노출 위치가 브랜드마다 달라 '
-            f'(TIGER는 진입 팝업, 나머지는 메인 배너) 좌측에 위치를 함께 표기합니다. '
-            f'우측은 그것이 <b>무엇을 주목하는지</b> — 상품명이 있으면 상품명, 없으면 테마입니다. '
-            f'여기서는 <b>지금 무엇을 최전면에 뒀는지</b>만 보고, 그 캠페인이 언제까지인지는 '
-            f'아래 <b>02 진행 중 이벤트</b>에서 확인합니다. '
-            f'<span style="color:{RED};font-weight:700;">NEW</span> = 전주에 없던 노출.</div>',
+            f'각 운용사 홈 <b>메인 영역의 첫 번째 노출</b>입니다. 우측은 그것이 '
+            f'<b>무엇을 주목하는지</b> — 상품명이 있으면 상품명, 없으면 테마나 카테고리입니다. '
+            f'링크는 모두 <b>해당 운용사 공식 홈페이지</b>로 연결됩니다. '
+            f'<span style="color:{RED};font-weight:700;">NEW</span> = 전주에 없던 배너.</div>',
             unsafe_allow_html=True,
         )
         if ch_brands:
@@ -1417,16 +1415,9 @@ with tab_channel:
                 if banners:
                     b = banners[0]
                     _focus = D.banner_focus(b["제목"])
-                    _pos = b.get("노출", "메인 배너")
-                    _pc, _pbg = (("#B0801F", "#FDF6E7") if _pos == "팝업"
-                                 else (MUTED, "#F2F4F7"))
-                    _right = (
-                        f'<span style="font-size:0.64rem;font-weight:700;color:{_pc};'
-                        f'background:{_pbg};border-radius:4px;padding:2px 7px;'
-                        f'margin-right:10px;white-space:nowrap;">{_pos}</span>'
-                        + (f'<span style="font-size:0.78rem;font-weight:700;color:{NAVY};'
-                           f'white-space:nowrap;">{_focus}</span>' if _focus else
-                           f'<span style="font-size:0.74rem;color:{FAINT};">—</span>'))
+                    _right = (f'<span style="font-size:0.78rem;font-weight:700;color:{NAVY};'
+                              f'white-space:nowrap;">{_focus}</span>' if _focus else
+                              f'<span style="font-size:0.74rem;color:{FAINT};">—</span>')
                     hp_rows += feed_row(brand, b["제목"][:52], _right,
                                         info.get("홈", "#"), NEW_BADGE if b.get("NEW") else "")
                 else:
@@ -1471,9 +1462,8 @@ with tab_channel:
             f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
             f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:12px;">'
-            f'01이 <b>지금 무엇을 최전면에 뒀는지</b>를 본다면, 여기서는 그 캠페인이 '
-            f'<b>언제 시작해 언제 끝나는지</b>를 봅니다 — 그래서 01의 항목이 여기 다시 '
-            f'나올 수 있습니다(예: TIGER 팝업 = 아래 이벤트). 집행 기간이 명시돼 있어 '
+            f'01이 <b>지금 무엇을 걸어놨는지</b>를 본다면, 여기서는 그 캠페인이 '
+            f'<b>언제 시작해 언제 끝나는지</b>를 봅니다. 집행 기간이 명시돼 있어 '
             f'③ 효과 측정에서 개입 시점을 정의하는 데 가장 적합한 신호입니다. '
             f'이벤트 보드를 파싱할 수 있는 곳은 KODEX·TIGER 2개사입니다.</div>', unsafe_allow_html=True)
         if _ev_brands:

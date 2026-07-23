@@ -1105,7 +1105,9 @@ def banner_focus(title: str) -> str:
     for kw, pat in NEWS_KW_PATTERNS:
         if re.search(pat, title or ""):
             return kw
-    return ""
+    # 상품도 테마도 없으면 브랜드가 스스로 붙인 카테고리 라벨을 쓴다 ('[ETF 포트폴리오] …')
+    m = re.match(r"\s*\[([^\]]{2,16})\]", title or "")
+    return m.group(1).strip() if m else ""
 
 
 _ETF_MENTION = re.compile(r"KODEX\s+[가-힣A-Za-z0-9&\+\.]+(?:\s*[가-힣A-Za-z0-9&\+\.]+)?")

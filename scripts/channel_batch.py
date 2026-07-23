@@ -144,44 +144,29 @@ def kodex():
 
 
 def tiger():
-    """TIGER에는 일반적인 메인 배너 캐러셀이 없다(실측).
+    """TIGER 메인 영역 — .only-main 안의 .c-section 블록들 (data-component=MainHero 등).
 
-    최상위 노출은 진입 즉시 뜨는 **팝업 레이어**(.layerPopArea)이고, 그 안은
-    이미지 링크뿐이라 제목이 없다 — 링크의 detailsKey로 이벤트 보드에서 제목을
-    가져온다. 기존 파서가 잡던 .focus-item은 페이지 한참 아래(1,700px)의
-    'ETF 영상' 섹션이라 메인 배너로 볼 수 없다."""
+    스와이퍼가 아니라 섹션이 세로로 쌓이는 구조라 'swiper-slide'를 찾으면 안 된다.
+    기존 파서는 페이지 1,700px 아래 '투자 포커스'(ETF 영상) 캐러셀을 잡고 있었다.
+    각 카드는 .category(라벨) + .title(헤드라인)로 나뉘어 있어 그대로 쓴다."""
     base = "https://investments.miraeasset.com"
     soup = get_soup(base + "/tigeretf/ko/main/index.do")
-
-    titles = {}
-    try:
-        for e in tiger_events():
-            k = re.search(r"detailsKey=(\d+)", e["링크"])
-            if k:
-                titles[k.group(1)] = e["제목"]
-    except Exception:
-        pass
-
+    main = soup.select_one(".only-main")
     items, seen = [], set()
-    pop = soup.select_one(".layerPopArea")
-    for a in (pop.select("a[href]") if pop else []):
-        k = re.search(r"detailsKey=(\d+)", a["href"])
-        if not k or k.group(1) in seen:
+    for card in (main.select(".c-section.active .c-card") if main else []):
+        title_el = card.select_one(".title")
+        if not title_el:
             continue
-        seen.add(k.group(1))
-        items.append({"제목": titles.get(k.group(1), f"이벤트 팝업 #{k.group(1)}"),
-                      "링크": absol(base, a["href"]), "노출": "팝업"})
-    if items:
-        return items[:MAX_BANNERS]
-
-    # 팝업이 내려간 주에는 'ETF 영상' 섹션을 대신 쓴다 — 성격이 다르므로 표시한다
-    for slide in soup.select("div.swiper-slide.focus-item"):
-        txt = clean(re.sub(r"\d{4}\.\d{2}\.\d{2}|ETF 영상", "", slide.get_text(" ", strip=True)), 80)
-        a = slide.find("a", href=True)
-        if len(txt) > 10 and txt not in seen:
-            seen.add(txt)
-            items.append({"제목": txt, "링크": absol(base, a["href"] if a else ""),
-                          "노출": "ETF 영상 섹션"})
+        title = clean(title_el.get_text(" ", strip=True), 70)
+        cat_el = card.select_one(".category .val")
+        cat = clean(cat_el.get_text(" ", strip=True), 16) if cat_el else ""
+        a = card.find("a", href=True)
+        if len(title) < 4 or title in seen:
+            continue
+        seen.add(title)
+        items.append({"제목": (f"[{cat}] {title}" if cat else title),
+                      "링크": absol(base, a["href"] if a else ""),
+                      "노출": "메인 배너"})
     return items[:MAX_BANNERS]
 
 
