@@ -1134,7 +1134,12 @@ def classify_marketing_events(events: list[dict]) -> list[dict]:
 
     for e in events:
         title = e.get("제목", "")
-        if _CAMPAIGN_PAT.search(title):
+        # 이벤트 보드 출처는 추정이 아니라 운용사가 직접 고지한 집행이다 — 최상위 근거
+        if e.get("채널") == "이벤트":
+            e["유형"] = "캠페인"
+            e["근거"] = (f'이벤트 {e.get("시작","")}~{e.get("종료","")}'
+                        if e.get("시작") else "이벤트 보드")
+        elif _CAMPAIGN_PAT.search(title):
             e["유형"], e["근거"] = "캠페인", "캠페인 신호어"
         elif id(e) in multi:
             e["유형"], e["근거"] = "캠페인", "복수 채널 동시 집행"
@@ -1146,22 +1151,30 @@ def classify_marketing_events(events: list[dict]) -> list[dict]:
 
 
 def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list[dict],
-                            universe: list[str] | None = None) -> list[dict]:
+                            universe: list[str] | None = None,
+                            events_board: list[dict] | None = None) -> list[dict]:
     """채널 수집물에서 ETF를 지목한 마케팅 이벤트를 추출.
 
     반환: [{ETF, 표기명, 주차, date, 채널, 제목, 링크, 분석가능}] — 날짜 내림차순.
-    분석가능=False는 순매수 유니버스에 없는 ETF(=DiD 계산 불가, 데이터 연동 필요)."""
+    분석가능=False는 순매수 유니버스에 없는 ETF(=DiD 계산 불가, 데이터 연동 필요).
+
+    events_board(운용사 이벤트 보드)는 다른 소스와 성격이 다르다 — 배너·영상·글은
+    '언제 올라왔나'만 알 수 있어 개입 시점을 수집일로 근사하지만, 이벤트는 집행
+    시작일·종료일이 명시돼 있다. 그래서 개입 주차를 시작일로 잡고 구간을 함께 싣는다."""
     uni = {_norm_etf(n): n for n in (universe if universe is not None else kodex_etfs())}
     src = []
     for b in banners or []:
-        src.append(("홈페이지", b.get("제목", ""), b.get("링크", ""), b.get("date", "")))
+        src.append(("홈페이지", b.get("제목", ""), b.get("링크", ""), b.get("date", ""), None))
     for v in videos or []:
-        src.append(("유튜브", v.get("title", ""), v.get("url", ""), v.get("published", "")))
+        src.append(("유튜브", v.get("title", ""), v.get("url", ""), v.get("published", ""), None))
     for p in posts or []:
-        src.append(("블로그", p.get("title", ""), p.get("link", ""), p.get("date", "")))
+        src.append(("블로그", p.get("title", ""), p.get("link", ""), p.get("date", ""), None))
+    for e in events_board or []:
+        # 개입 시점 = 이벤트 시작일 (수집일이 아니다)
+        src.append(("이벤트", e.get("제목", ""), e.get("링크", ""), e.get("시작", ""), e))
 
     events = []
-    for channel, title, link, date in src:
+    for channel, title, link, date, meta in src:
         m = _ETF_MENTION.search(title or "")
         if not m:
             continue
@@ -1170,11 +1183,15 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
         if len(tail) < 2 or tail.startswith("ETF"):
             continue  # 'KODEX ETF가 제안하는' 같은 브랜드 일반 언급은 제외
         matched = uni.get(_norm_etf(raw))
-        events.append({
+        row = {
             "ETF": matched or raw, "표기명": raw, "채널": channel,
             "제목": title, "링크": link, "date": (date or "")[:10],
             "주차": week_label_of(date or ""), "분석가능": matched is not None,
-        })
+        }
+        if meta:
+            row.update({"시작": meta.get("시작", ""), "종료": meta.get("종료", ""),
+                        "상태": meta.get("상태", "")})
+        events.append(row)
     classify_marketing_events(events)
     events.sort(key=lambda e: e["date"], reverse=True)
     return events

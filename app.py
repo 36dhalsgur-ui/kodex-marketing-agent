@@ -6,6 +6,7 @@ Z-score→Sigmoid 0~100점 설계를 따른다.
 """
 
 import datetime as dt
+import hashlib
 import importlib
 import json
 import re
@@ -36,13 +37,14 @@ if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
     D = importlib.reload(D)
 
 # 위 목록은 사람이 관리해서 새 함수를 추가할 때 빠뜨리기 쉽다(실제로 반복 발생).
-# 소스 파일의 실제 정의와 대조해, 목록에 없더라도 누락이 있으면 재로드한다.
+# 이름 존재 여부만 보면 '시그니처만 바뀐 기존 함수'를 놓친다(실측: detect_marketing_events에
+# 인자를 추가했는데 이름이 이미 있어 재로드가 안 걸렸다). 소스 해시를 직접 대조한다.
 try:
     _src = (Path(__file__).parent / "data.py").read_text()
-    _defined = set(re.findall(r"^(?:def\s+([a-zA-Z]\w*)|([A-Z][A-Z0-9_]{2,})\s*=)", _src, re.M))
-    _names = {a or b for a, b in _defined if (a or b)}
-    if any(not hasattr(D, n) for n in _names):
+    _sig = hashlib.md5(_src.encode()).hexdigest()
+    if getattr(D, "_SRC_SIG", None) != _sig:
         D = importlib.reload(D)
+        D._SRC_SIG = _sig
 except Exception:
     pass
 
@@ -1677,14 +1679,18 @@ with tab_did:
         for br in ch_data.get("brands", []) if br.get("브랜드") == "KODEX"
         for b in br.get("배너", [])
     ]
+    # 이벤트 보드는 집행 기간이 명시돼 있어 개입 시점 정의가 가장 정확하다
+    _kodex_events = next((b.get("이벤트목록", []) for b in ch_data.get("brands", [])
+                          if b.get("브랜드") == "KODEX"), [])
     events = D.detect_marketing_events(
         _kodex_banners, youtube.get("KODEX", []), blogs.get("KODEX", []),
-        universe=kodex_list(netbuy_df))
+        universe=kodex_list(netbuy_df), events_board=_kodex_events)
     campaigns = [e for e in events if e["유형"] == "캠페인"]
     others = [e for e in events if e["유형"] != "캠페인"]
     usable = [e for e in campaigns if e["분석가능"]]
 
-    CH_ICON = {"홈페이지": "#6B4FBB", "유튜브": "#C2333F", "블로그": "#1E7A55"}
+    CH_ICON = {"홈페이지": "#6B4FBB", "유튜브": "#C2333F", "블로그": "#1E7A55",
+               "이벤트": BRAND}
 
     def ev_row(e: dict, dim: bool = False) -> str:
         dot = CH_ICON.get(e["채널"], "#98A2B3")
