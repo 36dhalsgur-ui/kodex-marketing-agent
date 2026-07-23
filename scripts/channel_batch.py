@@ -413,6 +413,8 @@ def main():
             for b in banners:
                 b["NEW"] = bool(prev_titles) and b["제목"] not in prev_titles
                 b["링크유형"] = link_kind(b["링크"], home, own_domains)
+                # 노출 위치 — 파서가 지정하지 않았으면 메인 배너 캐러셀이다
+                b.setdefault("노출", "메인 배너")
             row["배너"] = slot_share(banners)
             # 배너 순서의 성격을 명시 — ACE만 운용사가 매긴 실제 우선순위
             row["순서근거"] = "운용사 지정 우선순위" if any("순위근거" in b for b in banners) else "사이트 노출 순서"
