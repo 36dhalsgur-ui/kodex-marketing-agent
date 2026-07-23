@@ -22,7 +22,7 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from weekly_batch import SECTORS  # 섹터 정의를 공유 (drift 방지)
+from weekly_batch import NON_STOCK_PAT, SECTORS  # 섹터 정의·필터 공유 (drift 방지)
 
 from pykrx import stock
 
@@ -66,12 +66,36 @@ def etf_members(code: str) -> list[dict]:
         nm = r.get("구성종목명")
         if not isinstance(nm, str) or not nm.strip():
             continue
+        if NON_STOCK_PAT.search(nm):   # 원화현금 등 비주식 행 — 구성종목이 아니다
+            continue
         try:
             w = float(r.get("비중") or 0)
         except Exception:
             w = 0.0
         rows.append({"티커": str(tk), "종목명": nm.strip(), "비중": round(w, 2)})
     rows.sort(key=lambda x: -x["비중"])
+    return rows[:MAX_ITEMS]
+
+
+def overseas_members(code: str) -> list[dict]:
+    """해외 ETF PDF — 종목명만. KRX가 해외 보유분에는 비중을 주지 않고(전부 0.0),
+    티커도 내부코드(4626A1 등)라 사용자에게 의미가 없다."""
+    df = None
+    for attempt in range(3):
+        try:
+            df = stock.get_etf_portfolio_deposit_file(code)
+            if df is not None and len(df):
+                break
+        except Exception:
+            pass
+        time.sleep(1.5 * (attempt + 1))
+    if df is None or not len(df):
+        raise ValueError("PDF 응답 없음(3회 재시도)")
+    rows = []
+    for _, r in df.iterrows():
+        nm = r.get("구성종목명")
+        if isinstance(nm, str) and nm.strip() and not NON_STOCK_PAT.search(nm):
+            rows.append({"종목명": nm.strip()})
     return rows[:MAX_ITEMS]
 
 
@@ -84,12 +108,17 @@ def main():
     out = []
     for cfg in SECTORS:
         name = cfg["name"]
-        kind, code = cfg["roster"]
-        row = {"섹터": name, "군": "테마" if kind == "etf_pdf" else "KRX섹터",
-               "기준": (f'{cfg["kodex"]} 구성종목(PDF)' if kind == "etf_pdf"
+        # 해외 섹터는 roster가 없다 — 가격 소스인 ETF의 PDF를 그대로 명부로 쓴다
+        overseas = not cfg.get("roster")
+        kind, code = ("etf_pdf", cfg["price"][1]) if overseas else cfg["roster"]
+        row = {"섹터": name,
+               "군": "해외" if overseas else ("테마" if kind == "etf_pdf" else "KRX섹터"),
+               "기준": (f'{cfg["kodex"]} 구성종목(PDF) · 비중 미제공' if overseas
+                      else f'{cfg["kodex"]} 구성종목(PDF)' if kind == "etf_pdf"
                       else f"KRX {name} 지수 구성종목")}
         try:
-            row["종목"] = etf_members(code) if kind == "etf_pdf" else index_members(code)
+            row["종목"] = (overseas_members(code) if overseas else
+                          etf_members(code) if kind == "etf_pdf" else index_members(code))
             row["종목수"] = len(row["종목"])
             print(f"  - {name}: {row['종목수']}종목")
         except Exception as e:

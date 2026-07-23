@@ -6,12 +6,18 @@
 
 산출: data/signal_board.json
 
-구성 (2계층):
+구성 (3계층):
 - 1군 KRX 공식 섹터지수 17개 — 가격 = 지수, 수급 명부 = 지수 구성종목
 - 2군 마케팅 테마 5개 (KRX 지수 부재) — 가격 = KODEX ETF, 수급 명부 = ETF PDF
+- 3군 해외 테마 4개 — 가격 = KODEX 해외 ETF, 벤치마크도 해외(KODEX 미국S&P500)
+
+  ※ 3군을 분리한 이유: 국내 반도체 지수가 과열기여도 미국 반도체가 과열기인 것은
+    아니다. 기초시장이 다르면 국면도 다르므로 판정을 분리한다. 벤치마크로 원화표시
+    KODEX 미국S&P500을 쓰면 분자·분모 모두 원화라 환율 효과가 상쇄된다.
+  ※ 3군은 구성종목이 해외 주식이라 KRX 투자자별 순매수가 존재하지 않는다 → 수급 없음.
 
 방법론:
-- 단계: RRG — 상대강도(가격/KRX300)의 26주 평균 대비 수준 × 4주/12주 평균 모멘텀
+- 단계: RRG — 상대강도(가격/벤치마크)의 26주 평균 대비 수준 × 4주/12주 평균 모멘텀
   (수준−·모멘텀+ = 태동기 / +·+ = 확산기 / +·− = 과열기 / −·− = 쇠퇴기)
 - 수급 확인: 구성종목의 최근 13주(분기) 순매수 합의 부호 — 큰손(외국인+기관) × 개인 2×2
   (태동형 큰손+/개인− · 확산형 +/+ · 과열형 −/+ · 쇠퇴형 −/−)
@@ -20,6 +26,7 @@
 
 import json
 import os
+import re
 import sys
 import time
 import warnings
@@ -32,12 +39,14 @@ from pykrx import stock
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "signal_board.json"
-BENCH = "5300"  # KRX 300
+BENCH = "5300"                  # KRX 300 — 국내 섹터 기본 벤치마크
+BENCH_US = ("etf", "379800")    # KODEX 미국S&P500 — 해외 섹터 벤치마크(원화표시)
+BENCH_LABEL = {"KRX300": "KRX 300", "US": "KODEX 미국S&P500"}
 
 # ── 22개 명부: price = ("index"|"etf", 코드) / roster = ("krx_index"|"etf_pdf", 코드)
 SECTORS = [
     # 1군 — KRX 공식 섹터지수 17
-    {"name": "반도체",     "price": ("index", "5044"), "roster": ("krx_index", "5044"), "kodex": "KODEX 반도체·미국반도체"},
+    {"name": "반도체",     "price": ("index", "5044"), "roster": ("krx_index", "5044"), "kodex": "KODEX 반도체"},
     {"name": "은행",       "price": ("index", "5046"), "roster": ("krx_index", "5046"), "kodex": "KODEX 은행"},
     {"name": "자동차",     "price": ("index", "5043"), "roster": ("krx_index", "5043"), "kodex": "KODEX 자동차"},
     {"name": "헬스케어",   "price": ("index", "5045"), "roster": ("krx_index", "5045"), "kodex": "KODEX 바이오·헬스케어"},
@@ -60,6 +69,11 @@ SECTORS = [
     {"name": "조선",       "price": ("etf", "0115D0"), "roster": ("etf_pdf", "0115D0"), "kodex": "KODEX 조선TOP10"},
     {"name": "AI·전력",    "price": ("etf", "487240"), "roster": ("etf_pdf", "487240"), "kodex": "KODEX AI전력핵심설비"},
     {"name": "원자력",     "price": ("etf", "0098F0"), "roster": ("etf_pdf", "0098F0"), "kodex": "KODEX 원자력SMR"},
+    # 3군 — 해외 테마 (벤치마크 = KODEX 미국S&P500 · 수급 미집계)
+    {"name": "미국반도체",  "price": ("etf", "390390"), "roster": None, "bench": "US", "kodex": "KODEX 미국반도체"},
+    {"name": "미국AI전력",  "price": ("etf", "487230"), "roster": None, "bench": "US", "kodex": "KODEX 미국AI전력핵심인프라"},
+    {"name": "미국AI테크",  "price": ("etf", "485540"), "roster": None, "bench": "US", "kodex": "KODEX 미국AI테크TOP10"},
+    {"name": "미국우주항공", "price": ("etf", "0167Z0"), "roster": None, "bench": "US", "kodex": "KODEX 미국우주항공"},
 ]
 
 TODAY = date.today()
@@ -77,13 +91,21 @@ def get_price(kind: str, code: str) -> pd.Series:
     return stock.get_etf_ohlcv_by_date(FR_53W, TO, code)["종가"]
 
 
+# ETF PDF의 비주식 행 — 현금·예금·선물 등은 '010010' 같은 6자리 가짜 코드로 들어온다.
+# 코드 형식만 보면 통과하므로 구성종목명으로 걸러야 한다. 지금은 미상장 코드라 조회가
+# 실패하고 넘어가지만, 실제 상장사 코드와 겹치면 엉뚱한 종목의 순매수가 섞인다.
+NON_STOCK_PAT = re.compile(r"현금|예금|예치금|선물|스왑|채권|CD|RP|MMF|원화|외화")
+
+
 def get_roster(kind: str, code: str) -> list[str]:
-    items = (
-        stock.get_index_portfolio_deposit_file(code)
-        if kind == "krx_index"
-        else stock.get_etf_portfolio_deposit_file(code).index
-    )
-    return [t for t in items if isinstance(t, str) and len(t) == 6 and t.isdigit()]
+    def ok(t) -> bool:
+        return isinstance(t, str) and len(t) == 6 and t.isdigit()
+
+    if kind == "krx_index":
+        return [t for t in stock.get_index_portfolio_deposit_file(code) if ok(t)]
+    pdf = stock.get_etf_portfolio_deposit_file(code)
+    return [t for t, r in pdf.iterrows()
+            if ok(t) and not NON_STOCK_PAT.search(str(r.get("구성종목명") or ""))]
 
 
 def flow_signature(big: float, indiv: float) -> str:
@@ -118,12 +140,15 @@ def main():
             prev_stages = {r["섹터"]: r.get("단계", "") for r in prev.get("board", [])}
         except Exception:
             pass
-    bench_w = (
-        stock.get_index_ohlcv_by_date(FR_53W, TO, BENCH)["종가"]
-        .resample("W-FRI").last().dropna()
-    )
-    # 미완결 주 제거 — 금요일 아닌 요일에 실행해도 '마지막 완결 주(금요일 마감)' 기준으로 고정
-    bench_w = bench_w[[d <= TODAY for d in bench_w.index.date]]
+    def _weekly(s: pd.Series) -> pd.Series:
+        s = s.resample("W-FRI").last().dropna()
+        # 미완결 주 제거 — 금요일 아닌 요일에 실행해도 '마지막 완결 주'로 고정
+        return s[[d <= TODAY for d in s.index.date]]
+
+    bench_w = _weekly(stock.get_index_ohlcv_by_date(FR_53W, TO, BENCH)["종가"])
+    # 해외 섹터용 — 원화표시 미국 대표 ETF (분자·분모 모두 원화라 환율이 상쇄된다)
+    bench_us_w = _weekly(get_price(*BENCH_US))
+    BENCH_W = {"KRX300": bench_w, "US": bench_us_w}
     week_end = bench_w.index[-1].date()
     week_start = week_end - timedelta(days=4)
 
@@ -156,15 +181,18 @@ def main():
     board = []
     for cfg in SECTORS:
         name = cfg["name"]
-        row = {"섹터": name, "군": "테마" if cfg["price"][0] == "etf" else "KRX섹터", "KODEX": cfg["kodex"]}
+        bkey = cfg.get("bench", "KRX300")
+        bw = BENCH_W[bkey]
+        row = {"섹터": name,
+               "군": "해외" if bkey != "KRX300" else ("테마" if cfg["price"][0] == "etf" else "KRX섹터"),
+               "벤치마크": BENCH_LABEL[bkey], "KODEX": cfg["kodex"]}
         # ── 가격 → RRG
         try:
             px = get_price(*cfg["price"])
-            w = px.resample("W-FRI").last().dropna()
-            w = w[[d <= TODAY for d in w.index.date]]  # 미완결 주 제거 (bench와 동일 기준)
+            w = _weekly(px)
             if len(w) >= 2:
                 row["주간수익률"] = round(float((w.iloc[-1] / w.iloc[-2] - 1) * 100), 2)
-            rs = (w / bench_w).dropna()
+            rs = (w / bw).dropna()
             if len(rs) < 27:
                 row.update({"단계": "관망", "비고": f"이력 {len(rs)}주 — 26주 미달"})
             else:
@@ -179,7 +207,7 @@ def main():
                 row.update({
                     "단계": quad(ratio, mom),
                     "RS수준": round(ratio, 1), "RS모멘텀": round(mom, 1),
-                    "초과수익4주": round(float((w.iloc[-1] / w.iloc[-5] - 1) * 100 - (bench_w.iloc[-1] / bench_w.iloc[-5] - 1) * 100), 1),
+                    "초과수익4주": round(float((w.iloc[-1] / w.iloc[-5] - 1) * 100 - (bw.iloc[-1] / bw.iloc[-5] - 1) * 100), 1),
                     "가격백분위52주": round(float(px.rank(pct=True).iloc[-1]) * 100),
                     "궤적": "→".join(path),
                 })
@@ -187,6 +215,15 @@ def main():
             row.update({"단계": "관망", "비고": f"시세 실패: {type(e).__name__}"})
 
         # ── 수급 — 13주(분기) 순매수 합 (주체별 분리 표시용)
+        # 해외 섹터(roster=None)는 구성종목이 해외 주식이라 KRX 투자자별 순매수가 없다.
+        # 국내 종목처럼 조회하면 헛돌기만 하므로 아예 건너뛴다.
+        if not cfg.get("roster"):
+            row["수급비고"] = "해외 구성종목 — KRX 투자자별 순매수 미제공"
+            if prev_stages.get(name):
+                row["전주단계"] = prev_stages[name]
+            print(f"  - {name}: {row.get('단계','?')} (해외 · 수급 없음)")
+            board.append(row)
+            continue
         try:
             stks = get_roster(*cfg["roster"])
             frn = pen = inst = indiv = 0.0
@@ -228,8 +265,10 @@ def main():
     bench_wk_ret = round(float((bench_w.iloc[-1] / bench_w.iloc[-2] - 1) * 100), 2)
     OUT.write_text(json.dumps(
         {"asof": TODAY.isoformat(), "benchmark": "KRX 300",
+         "benchmark_해외": "KODEX 미국S&P500",
          "주간구간": f"{week_start.isoformat()} ~ {week_end.isoformat()}",
          "벤치주간수익률": bench_wk_ret,
+         "벤치주간수익률_해외": round(float((bench_us_w.iloc[-1] / bench_us_w.iloc[-2] - 1) * 100), 2),
          "지표버전": "RRG 26/12/4주 · 수급 13주 부호(2×2)", "board": board},
         ensure_ascii=False, indent=2))
     n = sum(1 for r in board if r.get("단계") != "쇠퇴기")

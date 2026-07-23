@@ -489,14 +489,25 @@ def load_laws():
     return D.fetch_laws()
 
 
+def _mtime(name: str) -> float:
+    """배치 산출 JSON의 수정 시각 — 캐시 키로 써서 파일이 바뀌면 자동 무효화."""
+    p = Path(__file__).parent / "data" / name
+    return p.stat().st_mtime if p.exists() else 0.0
+
+
 @st.cache_data
-def load_sector_universe():
-    """섹터 구성종목 (scripts/sector_universe.py 산출)."""
-    p = Path(__file__).parent / "data" / "sector_universe.json"
+def _load_json(name: str, mtime: float):
+    p = Path(__file__).parent / "data" / name
     try:
         return json.loads(p.read_text()) if p.exists() else {}
     except Exception:
         return {}
+
+
+def load_sector_universe():
+    """섹터 구성종목 (scripts/sector_universe.py 산출).
+    배치를 다시 돌리면 mtime이 바뀌어 캐시가 자동으로 폐기된다."""
+    return _load_json("sector_universe.json", _mtime("sector_universe.json"))
 
 
 @st.cache_data
@@ -949,7 +960,8 @@ with tab_trend:
             out = ""
             for i, r in enumerate(rows):
                 has = r.get("RS수준") is not None
-                note = r.get("비고") or r.get("수급비고") or ""
+                # 해외 행의 수급비고는 '해외' 배지 + 수급 열의 '—'와 중복이라 생략
+                note = r.get("비고") or ("" if r.get("군") == "해외" else r.get("수급비고", "")) or ""
                 first = i == 0
                 badge = (f'<span style="display:inline-block;font-size:0.68rem;font-weight:800;'
                          f'color:{col};background:{bg};border-radius:5px;padding:3px 9px;">{stage}</span>'
@@ -959,7 +971,11 @@ with tab_trend:
                     f'<tr style="border-top:{"1px solid " + LINE if first and i == 0 else "1px solid #F2F5F9"};">'
                     f'<td style="width:96px;vertical-align:top;padding-top:11px;">{badge}</td>'
                     f'<td><b style="font-size:0.88rem;">{r["섹터"]}</b>'
-                    f'<div style="font-size:0.68rem;color:{FAINT};">{r.get("KODEX", "")}'
+                    + (f'<span style="font-size:0.6rem;font-weight:800;color:{NAVY};'
+                       f'background:{BRAND_SOFT};border-radius:4px;padding:2px 6px;'
+                       f'margin-left:6px;vertical-align:middle;">해외</span>'
+                       if r.get("군") == "해외" else "")
+                    + f'<div style="font-size:0.68rem;color:{FAINT};">{r.get("KODEX", "")}'
                     + (f' · {note}' if note else "") + '</div></td>'
                     + (
                         f'<td class="num"><b style="font-size:0.98rem;">{signed(r["RS수준"])}</b>'
@@ -1007,7 +1023,8 @@ with tab_trend:
             f'flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
             f'<div>{_chips}</div>'
             f'<div style="font-size:0.68rem;color:{FAINT};font-weight:600;">'
-            f'{sb.get("asof", "")} 기준 · 벤치마크 {sb.get("benchmark", "KRX 300")}</div></div>'
+            f'{sb.get("asof", "")} 기준 · 벤치마크 국내 {sb.get("benchmark", "KRX 300")}'
+            f' · 해외 {sb.get("benchmark_해외", "—")}</div></div>'
             f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
             f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:14px;">'
@@ -1244,14 +1261,19 @@ with tab_trend:
                         for it in items[:20])
                     cap = "KODEX ETF 구성내역(PDF) · 비중 내림차순 · 막대는 비중 상대 길이"
                 else:
+                    # 해외 ETF는 KRX가 비중도 티커도 제공하지 않아 종목명만 남는다
                     cells = "".join(
                         f'<span style="display:inline-block;font-size:0.78rem;color:{INK};'
                         f'background:#F5F6FA;border:1px solid #EAEDF3;border-radius:6px;'
                         f'padding:4px 10px;margin:0 6px 6px 0;">{it["종목명"]}'
-                        f'<span style="color:{FAINT};font-size:0.68rem;margin-left:5px;">{it["티커"]}</span></span>'
+                        + (f'<span style="color:{FAINT};font-size:0.68rem;margin-left:5px;">'
+                           f'{it["티커"]}</span>' if it.get("티커") else "")
+                        + '</span>'
                         for it in items[:40])
                     rows_u = f'<div style="padding:4px 0;">{cells}</div>'
-                    cap = "KRX 섹터지수 구성종목 · 지수는 비중을 공개하지 않아 종목명만 표시"
+                    cap = ("해외 ETF 구성종목 · KRX가 해외 보유분의 비중을 제공하지 않아 종목명만 표시"
+                           if s.get("군") == "해외" else
+                           "KRX 섹터지수 구성종목 · 지수는 비중을 공개하지 않아 종목명만 표시")
                 st.markdown(f'<div class="card" style="padding:10px 16px;">{rows_u}</div>',
                             unsafe_allow_html=True)
                 st.caption(cap)
