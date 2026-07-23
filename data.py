@@ -1339,7 +1339,84 @@ def _smoothed_intensity(df: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
-def did_series(df: pd.DataFrame, treat: str, controls: list[str]) -> pd.DataFrame:
+# 평행추세 판정 기준 — 개입 이전 구간에서 처치군과 얼마나 같이 움직였나
+PARALLEL_MIN_WEEKS = 4    # 이보다 짧으면 검증 자체가 불가
+PARALLEL_GOOD = 0.30      # Δ상관 이 이상이면 양호
+
+
+def control_diagnostics(df: pd.DataFrame, treat: str, candidates: list[str],
+                        event_week: str) -> pd.DataFrame:
+    """후보별 평행추세 적합도 — DiD가 성립하는지 실제로 확인한다.
+
+    DiD의 가정은 '마케팅이 없었다면 처치군도 대조군과 같은 방향으로 움직였을 것'이다.
+    테마·기초시장이 같다는 건 그럴듯한 이유일 뿐 검증이 아니다. 개입 이전 구간에서
+    주간 변화량(Δ)이 실제로 동행했는지를 본다.
+
+    반환 컬럼: 종목명·공통주·상관·평행오차·순자산·판정
+      상관   = 개입 전 Δ강도의 상관계수 (음수면 반대로 움직임 = 부적합)
+      평행오차 = |Δ처치 − Δ대조|의 평균. 작을수록 나란히 움직였다는 뜻
+    """
+    d = _smoothed_intensity(df)
+    weeks = list(dict.fromkeys(d["주차"]))
+    if event_week not in weeks:
+        return pd.DataFrame()
+    pre = weeks[: weeks.index(event_week)]
+    aum = df.drop_duplicates("종목명").set_index("종목명")["순자산"]
+
+    def series(n):
+        return d[d["종목명"] == n].set_index("주차")["강도"].reindex(weeks)
+
+    t = series(treat).loc[pre].astype(float)
+    rows = []
+    for c in candidates:
+        b = series(c).loc[pre].astype(float)
+        m = t.notna() & b.notna()
+        n_pre = int(m.sum())
+        corr = np.nan
+        err = np.nan
+        if n_pre >= 2:
+            dt_, dc_ = t[m].diff(), b[m].diff()
+            err = float(np.nanmean(np.abs(dt_ - dc_)))
+            # 처치군이 개입 전 내내 0이면(신규상장) 분산이 없어 상관을 낼 수 없다
+            if t[m].std() > 0 and b[m].std() > 0:
+                corr = float(np.corrcoef(t[m], b[m])[0, 1])
+        if n_pre < PARALLEL_MIN_WEEKS:
+            verdict = "검증 불가"
+        elif np.isnan(corr):
+            verdict = "검증 불가"
+        elif corr < 0:
+            verdict = "부적합"
+        elif corr < PARALLEL_GOOD:
+            verdict = "약함"
+        else:
+            verdict = "양호"
+        rows.append({"종목명": c, "공통주": n_pre, "상관": corr,
+                     "평행오차": err, "순자산": float(aum.get(c, 0) or 0),
+                     "판정": verdict})
+    out = pd.DataFrame(rows)
+    if len(out):
+        out = out.sort_values(["판정", "상관"], ascending=[True, False],
+                              key=lambda s: s.map({"양호": 0, "약함": 1, "검증 불가": 2,
+                                                   "부적합": 3}) if s.name == "판정" else s)
+    return out.reset_index(drop=True)
+
+
+def select_controls(diag: pd.DataFrame, max_n: int = 5) -> list[str]:
+    """평행추세가 확인된 후보만 대조군으로 채택.
+
+    '부적합'(반대로 움직인 종목)은 제외한다 — 넣으면 DiD가 부호까지 뒤집힌다.
+    검증이 불가능한 구간(신규상장 등)에서는 걸러낼 근거가 없으므로 후보를 그대로
+    두되, 화면에 '검증 불가'로 표시해 검증된 것처럼 보이지 않게 한다."""
+    if diag is None or not len(diag):
+        return []
+    ok = diag[diag["판정"].isin(["양호", "약함"])]
+    if not len(ok):                       # 검증 가능한 게 없으면 미검증 후보 유지
+        ok = diag[diag["판정"] == "검증 불가"]
+    return ok["종목명"].head(max_n).tolist()
+
+
+def did_series(df: pd.DataFrame, treat: str, controls: list[str],
+               weights: dict[str, float] | None = None) -> pd.DataFrame:
     """주차별 DiD 시계열: Δ처치(8주 베이스라인 대비) − Δ대조군 평균."""
     d = _smoothed_intensity(df)
     weeks = list(dict.fromkeys(d["주차"]))
@@ -1359,11 +1436,17 @@ def did_series(df: pd.DataFrame, treat: str, controls: list[str]) -> pd.DataFram
         base_t = treat_s.iloc[lo:i].mean()
         delta_t = treat_s.iloc[i] - base_t
         if len(controls):
-            deltas_c = [
-                ctrl_df[c].iloc[i] - ctrl_df[c].iloc[lo:i].mean() for c in controls
-            ]
-            valid = [v for v in deltas_c if pd.notna(v)]
-            delta_c = float(np.mean(valid)) if valid else np.nan
+            pairs = [(c, ctrl_df[c].iloc[i] - ctrl_df[c].iloc[lo:i].mean()) for c in controls]
+            valid = [(c, v) for c, v in pairs if pd.notna(v)]
+            if valid:
+                # 단순 평균은 96억 ETF와 1,782억 ETF를 같은 비중으로 다뤄
+                # 소형 종목의 노이즈가 그대로 들어온다 → 순자산 가중이 기본
+                ws = [max(float((weights or {}).get(c, 1.0)), 0.0) for c, _ in valid]
+                tot = sum(ws)
+                delta_c = (float(np.average([v for _, v in valid], weights=ws))
+                           if tot > 0 else float(np.mean([v for _, v in valid])))
+            else:
+                delta_c = np.nan
         else:
             delta_c = np.nan
         did = delta_t - delta_c if not math.isnan(delta_c) else np.nan

@@ -1768,11 +1768,15 @@ with tab_did:
         event_week = weeks_avail[-1]
 
     _uni = universe_frame(netbuy_df)
-    auto_controls = D.control_group(treat, _uni)
+    _cands = D.control_group(treat, _uni)
+    # 테마·기초시장이 같다는 건 '그럴듯한 이유'일 뿐 검증이 아니다.
+    # 개입 이전 구간에서 실제로 나란히 움직였는지 확인하고 그 결과로 채택한다.
+    _diag = D.control_diagnostics(netbuy_df, treat, _cands, event_week)
+    auto_controls = D.select_controls(_diag)
     ctrl_options = (sorted(_uni[_uni["운용사"] != "KODEX"]["종목명"].unique()) if _uni is not None
                     else sorted(n for n, _, i in D.ETF_UNIVERSE if i != "KODEX"))
     controls = st.multiselect(
-        "대조군 — 동일 테마·기초시장 경쟁 ETF (자동 매핑, 수정 가능)",
+        "대조군 — 평행추세가 확인된 경쟁 ETF (자동 선정, 수정 가능)",
         options=ctrl_options,
         default=auto_controls,
     )
@@ -1780,7 +1784,50 @@ with tab_did:
                + ("  (수동 지정 — 실제 마케팅 여부는 검증되지 않음)" if manual_mode
                   else "  (감지된 마케팅 집행 시점 기준)"))
 
-    series = D.did_series(netbuy_df, treat, controls)
+    # ── 평행추세 진단 — DiD의 가정이 성립하는지 보여준다
+    if len(_diag):
+        _V = {"양호": ("#1E7A55", "#EAF7EF"), "약함": ("#B0801F", "#FDF6E7"),
+              "부적합": (RED, "#FDECEB"), "검증 불가": (MUTED, "#F2F4F7")}
+        _n_bad = int((_diag["판정"] == "부적합").sum())
+        _n_untested = int((_diag["판정"] == "검증 불가").sum())
+        _rows = ""
+        for _, r in _diag.iterrows():
+            _c, _bg = _V.get(r["판정"], (MUTED, "#F2F4F7"))
+            _used = r["종목명"] in controls
+            _corr = "—" if pd.isna(r["상관"]) else f'{r["상관"]:+.2f}'
+            _rows += (
+                f'<tr style="opacity:{"1" if _used else "0.45"};">'
+                f'<td style="padding:6px 10px;font-size:0.82rem;">{r["종목명"]}</td>'
+                f'<td class="num" style="padding:6px 10px;font-size:0.82rem;">{_corr}</td>'
+                f'<td class="num" style="padding:6px 10px;font-size:0.82rem;">{r["평행오차"]:.2f}</td>'
+                f'<td class="num" style="padding:6px 10px;font-size:0.82rem;">{r["순자산"]:,.0f}억</td>'
+                f'<td style="padding:6px 10px;text-align:right;">'
+                f'<span style="font-size:0.68rem;font-weight:700;color:{_c};background:{_bg};'
+                f'border-radius:4px;padding:2px 8px;">{r["판정"]}</span></td></tr>')
+        with st.expander(
+                f"평행추세 진단 — 후보 {len(_diag)}개 중 {len(controls)}개 채택"
+                + (f" · 부적합 {_n_bad}개 제외" if _n_bad else "")
+                + (f" · 검증 불가 {_n_untested}개" if _n_untested else ""),
+                expanded=bool(_n_bad or _n_untested)):
+            st.markdown(
+                f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:10px;">'
+                f'DiD는 <b>"마케팅이 없었다면 처치군도 대조군과 같은 방향으로 움직였을 것"</b>을 가정합니다. '
+                f'개입 이전 구간에서 주간 강도 변화(Δ)가 실제로 동행했는지 확인한 결과입니다 — '
+                f'<b>상관이 음수(부적합)</b>면 반대로 움직였다는 뜻이라 넣으면 DiD 부호까지 왜곡됩니다. '
+                f'대조군 평균은 <b>순자산 가중</b>입니다 (소형 ETF의 노이즈 억제).</div>'
+                f'<table class="sig-table"><thead><tr>'
+                f'<th>후보</th><th class="num">Δ상관</th><th class="num">평행오차</th>'
+                f'<th class="num">순자산</th><th style="text-align:right;">판정</th>'
+                f'</tr></thead><tbody>{_rows}</tbody></table>',
+                unsafe_allow_html=True)
+            if _n_untested == len(_diag):
+                st.info(f"개입 이전 관측이 {int(_diag['공통주'].max())}주뿐이라 평행추세를 검증할 수 없습니다 "
+                        f"(최소 {D.PARALLEL_MIN_WEEKS}주 필요). 아래 DiD 값은 "
+                        "**가정이 확인되지 않은 상태**의 참고치입니다.")
+
+    _w = (_uni.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
+          if _uni is not None and "순자산" in _uni.columns else None)
+    series = D.did_series(netbuy_df, treat, controls, weights=_w)
     sc = D.did_score(series, event_week)
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
