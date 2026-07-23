@@ -219,6 +219,16 @@ def _euro(w: str) -> str:    # 으로/로 (ㄹ받침은 '로')
     return f"{w}로" if j in (None, 0, 8) else f"{w}으로"
 
 
+def _ga(w: str) -> str:      # 이/가
+    j = _has_jong(w)
+    return f"{w}이" if j else f"{w}가"
+
+
+def _reul(w: str) -> str:    # 을/를
+    j = _has_jong(w)
+    return f"{w}을" if j else f"{w}를"
+
+
 # 국면(RRG 22섹터)에 매핑되는 ETF 테마만 국면 판정 대상 — 나머지는 전략상품(레짐 로직)
 _THEME_TO_SECTOR = {"반도체": "반도체", "AI·전력": "AI·전력", "2차전지": "2차전지",
                     "방산": "방산", "조선": "조선", "원자력": "원자력"}
@@ -1398,11 +1408,11 @@ WEEKLY_SOURCES = [
 ]
 
 WEEKLY_FALLBACK = [
-    {"name": "코스피", "level": "7,475.94", "weekly": 1.8},
-    {"name": "코스닥", "level": "831.23", "weekly": -0.6},
-    {"name": "S&P 500", "level": "7,537.43", "weekly": 0.9},
-    {"name": "나스닥", "level": "26,121.16", "weekly": 1.4},
-    {"name": "USD/KRW", "level": "1,522.40", "weekly": 0.3},
+    {"name": "코스피", "level": "7,475.94", "daily": 0.4, "weekly": 1.8},
+    {"name": "코스닥", "level": "831.23", "daily": -0.2, "weekly": -0.6},
+    {"name": "S&P 500", "level": "7,537.43", "daily": 0.2, "weekly": 0.9},
+    {"name": "나스닥", "level": "26,121.16", "daily": 0.3, "weekly": 1.4},
+    {"name": "USD/KRW", "level": "1,522.40", "daily": 0.1, "weekly": 0.3},
 ]
 
 
@@ -1433,12 +1443,15 @@ def _fetch_weekly_one(label: str, kind: str, code: str) -> dict:
         closes = [_parse_price(r["closePrice"]) for r in rows]
     if len(closes) < 6:
         raise ValueError("이력 부족")
-    weekly = (closes[0] / closes[5] - 1) * 100  # 최근 5거래일 등락률
-    return {"name": label, "level": f"{closes[0]:,.2f}", "weekly": round(weekly, 2)}
+    # 같은 응답(7일치 종가)에서 일간·주간을 함께 계산 — 추가 호출이 없다
+    daily = (closes[0] / closes[1] - 1) * 100   # 전일 대비
+    weekly = (closes[0] / closes[5] - 1) * 100  # 최근 5거래일
+    return {"name": label, "level": f"{closes[0]:,.2f}",
+            "daily": round(daily, 2), "weekly": round(weekly, 2)}
 
 
 def fetch_weekly_market() -> list[dict]:
-    """주요 지수·환율의 주간(5거래일) 등락률. 실패 항목은 폴백."""
+    """주요 지수·환율의 전일 대비·주간 등락률. 실패 항목은 폴백."""
     fallback = {f["name"]: f for f in WEEKLY_FALLBACK}
     results: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=len(WEEKLY_SOURCES)) as ex:

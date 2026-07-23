@@ -706,9 +706,12 @@ with tab_home:
         f'{_hn}개 섹터 중 <b>{_hdec}개가 쇠퇴 국면</b>입니다.'
     ]
     if _hbench is not None:
-        _lead_parts.append(f'시장 대표 지수(KRX300)는 주간 <b>{_hbench:+.1f}%</b>.')
+        # '주간 -9.6%'는 섹터명처럼 읽혀서 '한 주 동안'으로 풀어 쓴다
+        _lead_parts.append(
+            f'시장 대표 지수(KRX300)는 한 주 동안 <b>{_hbench:+.1f}%</b> 움직였습니다.')
     if _hdn is not None:
-        _lead_parts.append(f'{_hdn["섹터"]}가 <b>{_hdn["주간수익률"]:+.1f}%</b>로 낙폭이 가장 컸습니다.')
+        _lead_parts.append(
+            f'{D._ga(_hdn["섹터"])} <b>{_hdn["주간수익률"]:+.1f}%</b>로 낙폭이 가장 컸습니다.')
     if _hemerge:
         _lead_parts.append(f'태동 국면은 <b>{", ".join(_hemerge)}</b> — 선점 콘텐츠 검토 대상입니다.')
     st.markdown(
@@ -717,17 +720,19 @@ with tab_home:
         unsafe_allow_html=True)
     st.write("")
 
-    # ── 시장 지수 (카드 나열 → 구분선 한 줄)
+    # ── 시장 지수 — 전일 대비를 앞에, 주간 누적을 보조로 (같은 응답에서 둘 다 계산됨)
     _cells = ""
     for m in load_weekly_market():
-        up = m["weekly"] >= 0
+        _d, _w = m.get("daily", 0.0), m["weekly"]
         _cells += (
             f'<div class="mkt-cell"><div class="mkt-n">{m["name"]}</div>'
-            f'<div class="mkt-v" style="color:{RED if up else COOL};">{m["weekly"]:+.1f}%</div>'
-            f'<div class="mkt-s">현재 {m["level"]}</div></div>')
+            f'<div class="mkt-v" style="color:{RED if _d >= 0 else COOL};">{_d:+.2f}%</div>'
+            f'<div class="mkt-s">{m["level"]} · 주간 '
+            f'<span style="color:{RED if _w >= 0 else COOL};font-weight:700;">{_w:+.1f}%</span>'
+            f'</div></div>')
     st.markdown(
         f'<div style="font-size:0.7rem;color:{FAINT};font-weight:600;letter-spacing:.06em;'
-        f'margin-bottom:6px;">금주 시장 · 최근 5거래일 등락률</div>'
+        f'margin-bottom:6px;">시장 현황 · 큰 숫자 = 전일 대비 · 30분마다 갱신</div>'
         f'<div class="mkt-strip">{_cells}</div>', unsafe_allow_html=True)
     st.write("")
 
