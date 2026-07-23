@@ -1,9 +1,60 @@
 {
-  "asof": "2026-07-22",
+  "asof": "2026-07-23",
   "brands": [
     {
       "브랜드": "KODEX",
       "홈": "https://www.kodex.com",
+      "이벤트목록": [
+        {
+          "제목": "KODEX 200커버드콜액티브 ETF 신규 상장 이벤트🍀",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=97",
+          "상태": "진행중",
+          "시작": "2026-07-14",
+          "종료": "2026-08-31"
+        },
+        {
+          "제목": "[연금, Kodex 하다] 한미 대표지수 투자 이벤트🎁",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=96",
+          "상태": "진행중",
+          "시작": "2026-06-29",
+          "종료": "2026-07-31"
+        },
+        {
+          "제목": "KODEX 전고체배터리ESS TOP2플러스 ETF 신규 상장 이벤트🔋",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=95",
+          "상태": "진행중",
+          "시작": "2026-06-23",
+          "종료": "2026-07-31"
+        },
+        {
+          "제목": "KODEX 현대차로보틱스밸류체인 TOP3플러스 ETF 신규상장 이벤트",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=94",
+          "상태": "진행중",
+          "시작": "2026-06-09",
+          "종료": "2026-07-31"
+        },
+        {
+          "제목": "[6~8월 릴레이 이벤트] Kodex ETF 순자산 200조 돌파 기념",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=93",
+          "상태": "진행중",
+          "시작": "2026-07-01",
+          "종료": "2026-07-31"
+        },
+        {
+          "제목": "KODEX 미국대표지수 ETF 적립식 매수 이벤트📈",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=92",
+          "상태": "진행중",
+          "시작": "2026-06-01",
+          "종료": "2026-12-31"
+        },
+        {
+          "제목": "Kodex ETF 증권사 이벤트 안내",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=33",
+          "상태": "진행중",
+          "시작": "2026-01-01",
+          "종료": "2026-12-31"
+        }
+      ],
       "배너": [
         {
           "제목": "신규상장(7/14) KODEX 200커버드콜액티브 ETF (종목코드 : 0219E0) 월말배당 추구에 옵션 프리미엄 비과세까지 투자자가 기다린",
@@ -23,6 +74,78 @@
     {
       "브랜드": "TIGER",
       "홈": "https://www.tigeretf.com",
+      "이벤트목록": [
+        {
+          "제목": "TIGER 패밀리클럽 친구 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=181",
+          "상태": "진행중",
+          "시작": "2026-07-15",
+          "종료": "2026-08-14"
+        },
+        {
+          "제목": "TIGER 글로벌반도체 ETF 매수 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=180",
+          "상태": "진행중",
+          "시작": "2026-07-06",
+          "종료": "2026-07-31"
+        },
+        {
+          "제목": "TIGER 미국우주테크 매수 인증 이벤트!",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=178",
+          "상태": "종료",
+          "시작": "2026-06-10",
+          "종료": "2026-07-10"
+        },
+        {
+          "제목": "Run Your Pace, TIGER ETF 20주년 X 큰별하프마라톤 이벤트(※당첨자 발표※)",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=177",
+          "상태": "종료",
+          "시작": "2026-05-27",
+          "종료": "2026-06-19"
+        },
+        {
+          "제목": "TIGER 미국나스닥100 ETF 순자산 10조 돌파 기념 매수 인증 이벤트!",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=176",
+          "상태": "종료",
+          "시작": "2026-05-20",
+          "종료": "2026-06-12"
+        },
+        {
+          "제목": "TIGER SK하이닉스/삼성전자 단일종목 레버리지 투자 가이드북 다운로드 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=175",
+          "상태": "종료",
+          "시작": "2026-05-19",
+          "종료": "2026-05-21"
+        },
+        {
+          "제목": "단일종목 레버리지·인버스 사전 교육 이수 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=174",
+          "상태": "종료",
+          "시작": "2026-05-11",
+          "종료": "2026-05-21"
+        },
+        {
+          "제목": "가정의 달 TIGER 패밀리클럽 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=173",
+          "상태": "종료",
+          "시작": "2026-05-04",
+          "종료": "2026-05-30"
+        },
+        {
+          "제목": "TIGER 커버드콜액티브 ETF 시리즈 분배금 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=172",
+          "상태": "종료",
+          "시작": "2026-04-21",
+          "종료": "2026-05-31"
+        },
+        {
+          "제목": "TIGER ETF App 업그레이드 기념 Event!",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=171",
+          "상태": "종료",
+          "시작": "2026-04-07",
+          "종료": "2026-04-30"
+        }
+      ],
       "배너": [
         {
           "제목": "투자에서 연금까지! 결국은 TIGER ETF",

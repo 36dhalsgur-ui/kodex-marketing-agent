@@ -254,8 +254,10 @@ st.markdown(
         font-size: 1.42rem; font-weight: 800; color: {INK}; letter-spacing: -0.032em;
         line-height: 1.25; padding-left: 12px; border-left: 3px solid {BRAND};
     }}
+    /* max-width에 ch를 쓰면 안 된다 — ch는 숫자 '0' 폭 기준이라 한글은 약 2배를 차지해
+       78ch가 실제로는 39글자 남짓에서 끊긴다. 폭은 상위 컨테이너에 맡긴다. */
     .sec-desc {{ font-size: 0.83rem; color: {MUTED}; margin-top: 6px; padding-left: 15px;
-        line-height: 1.6; max-width: 78ch; }}
+        line-height: 1.6; }}
 
     /* 카드 — 테두리 대신 옅은 그림자로 페이지 바탕 위에 띄운다 */
     .card {{
@@ -1488,9 +1490,56 @@ with tab_channel:
         else:
             st.info("배너 데이터가 없습니다 — 로컬에서 `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
 
-        # ── ② 공식 유튜브 — 최신 영상 (썸네일 그리드)
+        # ── ② 진행 중 이벤트 — 기간이 명시된 실제 캠페인
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-        sub_header("02", "공식 유튜브 — 최신 영상", "8개 브랜드 채널 RSS 실시간 · 브랜드별 최신 1건")
+        _ev_brands = [(b, ch_brands[b]["이벤트목록"]) for b in D.ISSUERS
+                      if ch_brands.get(b, {}).get("이벤트목록")]
+        _n_live = sum(1 for _, evs in _ev_brands for e in evs if e.get("상태") == "진행중")
+        sub_header("02", "진행 중 이벤트",
+                   f"기간이 명시된 실제 캠페인 · 진행 중 {_n_live}건")
+        st.markdown(
+            f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
+            f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
+            f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:12px;">'
+            f'메인 배너는 상품 상세로 가는 <b>상시 홍보물</b>이지만, 이벤트는 '
+            f'<b>대상 상품과 집행 기간이 명시된 캠페인</b>입니다 — ③ 효과 측정에서 '
+            f'개입 시점을 정의하는 데 가장 적합한 신호입니다. '
+            f'이벤트 보드를 파싱할 수 있는 곳은 KODEX·TIGER 2개사이며, 나머지는 '
+            f'메뉴 링크만 아래에 표시합니다.</div>', unsafe_allow_html=True)
+        if _ev_brands:
+            _today_iso = dt.date.today().isoformat()
+            for _b, _evs in _ev_brands:
+                _live = [e for e in _evs if e.get("상태") == "진행중"]
+                _rows = ""
+                for e in sorted(_live, key=lambda x: x.get("종료") or "9999")[:8]:
+                    _end = e.get("종료") or ""
+                    _left = ""
+                    if _end >= _today_iso:
+                        _d = (dt.date.fromisoformat(_end) - dt.date.today()).days
+                        _left = (f'<span style="color:{RED};font-weight:700;">D-{_d}</span>'
+                                 if _d <= 14 else f'<span style="color:{MUTED};">D-{_d}</span>')
+                    _rows += (
+                        f'<a class="kw-link" href="{e["링크"]}" target="_blank">'
+                        f'<div class="kw-row" style="align-items:center;">'
+                        f'<span class="kw-name" style="flex:1;font-size:0.83rem;font-weight:600;">'
+                        f'{e["제목"]}</span>'
+                        f'<span style="font-size:0.72rem;color:{FAINT};white-space:nowrap;'
+                        f'margin:0 10px;">{e.get("시작","")} ~ {_end}</span>'
+                        f'<span style="font-size:0.72rem;white-space:nowrap;min-width:44px;'
+                        f'text-align:right;">{_left}</span></div></a>')
+                st.markdown(
+                    f'<div class="card" style="padding:8px 16px;margin-bottom:12px;">'
+                    f'<div style="font-size:0.8rem;font-weight:800;color:{INK};padding:4px 0;">'
+                    f'{_b} <span style="font-size:0.7rem;color:{FAINT};font-weight:600;">'
+                    f'진행 중 {len(_live)}건 / 수집 {len(_evs)}건</span></div>'
+                    f'{_rows}</div>', unsafe_allow_html=True)
+            st.caption("운용사 이벤트 보드 주간 배치 수집 · D-n은 종료까지 남은 일수 (14일 이내 강조)")
+        else:
+            st.info("이벤트 데이터가 없습니다 — `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
+
+        # ── ③ 공식 유튜브 — 최신 영상 (썸네일 그리드)
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        sub_header("03", "공식 유튜브 — 최신 영상", "8개 브랜드 채널 RSS 실시간 · 브랜드별 최신 1건")
 
         def yt_video_card(v: dict) -> str:
             views = f"{v['views']:,}회" if v["views"] else "조회수 비공개"
@@ -1522,7 +1571,7 @@ with tab_channel:
 
         # ── ③ 공식 블로그 — 최신 글 (브랜드별 묶음)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-        sub_header("03", "공식 블로그 — 최신 글", "브랜드별 최신 4건 · 네이버 블로그 RSS 실시간")
+        sub_header("04", "공식 블로그 — 최신 글", "브랜드별 최신 4건 · 네이버 블로그 RSS 실시간")
         if any(blogs.values()):
             bcols = st.columns(2, gap="large")
             for i, brand in enumerate(D.ISSUERS):
@@ -1545,7 +1594,7 @@ with tab_channel:
 
         # ── ④ 운용사 뉴스 이슈 (외부 언론)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-        sub_header("04", "운용사 뉴스 이슈", "자체 채널이 아닌 외부 언론이 다룬 브랜드 이슈")
+        sub_header("05", "운용사 뉴스 이슈", "자체 채널이 아닌 외부 언론이 다룬 브랜드 이슈")
 
         BRAND_STYLE = {
             "KODEX": "linear-gradient(135deg,#16244D 0%,#3B5BA5 100%)",
@@ -1591,7 +1640,7 @@ with tab_channel:
         # ── ⑤ 브랜드 검색량 (캠페인 → 관심 반응 확인)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
         live_badge = "실데이터" if datalab_live else "데모 — NAVER_CLIENT_ID/SECRET 설정 시 실데이터"
-        sub_header("05", "브랜드 검색량 트렌드",
+        sub_header("06", "브랜드 검색량 트렌드",
                    f"위 캠페인·콘텐츠가 실제 관심으로 이어졌는지 확인 · {live_badge}")
         fig_dl = go.Figure()
         palette = {

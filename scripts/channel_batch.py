@@ -55,6 +55,77 @@ def get_soup(url: str) -> BeautifulSoup:
     return BeautifulSoup(r.text, "html.parser")
 
 
+# ── 이벤트 보드 추출기 ────────────────────────────────────────────
+# 메인 배너는 '상품 상세'로 가는 홍보물이지만, 이벤트 보드는 기간이 명시된
+# 실제 캠페인이다 — 대상 상품·시작일·종료일이 다 있어 DiD의 개입 정의에 그대로 쓴다.
+
+def _period(txt: str) -> tuple[str, str]:
+    """'2026.07.14 ~ 2026.08.31' → ('2026-07-14', '2026-08-31')"""
+    d = re.findall(r"(\d{4})[.\-](\d{2})[.\-](\d{2})", txt)
+    f = [f"{y}-{m}-{dd}" for y, m, dd in d[:2]]
+    return (f[0] if f else "", f[1] if len(f) > 1 else "")
+
+
+def kodex_events():
+    """samsungfund.com 이벤트 보드 — kodex.com은 전부 여기로 리다이렉트된다."""
+    base = "https://www.samsungfund.com/etf/lounge/"
+    soup = get_soup(base + "event.do")
+    out = []
+    for a in soup.select('a[href*="event-view.do"]'):
+        t = a.select_one(".event-tltle")
+        if not t:
+            continue
+        badge = a.select_one(".event-badge")
+        per = a.select_one(".event-period")
+        st, en = _period(per.get_text(" ", strip=True) if per else "")
+        out.append({"제목": clean(t.get_text(" ", strip=True), 90),
+                    "링크": absol(base, a["href"]),
+                    "상태": clean(badge.get_text(strip=True)) if badge else "",
+                    "시작": st, "종료": en})
+    return _dedup_events(out)
+
+
+def tiger_events():
+    """TIGER 이벤트 목록은 JS로 그려진다 — 목록을 만드는 ajax를 직접 호출한다.
+    (www.tigeretf.com은 1KB짜리 리다이렉트 껍데기라 링크 탐색이 통하지 않는다)"""
+    base = "https://investments.miraeasset.com/tigeretf/ko/customer/event/"
+    r = requests.post(base + "list.ajax",
+                      headers=dict(UA, **{"X-Requested-With": "XMLHttpRequest",
+                                          "Referer": base + "list.do"}),
+                      timeout=15)
+    r.raise_for_status()
+    soup = BeautifulSoup(r.text, "html.parser")
+    out = []
+    for li in soup.select("li"):
+        t = li.select_one(".title")
+        if not t:
+            continue
+        key = re.search(r"'detailsKey',\s*'(\d+)'", str(li))
+        vals = [v.get_text(strip=True) for v in li.select(".c-pair .value")]
+        st, en = _period(vals[0] if vals else "")
+        badge = li.select_one(".status")
+        out.append({"제목": clean(t.get_text(" ", strip=True), 90),
+                    "링크": base + f"view.do?detailsKey={key.group(1)}" if key else base + "list.do",
+                    "상태": clean(badge.get_text(strip=True)) if badge else "",
+                    "시작": st, "종료": en})
+    return _dedup_events(out)
+
+
+def _dedup_events(rows: list[dict]) -> list[dict]:
+    """링크 기준 중복 제거 — KODEX 보드는 반응형 레이아웃 때문에 같은 카드를
+    데스크톱·모바일용으로 두 번 렌더링한다."""
+    seen, out = set(), []
+    for e in rows:
+        if e["링크"] in seen:
+            continue
+        seen.add(e["링크"])
+        out.append(e)
+    return out
+
+
+EVENT_BOARDS = {"KODEX": kodex_events, "TIGER": tiger_events}
+
+
 # ── 사이트별 추출기: [{제목, 링크}] 반환 ──────────────────────────
 
 
@@ -261,6 +332,17 @@ def main():
     for name, fn in EXTRACTORS:
         home, own_domains = HOMES[name]
         row = {"브랜드": name, "홈": home}
+        # 이벤트 보드를 파싱할 수 있는 곳은 개별 이벤트를 기간까지 수집한다.
+        # 나머지는 종전대로 '이벤트 메뉴 링크' 한 줄만 찾는다.
+        if name in EVENT_BOARDS:
+            try:
+                evs = EVENT_BOARDS[name]()
+                row["이벤트목록"] = evs
+                live = [e for e in evs if e.get("상태") == "진행중"]
+                print(f"  - {name} 이벤트: 전체 {len(evs)}건 · 진행중 {len(live)}건")
+            except Exception as e:
+                row["이벤트비고"] = f"이벤트 수집 실패: {type(e).__name__}"
+                print(f"  - {name} 이벤트: 실패 {type(e).__name__}")
         ev = find_event_link(home)
         if ev:
             row["이벤트"] = ev
