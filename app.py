@@ -471,8 +471,21 @@ def load_theme_returns():
 
 
 @st.cache_data(ttl=1800)
-def load_youtube():
+def _load_youtube_cached():
     return D.fetch_youtube(n_per_channel=8)
+
+
+def load_youtube():
+    """전 채널이 빈 결과는 캐시에 남기지 않는다.
+
+    유튜브 RSS가 일시적으로 막히면 빈 dict가 30분 동안 캐시돼 화면이 계속
+    비어 있었다(실측). 수집 실패는 30분 붙잡을 값이 아니므로 즉시 폐기하고
+    한 번 더 시도한다."""
+    y = _load_youtube_cached()
+    if not any(y.values()):
+        _load_youtube_cached.clear()
+        y = _load_youtube_cached()
+    return y
 
 
 @st.cache_data(ttl=1800)
@@ -1547,9 +1560,16 @@ with tab_channel:
                     cols = st.columns(4, gap="medium")
                     for col, v in zip(cols, top_view[row_start : row_start + 4]):
                         col.markdown(yt_video_card(v), unsafe_allow_html=True)
-            st.caption("유튜브 채널 RSS 실시간 수집 (30분 캐시) · API 키 없이 동작, YOUTUBE_API_KEY 설정 시 좋아요·댓글 확장 가능")
+            _yt_fail = getattr(D, "YOUTUBE_STATUS", {})
+            if _yt_fail:
+                st.caption(
+                    "⚠ 수집 실패 " + ", ".join(f"{b}({e.split(':')[0]})" for b, e in _yt_fail.items())
+                    + " — 유튜브 RSS 일시 제한입니다. 직전 성공분을 표시 중이며 잠시 후 자동 복구됩니다.")
+            st.caption(f"유튜브 채널 RSS 실시간 수집 (30분 캐시) · {len(latest)}/{len(D.ISSUERS)}개 브랜드 · "
+                       "API 키 없이 동작, YOUTUBE_API_KEY 설정 시 좋아요·댓글 확장 가능")
         else:
-            st.info("유튜브 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
+            st.info("유튜브 수집에 실패했습니다 — RSS 일시 제한일 수 있습니다. "
+                    "잠시 후 새로고침하면 복구됩니다.")
 
         # ── ③ 공식 블로그 — 최신 글 (브랜드별 묶음)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)

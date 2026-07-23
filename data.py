@@ -11,6 +11,7 @@ import json
 import math
 import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -635,8 +636,18 @@ _YT_NS = {
 
 
 def _fetch_channel_videos(brand: str, channel_id: str, n: int = 3) -> list[dict]:
+    """유튜브 RSS는 짧은 시간에 여러 번 부르면 500/404를 돌려준다(실측).
+    한 번 실패했다고 빈 화면이 되지 않도록 간격을 두고 재시도한다."""
     url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
+    last = None
+    for attempt in range(3):
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        if r.status_code == 200:
+            break
+        last = r.status_code
+        time.sleep(1.5 * (attempt + 1))
+    else:
+        raise RuntimeError(f"HTTP {last}")
     root = ET.fromstring(r.content)
     videos = []
     for entry in root.findall("a:entry", _YT_NS)[:n]:
@@ -659,19 +670,33 @@ def _fetch_channel_videos(brand: str, channel_id: str, n: int = 3) -> list[dict]
     return videos
 
 
+# 직전에 성공한 결과 — 일시적 스로틀로 화면이 통째로 비는 것을 막는다
+_YT_LAST_GOOD: dict[str, list[dict]] = {}
+YOUTUBE_STATUS: dict[str, str] = {}
+
+
 def fetch_youtube(n_per_channel: int = 3) -> dict[str, list[dict]]:
-    """8개 브랜드 유튜브 채널의 최신 영상을 병렬 수집. 실패 채널은 빈 리스트."""
+    """8개 브랜드 유튜브 채널의 최신 영상 수집.
+
+    동시 8개 요청은 유튜브 스로틀을 유발해 전 채널이 한꺼번에 비는 일이 있었다
+    (실측: 15건 → 0건). 동시성을 낮추고, 실패한 채널은 직전 성공분으로 대체한다.
+    실패 사유는 YOUTUBE_STATUS에 남겨 화면에서 '수집 실패'와 '영상 없음'을 구분한다."""
     out: dict[str, list[dict]] = {}
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    YOUTUBE_STATUS.clear()
+    with ThreadPoolExecutor(max_workers=3) as ex:
         futures = {
             ex.submit(_fetch_channel_videos, b, cid, n_per_channel): b
             for b, cid in YOUTUBE_CHANNELS.items()
         }
         for fut, brand in futures.items():
             try:
-                out[brand] = fut.result()
-            except Exception:
-                out[brand] = []
+                vids = fut.result()
+                out[brand] = vids
+                if vids:
+                    _YT_LAST_GOOD[brand] = vids
+            except Exception as e:
+                out[brand] = _YT_LAST_GOOD.get(brand, [])
+                YOUTUBE_STATUS[brand] = f"{type(e).__name__}: {e}"
     return out
 
 
