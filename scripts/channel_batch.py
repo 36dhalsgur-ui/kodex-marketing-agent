@@ -281,6 +281,36 @@ HOMES = {
 }
 
 
+def link_kind(url: str, home: str, own_domains: list[str]) -> str:
+    """배너가 실제로 어디로 가는지 분류.
+
+    예전에는 자사 도메인 밖 링크를 홈으로 덮어썼는데, 그러면 브랜드마다 목적지가
+    제각각인 것(TIGER는 전부 유튜브, TIMEFOLIO는 전부 블로그)이 '어떤 건 홈,
+    어떤 건 상품'이라는 이유 모를 불일치로 보인다. 링크는 그대로 두고 유형을
+    표기해, 누르기 전에 어디로 갈지 알 수 있게 한다."""
+    if not url or url.rstrip("/") == home.rstrip("/"):
+        return "홈"
+    if re.search(r"youtube\.com|youtu\.be", url):
+        return "영상"
+    if "blog.naver.com" in url:
+        return "블로그"
+    if re.search(r"news\.naver\.com|/news/", url):
+        return "뉴스"
+    if any(d in url for d in own_domains):
+        # 자사 도메인 안에서도 목적지 성격이 다르다 — PLUS는 자사 TV(영상 콘텐츠),
+        # RISE는 공지·PDF 자료로 연결된다. '홈페이지'로 뭉뚱그리면 또 제각각으로 보인다.
+        if re.search(r"/(insight/)?tv/|/movie|/video", url, re.I):
+            return "영상"
+        if re.search(r"notice|공지", url, re.I):
+            return "공지"
+        if re.search(r"\.pdf|/pdf/", url, re.I):
+            return "자료"
+        if re.search(r"/(product|fund|prod|etf)", url, re.I):
+            return "상품"
+        return "홈페이지"
+    return "외부"
+
+
 _EVENT_PAT = re.compile(r"이벤트|EVENT", re.I)
 
 
@@ -353,8 +383,7 @@ def main():
             prev_titles = {b["제목"] for b in prev.get(name, [])}
             for b in banners:
                 b["NEW"] = bool(prev_titles) and b["제목"] not in prev_titles
-                if not any(d in b["링크"] for d in own_domains):
-                    b["링크"] = home
+                b["링크유형"] = link_kind(b["링크"], home, own_domains)
             row["배너"] = slot_share(banners)
             # 배너 순서의 성격을 명시 — ACE만 운용사가 매긴 실제 우선순위
             row["순서근거"] = "운용사 지정 우선순위" if any("순위근거" in b for b in banners) else "사이트 노출 순서"

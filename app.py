@@ -1405,7 +1405,9 @@ with tab_channel:
             f'ACE만 운용사가 매긴 실제 순위(rank)를 제공하고, 나머지는 사이트 노출 순서입니다. '
             f'대신 <b>슬롯 점유 수</b>와 <b>동시 집행 채널 수</b>를 "미는 강도"의 근거로 우측에 표시합니다. '
             f'<span style="color:{RED};font-weight:700;">NEW</span> = 전주에 없던 배너 · '
-            f'배너 링크는 대부분 해당 <b>상품 상세 페이지</b>로 연결됩니다.</div>',
+            f'좌측 배지는 <b>그 배너가 실제로 어디로 연결되는지</b>입니다 — '
+            f'브랜드마다 목적지가 달라(TIGER는 유튜브, TIMEFOLIO는 블로그) '
+            f'누르기 전에 알 수 있게 표기합니다.</div>',
             unsafe_allow_html=True,
         )
         if ch_brands:
@@ -1438,14 +1440,32 @@ with tab_channel:
                     f'border-radius:4px;padding:2px 7px;margin-left:4px;white-space:nowrap;">{t}</span>'
                     for t, c in chips)
 
+            # 배너가 실제로 어디로 가는지 — 브랜드마다 목적지 성격이 달라서
+            # (TIGER는 전부 유튜브, TIMEFOLIO는 블로그) 누르기 전에 알 수 있어야 한다
+            KIND_STYLE = {"상품": (BRAND, BRAND_SOFT), "영상": ("#C2333F", "#FDECEB"),
+                          "블로그": ("#1E7A55", "#EAF7EF"), "뉴스": ("#B0801F", "#FDF6E7"),
+                          "공지": ("#6B4FBB", "#F3EFFA"), "자료": ("#5B6478", "#F2F4F7"),
+                          "홈페이지": ("#5B6478", "#F2F4F7"), "홈": (FAINT, "#F7F9FC"),
+                          "외부": (FAINT, "#F7F9FC")}
+
+            def kind_chip(k: str) -> str:
+                if not k:
+                    return ""
+                c, bg = KIND_STYLE.get(k, (FAINT, "#F7F9FC"))
+                label = "링크 없음" if k == "홈" else k
+                return (f'<span style="font-size:0.64rem;font-weight:700;color:{c};'
+                        f'background:{bg};border-radius:4px;padding:2px 7px;'
+                        f'margin-right:6px;white-space:nowrap;">{label}</span>')
+
             hp_rows = ""
             for brand in D.ISSUERS:
                 info = ch_brands.get(brand, {})
                 banners = info.get("배너", [])
                 if banners:
                     b = banners[0]
-                    hp_rows += feed_row(brand, b["제목"][:52], push_chips(brand, b, info), b["링크"],
-                                        NEW_BADGE if b.get("NEW") else "")
+                    hp_rows += feed_row(brand, b["제목"][:52],
+                                        kind_chip(b.get("링크유형", "")) + push_chips(brand, b, info),
+                                        b["링크"], NEW_BADGE if b.get("NEW") else "")
                 else:
                     hp_rows += feed_row(
                         brand, f'<span style="color:{GRAY};">{info.get("비고", "수집된 배너 없음")}</span>',
