@@ -438,6 +438,11 @@ def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
         hoverlabel=dict(bgcolor="white", bordercolor=LINE,
                         font=dict(family="Pretendard, sans-serif", size=12, color=INK)),
     )
+    # title dict를 text 없이 넘기면 Plotly가 'undefined'를 그린다 —
+    # 제목을 소제목으로 빼둔 차트(브랜드 검색량 트렌드)가 여기 해당했다.
+    # 제목이 없으면 상단 여백도 함께 줄인다.
+    if not fig.layout.title.text:
+        fig.update_layout(title_text="", margin=dict(l=8, r=8, t=12, b=8))
     return fig
 
 
