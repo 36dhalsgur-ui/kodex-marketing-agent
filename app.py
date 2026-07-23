@@ -1685,7 +1685,10 @@ with tab_did:
     events = D.detect_marketing_events(
         _kodex_banners, youtube.get("KODEX", []), blogs.get("KODEX", []),
         universe=kodex_list(netbuy_df), events_board=_kodex_events)
-    campaigns = [e for e in events if e["유형"] == "캠페인"]
+    # 같은 ETF를 여러 채널에 집행하면 채널 수만큼 잡히지만, 순매수 시계열은 하나뿐이라
+    # DiD는 상품당 한 번이면 된다. 감지 내역은 아래 목록에 그대로 남긴다.
+    campaigns_raw = [e for e in events if e["유형"] == "캠페인"]
+    campaigns = D.dedupe_campaigns(campaigns_raw)
     others = [e for e in events if e["유형"] != "캠페인"]
     usable = [e for e in campaigns if e["분석가능"]]
 
@@ -1705,7 +1708,9 @@ with tab_did:
             f'<a class="kw-link" href="{e["링크"]}" target="_blank"><div class="kw-row" style="align-items:center;">'
             f'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:9px;"></span>'
             f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
-            f'border-radius:5px;padding:2px 7px;margin-right:9px;white-space:nowrap;">{e["채널"]}</span>'
+            f'border-radius:5px;padding:2px 7px;margin-right:9px;white-space:nowrap;">'
+            + (f'{e["채널"]} +{e["채널수"]-1}' if e.get("채널수", 1) > 1 else e["채널"])
+            + '</span>'
             f'<span class="kw-name" style="flex:1;font-size:0.83rem;font-weight:700;color:{name_color};">{e["표기명"]}</span>'
             f'<span style="font-size:0.7rem;color:#98A2B3;margin-right:10px;white-space:nowrap;">{e["근거"]}</span>'
             f'<span style="font-size:0.75rem;color:#475467;margin-right:10px;white-space:nowrap;">{e["주차"]}</span>'
@@ -1715,8 +1720,10 @@ with tab_did:
     sub_header("01", "감지된 캠페인", "특정 ETF를 미는 일회성 집행만 = DiD의 처치")
     st.markdown(
         f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
-        f'캠페인 <b style="color:{INK};">{len(campaigns)}건</b> (분석 가능 {len(usable)}건) · '
-        f'정기물·단발 언급 {len(others)}건은 개입으로 보지 않아 제외</div>',
+        f'감지 {len(campaigns_raw)}건 → <b style="color:{INK};">상품 {len(campaigns)}종</b>'
+        f' (분석 가능 {len(usable)}종) · 정기물·단발 언급 {len(others)}건은 개입으로 보지 않아 제외<br>'
+        f'같은 상품을 여러 채널에 집행해도 순매수 시계열은 하나뿐이라 '
+        f'<b>DiD는 상품당 한 번</b>만 돌립니다 — 개입 시점은 <b>가장 먼저 시작한 채널</b> 기준입니다.</div>',
         unsafe_allow_html=True,
     )
     if campaigns:
@@ -1740,7 +1747,9 @@ with tab_did:
     # ── 분석할 캠페인 선택 (처치 ETF + 개입 주차가 함께 결정된다)
     manual_mode = False
     if usable:
-        labels = [f'{e["표기명"]} · {e["주차"]} · {e["채널"]}' for e in usable]
+        labels = [f'{e["표기명"]} · 개입 {e["주차"]}'
+                  + (f' · {e["채널수"]}개 채널' if e.get("채널수", 1) > 1 else f' · {e["채널"]}')
+                  for e in usable]
         pick = st.selectbox("분석할 마케팅 이벤트", labels,
                             help="선택한 이벤트의 ETF가 처치군, 집행 주차가 개입 시점이 됩니다")
         ev = usable[labels.index(pick)]

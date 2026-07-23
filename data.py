@@ -117,7 +117,14 @@ ETF_THEMES = [
     ("채권", r"채권|국채|금리|CD|단기자금|통안"),
     ("금·원자재", r"금현물|골드|은|원유|구리|원자재"),
     ("빅테크", r"빅테크|테크|나스닥100|매그니피센트|M7"),
-    ("시장대표", r"200|코스피|코스닥|S&P500|MSCI"),
+    ("로봇·모빌리티", r"로봇|로보틱스|휴머노이드|자율주행|모빌리티|드론|UAM|전기차|테슬라"),
+    ("신재생·수소", r"수소|신재생|클린에너지|태양광|풍력|탄소|기후|천연가스"),
+    ("환율·통화", r"달러선물|엔선물|환헤지|머니마켓|SOFR"),
+    ("연금·자산배분", r"TDF\d|TRF\d|멀티에셋|자산배분|퇴직연금"),
+    ("팩터·스타일", r"가치주|성장주|우량주|모멘텀|퀄리티|밸류Plus|최소변동성|멀티팩터|동일가중"),
+    ("국가지수", r"인도|차이나|중국본토|일본|유럽|대만|베트남|Nifty|CSI|TOPIX|니케이|HSCEI|ChiNext"),
+    ("국내섹터", r"건설|철강|증권|보험|자동차|운송|기계장비|경기소비재|필수소비재|게임|K콘텐츠|웹툰"),
+    ("시장대표", r"200|코스피|코스닥|S&P500|MSCI|KRX300|KTOP30|밸류업|Top10|Top5"),
 ]
 
 
@@ -397,10 +404,13 @@ def real_netbuy_frame(flows: dict) -> pd.DataFrame:
     rows = []
     for e in flows.get("etfs", []):
         aum = e.get("순자산억")
+        # 테마·기초시장은 JSON에 저장된 값 대신 현재 규칙으로 다시 분류한다.
+        # 배치를 다시 돌리지 않아도 분류 개선이 즉시 반영되고, 규칙이 한 곳에만 있다.
+        theme, market = classify_etf(e["종목명"])
         for w in e.get("주간", []):
             rows.append({
-                "주차": w["주차"], "종목명": e["종목명"], "테마": e["테마"],
-                "기초시장": e.get("기초시장", ""), "운용사": e["운용사"],
+                "주차": w["주차"], "종목명": e["종목명"], "테마": theme,
+                "기초시장": market, "운용사": e["운용사"],
                 "순매수액": w.get("개인순매수억", 0), "순자산": aum,
             })
     df = pd.DataFrame(rows)
@@ -1251,6 +1261,37 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
     return events
 
 
+def dedupe_campaigns(events: list[dict]) -> list[dict]:
+    """같은 ETF의 캠페인을 하나로 묶는다 — DiD는 상품당 한 번만 돌리면 된다.
+
+    같은 상품을 홈페이지·유튜브·블로그·이벤트에 동시 집행하면 채널 수만큼
+    이벤트가 잡히는데, 순매수 시계열은 하나뿐이라 몇 번을 돌려도 처치군은 같다.
+    달라지는 건 개입 주차뿐이고, 그건 '가장 먼저 시작한 시점'이 맞다.
+
+    대표 선정: 집행 기간이 명시된 이벤트 > 그 외 최초 감지일.
+    묶인 채널 목록은 '멀티채널 집행'의 근거로 남긴다."""
+    by_etf: dict[str, list[dict]] = {}
+    for e in events:
+        by_etf.setdefault(e["ETF"], []).append(e)
+
+    out = []
+    for etf, evs in by_etf.items():
+        dated = [e for e in evs if e.get("date")]
+        board = [e for e in dated if e.get("채널") == "이벤트"]
+        # 이벤트 보드가 있으면 그 시작일이 개입 시점 — 추정이 아니라 고지된 값이다
+        rep = min(board or dated or evs, key=lambda e: e.get("date") or "9999")
+        rep = dict(rep)
+        chans = sorted({e["채널"] for e in evs})
+        rep["채널목록"] = chans
+        rep["채널수"] = len(chans)
+        rep["감지건수"] = len(evs)
+        if len(chans) > 1:
+            rep["근거"] = f'{rep.get("근거", "")} · {len(chans)}개 채널 동시'.strip(" ·")
+        out.append(rep)
+    out.sort(key=lambda e: e.get("date") or "", reverse=True)
+    return out
+
+
 def kodex_etfs() -> list[str]:
     return sorted(n for n, _, issuer in ETF_UNIVERSE if issuer == "KODEX")
 
@@ -1269,6 +1310,11 @@ def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list
         if len(row):
             theme = row.iloc[0]["테마"]
             market = row.iloc[0].get("기초시장", "")
+            # '기타'는 동질 집단이 아니라 '분류 실패한 것들 모음'이다.
+            # 자동 매핑하면 로보틱스 ETF에 회사채·ESG·수소경제가 대조군으로 붙는다(실측).
+            # 틀린 대조군으로 그럴듯한 DiD를 내놓느니 비워두고 직접 지정하게 한다.
+            if theme == "기타":
+                return []
             peers = universe[(universe["테마"] == theme)
                              & (universe["기초시장"] == market)
                              & (universe["운용사"] != "KODEX")]
