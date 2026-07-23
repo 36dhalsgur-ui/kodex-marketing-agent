@@ -150,9 +150,12 @@ st.markdown(
     .mkt-cell:first-child {{ border-left: none; }}
     .mkt-n {{ font-size: 0.64rem; font-weight: 700; letter-spacing: .07em; color: {FAINT};
         text-transform: uppercase; }}
-    .mkt-v {{ font-size: 1.02rem; font-weight: 800; margin-top: 3px;
-        font-variant-numeric: tabular-nums; letter-spacing: -.01em; }}
-    .mkt-s {{ font-size: 0.68rem; color: {FAINT}; margin-top: 1px;
+    .mkt-v {{ font-size: 1.02rem; font-weight: 800; margin-top: 3px; color: {INK};
+        font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+        display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }}
+    /* 전일 등락률 — 지수값 옆 수식어라 한 급 작게 */
+    .mkt-d {{ font-size: 0.82rem; font-weight: 700; }}
+    .mkt-s {{ font-size: 0.68rem; color: {FAINT}; margin-top: 2px;
         font-variant-numeric: tabular-nums; }}
 
     /* 홈 — KPI (하나만 주인공) */
@@ -726,13 +729,15 @@ with tab_home:
         _d, _w = m.get("daily", 0.0), m["weekly"]
         _cells += (
             f'<div class="mkt-cell"><div class="mkt-n">{m["name"]}</div>'
-            f'<div class="mkt-v" style="color:{RED if _d >= 0 else COOL};">{_d:+.2f}%</div>'
-            f'<div class="mkt-s">{m["level"]} · 주간 '
+            # 지수값이 주인공, 전일 등락률은 그 옆에 붙는 수식어
+            f'<div class="mkt-v">{m["level"]}'
+            f'<span class="mkt-d" style="color:{RED if _d >= 0 else COOL};">{_d:+.2f}%</span></div>'
+            f'<div class="mkt-s">주간 '
             f'<span style="color:{RED if _w >= 0 else COOL};font-weight:700;">{_w:+.1f}%</span>'
             f'</div></div>')
     st.markdown(
         f'<div style="font-size:0.7rem;color:{FAINT};font-weight:600;letter-spacing:.06em;'
-        f'margin-bottom:6px;">시장 현황 · 큰 숫자 = 전일 대비 · 30분마다 갱신</div>'
+        f'margin-bottom:6px;">시장 현황 · 30분마다 갱신</div>'
         f'<div class="mkt-strip">{_cells}</div>', unsafe_allow_html=True)
     st.write("")
 
