@@ -92,6 +92,9 @@ st.markdown(
                      'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
         color: {INK}; background: {BG_PAGE};
         font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
+        /* 한글은 기본값이면 단어 중간에서 끊긴다("감지"/"된"). 어절 단위로만 줄바꿈하되,
+           한 어절이 줄보다 길면 넘치지 않게 예외적으로 쪼갠다. */
+        word-break: keep-all; overflow-wrap: break-word;
     }}
     .stApp *:not([data-testid="stIconMaterial"]):not([class*="material-symbols"]) {{
         font-family: inherit;
@@ -252,7 +255,7 @@ st.markdown(
         line-height: 1.25; padding-left: 12px; border-left: 3px solid {BRAND};
     }}
     .sec-desc {{ font-size: 0.83rem; color: {MUTED}; margin-top: 6px; padding-left: 15px;
-        line-height: 1.6; max-width: 74ch; }}
+        line-height: 1.6; max-width: 78ch; }}
 
     /* 카드 — 테두리 대신 옅은 그림자로 페이지 바탕 위에 띄운다 */
     .card {{
