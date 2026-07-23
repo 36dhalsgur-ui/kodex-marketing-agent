@@ -144,15 +144,44 @@ def kodex():
 
 
 def tiger():
+    """TIGER에는 일반적인 메인 배너 캐러셀이 없다(실측).
+
+    최상위 노출은 진입 즉시 뜨는 **팝업 레이어**(.layerPopArea)이고, 그 안은
+    이미지 링크뿐이라 제목이 없다 — 링크의 detailsKey로 이벤트 보드에서 제목을
+    가져온다. 기존 파서가 잡던 .focus-item은 페이지 한참 아래(1,700px)의
+    'ETF 영상' 섹션이라 메인 배너로 볼 수 없다."""
     base = "https://investments.miraeasset.com"
     soup = get_soup(base + "/tigeretf/ko/main/index.do")
+
+    titles = {}
+    try:
+        for e in tiger_events():
+            k = re.search(r"detailsKey=(\d+)", e["링크"])
+            if k:
+                titles[k.group(1)] = e["제목"]
+    except Exception:
+        pass
+
     items, seen = [], set()
+    pop = soup.select_one(".layerPopArea")
+    for a in (pop.select("a[href]") if pop else []):
+        k = re.search(r"detailsKey=(\d+)", a["href"])
+        if not k or k.group(1) in seen:
+            continue
+        seen.add(k.group(1))
+        items.append({"제목": titles.get(k.group(1), f"이벤트 팝업 #{k.group(1)}"),
+                      "링크": absol(base, a["href"]), "노출": "팝업"})
+    if items:
+        return items[:MAX_BANNERS]
+
+    # 팝업이 내려간 주에는 'ETF 영상' 섹션을 대신 쓴다 — 성격이 다르므로 표시한다
     for slide in soup.select("div.swiper-slide.focus-item"):
         txt = clean(re.sub(r"\d{4}\.\d{2}\.\d{2}|ETF 영상", "", slide.get_text(" ", strip=True)), 80)
         a = slide.find("a", href=True)
         if len(txt) > 10 and txt not in seen:
             seen.add(txt)
-            items.append({"제목": txt, "링크": absol(base, a["href"] if a else "")})
+            items.append({"제목": txt, "링크": absol(base, a["href"] if a else ""),
+                          "노출": "ETF 영상 섹션"})
     return items[:MAX_BANNERS]
 
 

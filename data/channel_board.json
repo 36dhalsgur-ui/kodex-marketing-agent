@@ -150,39 +150,20 @@
       ],
       "배너": [
         {
-          "제목": "투자에서 연금까지! 결국은 TIGER ETF",
-          "링크": "https://youtu.be/QC-_V640Dno?si=9xbLxp9f8_iGUisS",
-          "NEW": false,
-          "링크유형": "영상",
-          "슬롯수": 4
-        },
-        {
-          "제목": "ISA/연금 투자 결국은 TIGER ETF",
-          "링크": "https://www.youtube.com/watch?v=-IOzlPjLHIY",
-          "NEW": false,
-          "링크유형": "영상",
-          "슬롯수": 4
-        },
-        {
-          "제목": "TIGER ETF 함께 달려온 20년, 함께 열어갈 미래",
-          "링크": "https://youtu.be/OH_XIF5jt2w?si=hQookIfUNUlJ0f2C",
-          "NEW": false,
-          "링크유형": "영상",
-          "슬롯수": 4
-        },
-        {
-          "제목": "확실한 장기투자, 강력한 분산투자! TIGER KRX금현물 ETF",
-          "링크": "https://www.youtube.com/watch?v=uZNAJSzYAq8",
-          "NEW": false,
-          "링크유형": "영상",
+          "제목": "TIGER 글로벌반도체 ETF 매수 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=180",
+          "노출": "팝업",
+          "NEW": true,
+          "링크유형": "홈페이지",
           "슬롯수": 1
         },
         {
-          "제목": "국장 투자의 시작, 결국은 TIGER ETF",
-          "링크": "https://www.youtube.com/watch?v=HbSZ5uGFF34",
-          "NEW": false,
-          "링크유형": "영상",
-          "슬롯수": 4
+          "제목": "TIGER 패밀리클럽 친구 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=181",
+          "노출": "팝업",
+          "NEW": true,
+          "링크유형": "홈페이지",
+          "슬롯수": 1
         }
       ],
       "순서근거": "사이트 노출 순서"
