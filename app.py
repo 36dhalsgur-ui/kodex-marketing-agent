@@ -2348,7 +2348,7 @@ with tab_report:
     }
 
     # ══════════ 헤드라인 ══════════
-    _lead = RT.build_lead(ctx)
+    _lead = RT.build_lead(ctx, polite=True)
     st.markdown(
         f'<div style="background:linear-gradient(135deg,#16244D,#1F3A6E);border-radius:12px;'
         f'padding:20px 24px;color:#fff;">'
@@ -2523,8 +2523,7 @@ with tab_report:
             st.markdown(_gap_card(gap_details[0]), unsafe_allow_html=True)
             if len(gap_details) > 1:
                 _rest = gap_details[1:]
-                _labels = " · ".join(f'{d["테마"]}×{d["시장"]}' for d in _rest)
-                with st.expander(f"더보기 {len(_rest)}건 — {_labels}"):
+                with st.expander(f"더보기 {len(_rest)}건"):
                     for d in _rest:
                         st.markdown(_gap_card(d), unsafe_allow_html=True)
             st.markdown(

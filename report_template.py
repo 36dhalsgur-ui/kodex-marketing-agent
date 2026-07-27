@@ -35,20 +35,27 @@ def _reul(word: str) -> str:
     return "를"
 
 
-def build_lead(ctx: dict) -> str:
-    """리드 문단 — 국면·캠페인·검색을 엮은 한 단락 종합 (규칙 기반)."""
+def build_lead(ctx: dict, polite: bool = False) -> str:
+    """리드 문단 — 국면·캠페인·검색을 엮은 한 단락 종합 (규칙 기반).
+
+    polite=True면 경어체 — 앱 탭은 홈 스냅샷과 어투를 맞춘다.
+    PDF·HTML 리포트는 문서라서 평서체를 그대로 쓴다."""
+    def _e(plain: str, formal: str) -> str:
+        return formal if polite else plain
+
     n_dec = ctx["stage_counts"].get("쇠퇴기", 0)
     n_tot = ctx["n_sectors"]
     bench = ctx.get("bench_ret")
     # 앞단 — 시장 상황
     market = [
         f'이번 주 국내 증시는 {n_tot}개 섹터 중 <span class="hl">{n_dec}개가 쇠퇴 국면</span>에 '
-        f'진입하며 광범위한 조정을 겪었다.'
+        f'진입하며 광범위한 조정을 {_e("겪었다", "겪었습니다")}.'
     ]
     if bench is not None:
         worst = ctx["top_dn"][0] if ctx["top_dn"] else None
         w = (f'{_ga(_esc(worst[0]))} <b>{worst[1]:+.1f}%</b>로 낙폭이 가장 컸고, ' if worst else "")
-        market.append(f'{w}시장 대표 지수(KRX300)도 <b>{bench:+.1f}%</b> 동반 하락했다.')
+        market.append(f'{w}시장 대표 지수(KRX300)도 <b>{bench:+.1f}%</b> '
+                      f'동반 {_e("하락했다", "하락했습니다")}.')
 
     # 뒷단 — 우리 마케팅 해석
     tail = []
@@ -60,15 +67,16 @@ def build_lead(ctx: dict) -> str:
         pre = "신규상장된 " if "신규" in (c0.get("제목") or "") else ""
         tail.append(
             f'이런 하락장에서 삼성자산운용은 {pre}<b>{_esc(nm)}</b>{_reul(nm)} 중심으로 '
-            f'마케팅 집행하며 방어형 수요를 겨냥했다.')
-        tail.append(f'— <span class="hl">국면에 부합하는 선택</span>이다.')
+            f'마케팅 집행하며 방어형 수요를 {_e("겨냥했다", "겨냥했습니다")}.')
+        tail.append(f'— <span class="hl">국면에 부합하는 선택</span>{_e("이다", "입니다")}.')
     ups = sorted([(k, v) for k, v in ctx.get("search", {}).items() if v > 15],
                  key=lambda x: -x[1])[:2]
     if ups:
         names = "·".join(k for k, _ in ups)
         tail.append(
             f'반면 검색 수요는 {_esc(names)}로 쏠렸으나 해당 테마는 이미 과열·쇠퇴 국면이어서, '
-            f'지금은 신규 진입보다 재매집이 진행 중인 섹터를 다음 사이클 후보로 관찰할 시점이다.')
+            f'지금은 신규 진입보다 재매집이 진행 중인 섹터를 다음 사이클 후보로 '
+            f'관찰할 {_e("시점이다", "시점입니다")}.')
 
     # 시장 상황(앞) / 우리 해석(뒤) 사이에서만 한 번 줄을 바꾼다
     out = " ".join(market)
