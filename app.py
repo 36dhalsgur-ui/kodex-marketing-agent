@@ -707,7 +707,7 @@ def kodex_campaigns(ch_data: dict, youtube: dict, blogs: dict,
     events = D.detect_marketing_events(
         banners, youtube.get("KODEX", []), blogs.get("KODEX", []),
         universe=kodex_list(netbuy_df), events_board=board)
-    campaigns = D.dedupe_campaigns([e for e in events if e["유형"] == "캠페인"])
+    campaigns = D.dedupe_campaigns([e for e in events if e["유형"] in D.CAMPAIGN_TYPES])
     return events, campaigns
 
 
@@ -770,6 +770,8 @@ except Exception:
     CHANNEL = {}
 
 _ALL_EVENTS, CAMPAIGNS = kodex_campaigns(CHANNEL, youtube, blogs, netbuy_df)
+# 리워드를 건 판촉만 따로 — 블로그 소개 글과 매수 이벤트를 같은 칸에 세지 않는다
+PROMOS = [c for c in CAMPAIGNS if c["유형"] == D.PROMO]
 _UNI = universe_frame(netbuy_df)
 _AUM = (netbuy_df.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
         if "순자산" in netbuy_df.columns else {})
@@ -888,18 +890,29 @@ with tab_home:
 
     # 시장 상황(앞)과 우리 액션(뒤) 사이에서만 한 번 줄을 바꾼다 — 리포트와 동일
     _act = []
-    if CAMPAIGNS:
-        _c0 = CAMPAIGNS[0]
-        _cn = _c0.get("표기명", "")
-        _act.append(f'현재 <b>{_cn}</b>{D._reul(_cn)[len(_cn):]} 중심으로 마케팅을 집행 중이며, '
-                    f'감지된 캠페인은 <b>{len(CAMPAIGNS)}종</b>입니다.')
-    if EMERGING_GO:
-        _names = ", ".join(e["섹터"] for e in EMERGING_GO)
-        # 근거는 '핵심 — 부연' 꼴이라 앞머리만 쓴다 ('.'로 자르면 소수점이 잘린다)
-        _why = (f' ({EMERGING_GO[0]["근거"].split("—")[0].strip()})'
-                if len(EMERGING_GO) == 1 else "")
-        _act.append(f'태동 {len(EMERGING_JUDGED)}개 중 <b>{_names}</b>{D._ga(_names)[len(_names):]} '
-                    f'착수 대상입니다{_why}.')
+    if PROMOS:
+        # 프로모션(리워드 걸린 판촉)만 앞세운다 — 블로그 소개 글은 '집행 중'이라 말하지 않는다
+        _cn = PROMOS[0].get("표기명", "")
+        _rest = len(CAMPAIGNS) - len(PROMOS)
+        _act.append(f'프로모션은 <b>{_cn}</b> 등 <b>{len(PROMOS)}종</b>을 집행 중이며, '
+                    + (f'리워드 없는 콘텐츠 푸시가 {_rest}종 더 있습니다.' if _rest else '콘텐츠 푸시는 없습니다.'))
+    elif CAMPAIGNS:
+        _act.append(f'진행 중인 프로모션은 없고, 콘텐츠 푸시 <b>{len(CAMPAIGNS)}종</b>만 감지됐습니다.')
+    # 판정을 뭉뚱그리지 않는다 — '착수'와 '선점 검토'는 나가는 돈의 규모가 다르다
+    _go_now = [e for e in EMERGING_GO if e["판정"] == "착수"]
+    _prep = [e for e in EMERGING_GO if e["판정"] == "선점 검토"]
+    if _go_now:
+        _n1 = ", ".join(e["섹터"] for e in _go_now)
+        _why = (f' ({_go_now[0]["근거"].split("—")[0].strip()})' if len(_go_now) == 1 else "")
+        _s = f'태동 {len(EMERGING_JUDGED)}개 중 <b>{_n1}</b>{D._ga(_n1)[len(_n1):]} 착수 대상입니다{_why}'
+        if _prep:
+            _n2 = ", ".join(e["섹터"] for e in _prep)
+            _s += f'. {_n2}{D._eun(_n2)[len(_n2):]} 소재만 준비합니다'
+        _act.append(_s + ".")
+    elif _prep:
+        _n2 = ", ".join(e["섹터"] for e in _prep)
+        _act.append(f'태동 {len(EMERGING_JUDGED)}개 중 착수 기준을 넘긴 섹터는 없습니다 — '
+                    f'<b>{_n2}</b>{D._eun(_n2)[len(_n2):]} 소재만 준비하고 집행은 보류합니다.')
     elif EMERGING_JUDGED:
         _act.append(f'태동 {len(EMERGING_JUDGED)}개는 모두 착수 기준에 못 미칩니다 '
                     f'({EMERGING_DROPPED}).')
@@ -1836,17 +1849,24 @@ with tab_did:
     )
     st.write("")
 
-    # ── 마케팅 이벤트 탐지 — 채널 수집물(배너·유튜브·블로그)이 지목한 ETF = 처치
+    # ── 처치 = 프로모션만. 콘텐츠 푸시(블로그 소개 글·상품 안내 배너)는 여기서 빼고
+    # ② 채널 모니터링에 남긴다. 이 탭이 답해야 할 질문은 "돈이 크게 들어가는 이벤트가
+    # 실제로 순매수를 움직였나"이지, 글 한 편의 효과가 아니다.
     events, _campaigns_dedup = kodex_campaigns(ch_data, youtube, blogs, netbuy_df)
     # 같은 ETF를 여러 채널에 집행하면 채널 수만큼 잡히지만, 순매수 시계열은 하나뿐이라
     # DiD는 상품당 한 번이면 된다. 감지 내역은 아래 목록에 그대로 남긴다.
-    campaigns_raw = [e for e in events if e["유형"] == "캠페인"]
-    campaigns = _campaigns_dedup
-    others = [e for e in events if e["유형"] != "캠페인"]
+    campaigns = [e for e in _campaigns_dedup if e["유형"] == D.PROMO]
+    _promo_names = {e["ETF"] for e in campaigns}
+    campaigns_raw = [e for e in events if e["ETF"] in _promo_names and e["유형"] == D.PROMO]
+    contents = [e for e in _campaigns_dedup if e["유형"] == D.CONTENT]
+    others = [e for e in events if e["유형"] not in D.CAMPAIGN_TYPES]
     usable = [e for e in campaigns if e["분석가능"]]
 
     CH_ICON = {"홈페이지": "#6B4FBB", "유튜브": "#C2333F", "블로그": "#1E7A55",
                "이벤트": BRAND}
+
+    # 프로모션(리워드 걸린 판촉)과 콘텐츠 푸시는 급이 다르다 — 배지로 구분한다
+    TYPE_BADGE = {D.PROMO: ("#8A2E1F", "#FDF1EC"), D.CONTENT: ("#475467", "#F2F4F7")}
 
     def ev_row(e: dict, dim: bool = False) -> str:
         dot = CH_ICON.get(e["채널"], "#98A2B3")
@@ -1857,9 +1877,15 @@ with tab_did:
                      if e["분석가능"] else
                      f'<span style="font-size:0.68rem;color:{GRAY};">순매수 미연동</span>')
         name_color = GRAY if dim else INK
+        _tc, _tbg = TYPE_BADGE.get(e.get("유형", ""), ("#98A2B3", "#F2F4F7"))
+        badge = ("" if dim else
+                 f'<span style="font-size:0.68rem;font-weight:800;color:{_tc};background:{_tbg};'
+                 f'border-radius:5px;padding:2px 7px;margin-right:7px;white-space:nowrap;">'
+                 f'{e.get("유형","")}</span>')
         return (
             f'<a class="kw-link" href="{e["링크"]}" target="_blank"><div class="kw-row" style="align-items:center;">'
             f'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:9px;"></span>'
+            + badge +
             f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
             f'border-radius:5px;padding:2px 7px;margin-right:9px;white-space:nowrap;">'
             + (f'{e["채널"]} +{e["채널수"]-1}' if e.get("채널수", 1) > 1 else e["채널"])
@@ -1870,13 +1896,17 @@ with tab_did:
             f'{right}</div></a>'
         )
 
-    sub_header("01", "감지된 캠페인", "특정 ETF를 미는 일회성 집행만 = DiD의 처치")
+    sub_header("01", "측정 대상 프로모션", "리워드를 건 판촉만 = DiD의 처치")
     st.markdown(
         f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
-        f'감지 {len(campaigns_raw)}건 → <b style="color:{INK};">상품 {len(campaigns)}종</b>'
-        f' (분석 가능 {len(usable)}종) · 정기물·단발 언급 {len(others)}건은 개입으로 보지 않아 제외<br>'
+        f'<b style="color:{INK};">프로모션 {len(campaigns)}종</b> '
+        f'(감지 {len(campaigns_raw)}건 · 분석 가능 {len(usable)}종)<br>'
+        f'이 탭이 답할 질문은 <b>“비용이 크게 들어가는 이벤트가 실제로 순매수를 움직였나”</b>입니다. '
+        f'그래서 <b>매수·인증·응모 이벤트처럼 리워드를 걸고 행동을 요구하는 판촉</b>만 처치로 씁니다. '
+        f'리워드 없는 콘텐츠 푸시(블로그 소개 글, 상품 안내 배너, 영상)는 집행 비용의 급이 달라 '
+        f'여기서 제외하고 <b>② 채널 모니터링</b>에서 봅니다.<br>'
         f'같은 상품을 여러 채널에 집행해도 순매수 시계열은 하나뿐이라 '
-        f'<b>DiD는 상품당 한 번</b>만 돌립니다 — 개입 시점은 <b>가장 먼저 시작한 채널</b> 기준입니다.</div>',
+        f'<b>DiD는 상품당 한 번</b>만 돌립니다 — 개입 시점은 <b>이벤트 시작일</b> 기준입니다.</div>',
         unsafe_allow_html=True,
     )
     if campaigns:
@@ -1884,13 +1914,18 @@ with tab_did:
             f'<div class="card" style="padding:8px 16px;">{"".join(ev_row(e) for e in campaigns[:8])}</div>',
             unsafe_allow_html=True)
     else:
-        st.info("감지된 캠페인이 없습니다 — 수집물에 특정 ETF를 미는 일회성 집행이 없습니다.")
-    if others:
-        with st.expander(f"DiD에서 제외된 콘텐츠 {len(others)}건 — 정기물 · 단발 언급"):
+        st.info("측정할 프로모션이 없습니다 — 리워드를 건 매수·인증 이벤트가 감지되지 않았습니다.")
+    _excluded = contents + others
+    if _excluded:
+        with st.expander(f"처치에서 제외 {len(_excluded)}건 — 콘텐츠 푸시 {len(contents)}종 · "
+                         f"정기물·단발 언급 {len(others)}건"):
             st.markdown(
-                f'<div style="padding:0 4px;">{"".join(ev_row(e, dim=True) for e in others[:12])}</div>',
+                f'<div style="padding:0 4px;">'
+                f'{"".join(ev_row(e, dim=True) for e in _excluded[:14])}</div>',
                 unsafe_allow_html=True)
-            st.caption("정기 리포트는 평소 반복되는 베이스라인이라 개입이 아니고, 단발 언급은 "
+            st.caption("콘텐츠 푸시는 리워드가 없어 비용 구조가 다르고 효과도 완만해, 이벤트 효과와 "
+                       "섞으면 판촉의 실제 기여를 흐립니다 — ② 채널 모니터링에서 확인하세요. "
+                       "정기 리포트는 평소 반복되는 베이스라인이라 개입이 아니고, 단발 언급은 "
                        "교육 콘텐츠에 예시로 등장한 경우가 많아 해당 ETF를 위한 마케팅으로 보기 어렵습니다.")
     st.write("")
 
@@ -2165,7 +2200,10 @@ with tab_report:
     except Exception:
         _ch = {}
     # ③과 같은 파이프라인 — 탭마다 따로 계산해 숫자가 어긋나던 것을 없앤다
-    rep_events, rep_campaigns = kodex_campaigns(_ch, youtube, rep_blogs, netbuy_df)
+    rep_events, _rep_all = kodex_campaigns(_ch, youtube, rep_blogs, netbuy_df)
+    # 리포트가 말하는 '집행'도 ③과 같이 프로모션 기준 — 콘텐츠 푸시는 ②에서 본다
+    rep_campaigns = [c for c in _rep_all if c["유형"] == D.PROMO]
+    rep_contents = [c for c in _rep_all if c["유형"] == D.CONTENT]
     _week_ago_r = (dt.date.today() - dt.timedelta(days=7)).isoformat()
     _uni_r = universe_frame(netbuy_df)
 
@@ -2356,7 +2394,7 @@ with tab_report:
     with k2:
         _b = ctx["bench_ret"]
         kpis = [("KRX300 주간", f"{_b:+.1f}%" if _b is not None else "—", COOL if (_b or 0) < 0 else RED),
-                ("집행 캠페인", f"{len(rep_campaigns)}건", INK),
+                ("집행 프로모션", f"{len(rep_campaigns)}건", INK),
                 ("축소 검토", f"{n_cut}건", COOL)]
         cells = "".join(
             f'<div style="flex:1;text-align:center;"><div style="font-size:0.66rem;color:{GRAY};">{k}</div>'
@@ -2405,7 +2443,8 @@ with tab_report:
     b1, b2 = st.columns(2, gap="large")
     with b1:
         sub_header("B", "태동기 착수",
-                   f"태동 {_n_em}개 중 착수 가치 {len(emerging_all)}건")
+                   f"태동 {_n_em}개 중 착수 {_n_idle}건 · 선점 검토 "
+                   f"{len(emerging_all) - _n_idle}건")
         if emerging_all:
             _VC = {"착수": ("#B0801F", "#FDF6E7"), "선점 검토": ("#2C63B5", "#EAF0FD"),
                    "관찰": (MUTED, "#F2F4F7"), "집행 중": (MUTED, "#F2F4F7"),
@@ -2431,8 +2470,10 @@ with tab_report:
             st.markdown(
                 f'<div class="card" style="padding:6px 18px 12px;">{_rows}'
                 f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
-                f'확산 전환이 임박했거나(모멘텀 강 + 평균선 근접) 큰손이 조용히 매집 중이고, '
-                f'<b>순자산이 집행 하한 {D.AUM_MARKETABLE:,.0f}억을 넘는</b> 섹터만 올립니다.'
+                f'<b>착수</b>는 순자산이 집행 하한 {D.AUM_MARKETABLE:,.0f}억을 넘고, 확산 전환이 '
+                f'임박했으며(모멘텀 {D.EMERGING_MOM_STRONG:.0f} 이상 + 평균선 근접), '
+                f'외국인·연기금 자금이 빠지지 않는 섹터만 올립니다. 셋 중 하나라도 어긋나면 '
+                f'<b>선점 검토</b>로 내려 소재만 준비합니다 — 캠페인비는 되돌릴 수 없습니다.'
                 + (f'<br>제외 {_n_em - len(emerging_all)}개 — {_em_dropped}' if _em_dropped else "")
                 + '</div></div>',
                 unsafe_allow_html=True)

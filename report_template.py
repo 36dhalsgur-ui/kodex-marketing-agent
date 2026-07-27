@@ -287,8 +287,9 @@ def render_report(ctx: dict) -> str:
                 '<table class="mini"><thead><tr><th>판정</th><th>섹터</th>'
                 '<th>KODEX 상품</th><th>근거</th></tr></thead>'
                 f'<tbody>{_r}</tbody></table>'
-                '<p class="note">확산 전환이 임박했거나 큰손이 조용히 매집 중이고, 순자산이 '
-                '집행 하한을 넘는 섹터만 올린다. 규모 미달·관찰 섹터는 제외했다.</p>')
+                '<p class="note">착수는 ① 순자산이 집행 하한을 넘고 ② 확산 전환이 임박했으며 '
+                '③ 외국인·연기금 자금이 빠지지 않는 섹터만 올린다. 하나라도 어긋나면 선점 검토로 '
+                '내려 소재만 준비한다. 규모 미달·관찰 섹터는 제외했다.</p>')
 
     # 05-C 신규 출시 후보 — 검토 대상 전부를 상세 제안으로 (1건만 상세하면 나머지는 판단이 안 선다)
     _details = ctx.get("gap_details") or ([ctx["gap"]] if ctx.get("gap") else [])
