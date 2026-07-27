@@ -64,14 +64,23 @@ def week_ranges(n: int) -> list[tuple[str, date, date]]:
     return out
 
 
+# 이름 캐시 유효기간. 주석은 '주 1회 갱신'이었지만 실제로는 파일을 지우기 전까지
+# 영원히 재사용해, 신규 상장 ETF가 라인업 공백 분석에 영영 반영되지 않았다(실측:
+# 6일 지난 캐시를 그대로 사용). 배치가 주 1회 도니 6일이면 매번 새로 받는다.
+NAME_CACHE_MAX_AGE_DAYS = 6
+
+
 def load_names() -> dict[str, str]:
-    """티커→종목명. 1,100종 조회가 느려 캐시한다(주 1회 갱신)."""
+    """티커→종목명. 1,100종 조회가 느려 캐시하되, 오래되면 다시 받는다."""
     if NAME_CACHE.exists():
         try:
+            age_days = (time.time() - NAME_CACHE.stat().st_mtime) / 86400
             cached = json.loads(NAME_CACHE.read_text())
-            if cached:
-                print(f"  이름 캐시 사용 ({len(cached)}종) — 갱신하려면 {NAME_CACHE.name} 삭제")
+            if cached and age_days <= NAME_CACHE_MAX_AGE_DAYS:
+                print(f"  이름 캐시 사용 ({len(cached)}종 · {age_days:.1f}일 전)")
                 return cached
+            if cached:
+                print(f"  이름 캐시 만료 ({age_days:.1f}일 > {NAME_CACHE_MAX_AGE_DAYS}일) — 다시 수집")
         except Exception:
             pass
     names = {}

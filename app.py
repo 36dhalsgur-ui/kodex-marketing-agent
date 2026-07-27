@@ -2121,19 +2121,39 @@ with tab_report:
             }
             break
 
-    # 태동기 착수 후보 (현재 미집행 섹터)
+    # 태동기 착수 후보 — 목록 순서(=배치의 섹터 정의 순서)로 첫 번째를 집으면
+    # 태동기가 여럿일 때 늘 같은 섹터만 나와 "지난주 그대로"로 보인다.
+    # 태동기 안에서도 '가장 강하게 돌아서는' 곳을 고른다: RS모멘텀 내림차순.
     _marketed = {r["표기명"] for r in review}
+    _emerging_rows = sorted(
+        (r for r in rep_board if r.get("단계") == "태동기"),
+        key=lambda r: -(r.get("RS모멘텀") if r.get("RS모멘텀") is not None else -99))
     emerging = None
-    for r in rep_board:
-        if r.get("단계") == "태동기":
-            emerging = {"섹터": r["섹터"], "kodex": r.get("KODEX", "KODEX 보유 상품"),
-                        "peer_note": "경쟁 8개 브랜드 모두 해당 섹터 캠페인 미집행 — 선점 여지가 큽니다."}
-            break
+    if _emerging_rows:
+        r = _emerging_rows[0]
+        _n_em = len(_emerging_rows)
+        emerging = {
+            "섹터": r["섹터"], "kodex": r.get("KODEX", "KODEX 보유 상품"),
+            "배지": "유일 태동기" if _n_em == 1 else f"태동 {_n_em}개 중 1순위",
+            "peer_note": (
+                f'태동 {_n_em}개 중 RS모멘텀이 가장 높습니다'
+                f'({r.get("RS모멘텀", 0):+.1f}). '
+                if _n_em > 1 else "")
+            + "경쟁 8개 브랜드 모두 해당 섹터 캠페인 미집행 — 선점 여지가 큽니다.",
+        }
     emerging_names = ", ".join(r["섹터"] for r in rep_board if r.get("단계") == "태동기")
     expanding_names = ", ".join(r["섹터"] for r in rep_board if r.get("단계") == "확산기")
 
     # 신규 출시 후보 (라인업 공백 1순위)
+    # 라인업 공백은 신규 상장이 있어야 바뀌는 지표라 주 단위로는 잘 안 움직인다.
+    # 화면에 기준을 밝히지 않으면 "갱신이 안 된다"로 오해된다.
     gaps = D.lineup_gaps() if hasattr(D, "lineup_gaps") else []
+    _names_p = Path(__file__).parent / "data" / "etf_names.json"
+    try:
+        _gap_basis = (len(json.loads(_names_p.read_text())),
+                      dt.date.fromtimestamp(_names_p.stat().st_mtime).isoformat())
+    except Exception:
+        _gap_basis = (0, "")
     gap_ctx = None
     if gaps:
         g = gaps[0]
@@ -2150,6 +2170,8 @@ with tab_report:
             "국면": _stage,
             "신호설명": (f'검색 {_srch:+.1f}%' if _srch is not None else "검색 신호 없음")
                         + (f' · 국면상 {_stage}' if _stage else ""),
+            "기준": f"전체 ETF {_gap_basis[0]:,}종 · {_gap_basis[1]} 수집" if _gap_basis[0] else "",
+            "공백수": len(gaps),
             "타이밍": "대기" if _stage in ("과열기", "쇠퇴기") else "검토",
             "타이밍설명": ("국면이 고점/쇠퇴 구간 — 진정 후 겨냥, 리드타임 감안 준비만 착수"
                         if _stage in ("과열기", "쇠퇴기") else "국면 확인 후 출시 시점 판단"),
@@ -2251,7 +2273,8 @@ with tab_report:
             st.markdown(
                 f'<div class="card"><div style="font-size:1rem;font-weight:800;">{emerging["섹터"]} '
                 f'<span style="font-size:0.65rem;font-weight:700;color:#fff;background:#4C6FC6;'
-                f'border-radius:20px;padding:2px 9px;vertical-align:middle;">유일 태동기</span></div>'
+                f'border-radius:20px;padding:2px 9px;vertical-align:middle;">'
+                f'{emerging.get("배지", "태동기")}</span></div>'
                 f'<div style="font-size:0.8rem;color:{GRAY};line-height:1.65;margin-top:6px;">'
                 f'<b style="color:{INK};">{emerging["kodex"]}</b> 보유하나 현재 미집행 — 확산 전환 전 '
                 f'인지도를 선점하는 착수 대상입니다.<br>{emerging["peer_note"]}</div></div>',
@@ -2270,7 +2293,11 @@ with tab_report:
                 f'출시 {gap_ctx["타이밍"]}</span></div>'
                 f'<div style="font-size:0.8rem;color:{GRAY};line-height:1.65;margin-top:6px;">'
                 f'KODEX 미보유 · 경쟁 <b style="color:{INK};">{gap_ctx["경쟁사수"]}종</b> '
-                f'({gap_ctx["유형요약"]})<br>{gap_ctx["타이밍설명"]}</div></div>',
+                f'({gap_ctx["유형요약"]})<br>{gap_ctx["타이밍설명"]}</div>'
+                f'<div style="font-size:0.68rem;color:{FAINT};margin-top:8px;'
+                f'border-top:1px solid {LINE};padding-top:6px;">'
+                f'공백 {gap_ctx["공백수"]}건 중 1순위 · {gap_ctx["기준"]}<br>'
+                f'신규 상장이 있을 때만 바뀝니다</div></div>',
                 unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="card"><div style="font-size:0.82rem;color:{GRAY};">'
