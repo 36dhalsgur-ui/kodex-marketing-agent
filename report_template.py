@@ -170,6 +170,13 @@ td.num{text-align:right;} .up{color:var(--up); font-weight:700;} .down{color:var
 .foot .src{display:flex; flex-wrap:wrap; gap:6px 14px; margin-bottom:10px;}
 .foot .src span{color:var(--muted);} .foot .src b{color:var(--ink);}
 .foot .byline b{color:var(--brand);}
+table.mini{width:100%;border-collapse:collapse;margin-top:12px;font-size:9.5pt}
+table.mini th{text-align:left;font-weight:700;color:#5B6478;border-bottom:1.5px solid #1F3A6E;
+  padding:5px 7px;font-size:8.5pt;letter-spacing:.04em}
+table.mini td{padding:5px 7px;border-bottom:1px solid #EEF1F6;color:#141B2D}
+table.mini .num{text-align:right}
+p.note{font-size:8.5pt;color:#8A93A6;margin:6px 0 0;line-height:1.5}
+
 @media print{
   body{background:#fff;}
   .rpt{box-shadow:none; margin:0; max-width:none; padding:0 12mm 12mm;}
@@ -267,6 +274,19 @@ def render_report(ctx: dict) -> str:
             f'확산 전환 전 인지도를 선점하는 착수 대상입니다.</div></div>'
             f'<div class="em-side"><div class="es-k">경쟁사 참조</div>'
             f'<div class="es-v">{_esc(em["peer_note"])}</div></div></div>')
+        # 1순위만 싣고 끝내면 나머지 태동 섹터가 검토되지 않는다 — 전체를 표로 덧붙인다
+        _ems = ctx.get("emerging_all") or []
+        if len(_ems) > 1:
+            _r = "".join(
+                f'<tr><td>{_esc(e["섹터"])}</td><td>{_esc(e["kodex"])}</td>'
+                f'<td class="num">{e["모멘텀"]:+.1f}</td>'
+                f'<td>{"집행 중" if e["집행"] else "<b>착수 대상</b>"}</td></tr>'
+                for e in _ems)
+            em_html += (
+                '<table class="mini"><thead><tr><th>섹터</th><th>KODEX 상품</th>'
+                '<th class="num">RS모멘텀</th><th>집행 상태</th></tr></thead>'
+                f'<tbody>{_r}</tbody></table>'
+                '<p class="note">태동 국면 전체 — RS모멘텀 내림차순. 미집행 섹터가 착수 후보다.</p>')
 
     # 05-C 신규 출시 후보
     gp = ctx.get("gap")
@@ -292,6 +312,20 @@ def render_report(ctx: dict) -> str:
             f'<div class="pc-d">{_esc(gp["신호설명"])}</div></div></div>'
             f'<div class="prop-angle"><b>차별화 각도 —</b> {_esc(gp["차별화"])}</div>'
             f'<div class="prop-verify"><span class="pv-label">담당자 검증 필요</span>{chips}</div></div>')
+        # 1순위 상세 뒤에 공백 전체를 붙인다 — 나머지 후보도 같은 자리에서 검토되게
+        _gs = ctx.get("gaps_all") or []
+        if len(_gs) > 1:
+            _r = "".join(
+                f'<tr><td>{_esc(g["테마"])} × {_esc(g["시장"])}</td>'
+                f'<td>{_esc(g["브랜드"])}</td><td class="num">{g["경쟁사수"]}종</td>'
+                f'<td>{_esc(g["국면"] or "—")}</td><td>{_esc(g["타이밍"])}</td></tr>'
+                for g in _gs)
+            gap_html += (
+                '<table class="mini"><thead><tr><th>테마 × 기초시장</th><th>경쟁 브랜드</th>'
+                '<th class="num">경쟁</th><th>국면</th><th>타이밍</th></tr></thead>'
+                f'<tbody>{_r}</tbody></table>'
+                '<p class="note">KODEX 미보유 · 경쟁사 3곳 이상 보유. 국면이 과열·쇠퇴면 '
+                '대기(리드타임 감안 준비만), 그 외 검토. 신규 상장이 있을 때만 바뀐다.</p>')
 
     return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <title>KODEX 주간 마케팅 리포트 — {_esc(ctx['week'])}</title>

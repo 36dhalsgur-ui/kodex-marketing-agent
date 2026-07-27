@@ -2121,27 +2121,44 @@ with tab_report:
             }
             break
 
-    # 태동기 착수 후보 — 목록 순서(=배치의 섹터 정의 순서)로 첫 번째를 집으면
-    # 태동기가 여럿일 때 늘 같은 섹터만 나와 "지난주 그대로"로 보인다.
-    # 태동기 안에서도 '가장 강하게 돌아서는' 곳을 고른다: RS모멘텀 내림차순.
-    _marketed = {r["표기명"] for r in review}
-    _emerging_rows = sorted(
-        (r for r in rep_board if r.get("단계") == "태동기"),
-        key=lambda r: -(r.get("RS모멘텀") if r.get("RS모멘텀") is not None else -99))
+    # 태동기 착수 — 1순위만 보면 나머지 섹터는 검토 자체가 안 된다.
+    # 태동기 전체를 훑고, 각각 '우리 상품이 있는가 · 지금 밀고 있는가'를 붙인다.
+    _marketed = {D._norm_etf(r["표기명"]) for r in review}
+
+    def _is_marketed(kodex_field: str) -> bool:
+        """섹터에 매핑된 KODEX 상품 중 하나라도 현재 집행 중인가.
+        KODEX 열은 '반도체·미국반도체'처럼 복수 상품이 올 수 있다."""
+        for nm in re.split(r"[·,/]", kodex_field or ""):
+            nm = nm.strip()
+            if not nm:
+                continue
+            key = D._norm_etf(nm if nm.startswith("KODEX") else f"KODEX {nm}")
+            if any(key and key in m for m in _marketed):
+                return True
+        return False
+
+    emerging_all = []
+    for r in sorted((x for x in rep_board if x.get("단계") == "태동기"),
+                    key=lambda x: -(x.get("RS모멘텀") if x.get("RS모멘텀") is not None else -99)):
+        emerging_all.append({
+            "섹터": r["섹터"], "kodex": r.get("KODEX", ""),
+            "모멘텀": r.get("RS모멘텀"), "수준": r.get("RS수준"),
+            "집행": _is_marketed(r.get("KODEX", "")),
+        })
+    _n_em = len(emerging_all)
+    _n_idle = sum(1 for e in emerging_all if not e["집행"])
     emerging = None
-    if _emerging_rows:
-        r = _emerging_rows[0]
-        _n_em = len(_emerging_rows)
+    if emerging_all:
+        top = emerging_all[0]
         emerging = {
-            "섹터": r["섹터"], "kodex": r.get("KODEX", "KODEX 보유 상품"),
+            "섹터": top["섹터"], "kodex": top["kodex"] or "KODEX 보유 상품",
             "배지": "유일 태동기" if _n_em == 1 else f"태동 {_n_em}개 중 1순위",
-            "peer_note": (
-                f'태동 {_n_em}개 중 RS모멘텀이 가장 높습니다'
-                f'({r.get("RS모멘텀", 0):+.1f}). '
-                if _n_em > 1 else "")
-            + "경쟁 8개 브랜드 모두 해당 섹터 캠페인 미집행 — 선점 여지가 큽니다.",
+            "peer_note": (f'태동 {_n_em}개 중 RS모멘텀 최고({top["모멘텀"]:+.1f}). '
+                          if _n_em > 1 and top["모멘텀"] is not None else "")
+                         + (f'{_n_idle}개 섹터가 미집행 상태입니다.' if _n_idle else
+                            "태동 섹터 모두 이미 집행 중입니다."),
         }
-    emerging_names = ", ".join(r["섹터"] for r in rep_board if r.get("단계") == "태동기")
+    emerging_names = ", ".join(e["섹터"] for e in emerging_all)
     expanding_names = ", ".join(r["섹터"] for r in rep_board if r.get("단계") == "확산기")
 
     # 신규 출시 후보 (라인업 공백 1순위)
@@ -2180,6 +2197,18 @@ with tab_report:
                     + "추종 지수 존재 여부와 구성종목은 담당자 검증이 필요합니다.",
         }
 
+    # 공백 전체 — 1순위만 보면 나머지 후보가 검토되지 않는다
+    gaps_all = []
+    for g in gaps:
+        _st = next((r.get("단계", "") for r in rep_board if r["섹터"] == g["테마"]), "")
+        gaps_all.append({
+            "테마": g["테마"], "시장": g["시장"], "경쟁사수": g["경쟁사수"],
+            "브랜드": ", ".join(f"{b} {n}" for b, n in
+                              sorted(g["브랜드"].items(), key=lambda x: -x[1])),
+            "국면": _st,
+            "타이밍": "대기" if _st in ("과열기", "쇠퇴기") else "검토",
+        })
+
     ctx = {
         "week": event_week, "asof": _sb_all.get("asof", ""), "issued": dt.date.today().isoformat(),
         "n_sectors": n_sectors, "n_kodex": len(kodex_list(netbuy_df)),
@@ -2189,7 +2218,8 @@ with tab_report:
         "campaigns": rep_campaigns, "top_brand": brand_act[0] if brand_act else ("—", 0),
         "flow_top": flow_top, "did": did_ctx, "review": review, "review_read": review_read,
         "emerging": emerging, "emerging_names": emerging_names, "expanding_names": expanding_names,
-        "gap": gap_ctx, "search": rep_search,
+        "gap": gap_ctx, "gaps_all": gaps_all, "emerging_all": emerging_all,
+        "search": rep_search,
     }
 
     # ══════════ 헤드라인 ══════════
@@ -2268,36 +2298,62 @@ with tab_report:
     # ══════════ B · C ══════════
     b1, b2 = st.columns(2, gap="large")
     with b1:
-        sub_header("B", "태동기 착수")
-        if emerging:
+        sub_header("B", "태동기 착수", f"태동 {len(emerging_all)}개 전체 · 미집행 {_n_idle}개")
+        if emerging_all:
+            _rows = ""
+            for e in emerging_all:
+                _idle = not e["집행"]
+                _tag = ('<span style="font-size:0.64rem;font-weight:800;color:#B0801F;'
+                        'background:#FDF6E7;border-radius:4px;padding:2px 7px;">착수 대상</span>'
+                        if _idle else
+                        f'<span style="font-size:0.64rem;font-weight:700;color:{MUTED};'
+                        f'background:#F2F4F7;border-radius:4px;padding:2px 7px;">집행 중</span>')
+                _rows += (
+                    f'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;'
+                    f'border-bottom:1px solid #F0F2F7;">'
+                    f'<span style="flex:1;font-size:0.84rem;font-weight:700;color:{INK};">'
+                    f'{e["섹터"]}<span style="font-size:0.68rem;color:{FAINT};font-weight:500;'
+                    f'margin-left:6px;">{e["kodex"]}</span></span>'
+                    f'<span style="font-size:0.76rem;font-weight:700;color:{RED};'
+                    f'white-space:nowrap;">{e["모멘텀"]:+.1f}</span>'
+                    f'<span style="white-space:nowrap;min-width:56px;text-align:right;">{_tag}</span>'
+                    f'</div>')
             st.markdown(
-                f'<div class="card"><div style="font-size:1rem;font-weight:800;">{emerging["섹터"]} '
-                f'<span style="font-size:0.65rem;font-weight:700;color:#fff;background:#4C6FC6;'
-                f'border-radius:20px;padding:2px 9px;vertical-align:middle;">'
-                f'{emerging.get("배지", "태동기")}</span></div>'
-                f'<div style="font-size:0.8rem;color:{GRAY};line-height:1.65;margin-top:6px;">'
-                f'<b style="color:{INK};">{emerging["kodex"]}</b> 보유하나 현재 미집행 — 확산 전환 전 '
-                f'인지도를 선점하는 착수 대상입니다.<br>{emerging["peer_note"]}</div></div>',
+                f'<div class="card" style="padding:6px 18px 12px;">{_rows}'
+                f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
+                f'RS모멘텀 내림차순 — 위쪽일수록 강하게 돌아서는 중. '
+                f'경쟁 8개 브랜드 모두 해당 섹터 캠페인 미집행.</div></div>',
                 unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="card"><div style="font-size:0.82rem;color:{GRAY};">'
                         f'이번 주 태동 국면 섹터가 없습니다.</div></div>', unsafe_allow_html=True)
     with b2:
-        sub_header("C", "신규 출시 후보")
-        if gap_ctx:
+        sub_header("C", "신규 출시 후보", f"라인업 공백 {len(gaps_all)}건 전체")
+        if gaps_all:
+            _TC = {"검토": ("#B0801F", "#FDF6E7"), "대기": (MUTED, "#F2F4F7")}
+            _rows = ""
+            for g in gaps_all:
+                _c, _bg = _TC.get(g["타이밍"], (MUTED, "#F2F4F7"))
+                _rows += (
+                    f'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;'
+                    f'border-bottom:1px solid #F0F2F7;">'
+                    f'<span style="flex:1;font-size:0.84rem;font-weight:700;color:{INK};">'
+                    f'{g["테마"]} × {g["시장"]}'
+                    f'<span style="font-size:0.68rem;color:{FAINT};font-weight:500;'
+                    f'margin-left:6px;">{g["브랜드"]}</span></span>'
+                    f'<span style="font-size:0.76rem;color:{MUTED};white-space:nowrap;">'
+                    f'{g["경쟁사수"]}종</span>'
+                    f'<span style="font-size:0.7rem;color:{FAINT};white-space:nowrap;'
+                    f'min-width:44px;text-align:right;">{g["국면"] or "—"}</span>'
+                    f'<span style="font-size:0.64rem;font-weight:800;color:{_c};background:{_bg};'
+                    f'border-radius:4px;padding:2px 7px;white-space:nowrap;">{g["타이밍"]}</span>'
+                    f'</div>')
             st.markdown(
-                f'<div class="card"><div style="font-size:1rem;font-weight:800;">'
-                f'{gap_ctx["테마"]} × {gap_ctx["시장"]} '
-                f'<span style="font-size:0.65rem;font-weight:700;color:#fff;background:#B0801F;'
-                f'border-radius:20px;padding:2px 9px;vertical-align:middle;">'
-                f'출시 {gap_ctx["타이밍"]}</span></div>'
-                f'<div style="font-size:0.8rem;color:{GRAY};line-height:1.65;margin-top:6px;">'
-                f'KODEX 미보유 · 경쟁 <b style="color:{INK};">{gap_ctx["경쟁사수"]}종</b> '
-                f'({gap_ctx["유형요약"]})<br>{gap_ctx["타이밍설명"]}</div>'
-                f'<div style="font-size:0.68rem;color:{FAINT};margin-top:8px;'
-                f'border-top:1px solid {LINE};padding-top:6px;">'
-                f'공백 {gap_ctx["공백수"]}건 중 1순위 · {gap_ctx["기준"]}<br>'
-                f'신규 상장이 있을 때만 바뀝니다</div></div>',
+                f'<div class="card" style="padding:6px 18px 12px;">{_rows}'
+                f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
+                f'KODEX 미보유 · 경쟁사 3곳 이상 보유 · {gap_ctx["기준"] if gap_ctx else ""}<br>'
+                f'국면이 과열·쇠퇴면 <b>대기</b>(리드타임 감안 준비만), 그 외 <b>검토</b>. '
+                f'신규 상장이 있을 때만 바뀝니다.</div></div>',
                 unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="card"><div style="font-size:0.82rem;color:{GRAY};">'
