@@ -2137,26 +2137,25 @@ with tab_report:
                 return True
         return False
 
-    emerging_all = []
-    for r in sorted((x for x in rep_board if x.get("단계") == "태동기"),
-                    key=lambda x: -(x.get("RS모멘텀") if x.get("RS모멘텀") is not None else -99)):
-        emerging_all.append({
-            "섹터": r["섹터"], "kodex": r.get("KODEX", ""),
-            "모멘텀": r.get("RS모멘텀"), "수준": r.get("RS수준"),
-            "집행": _is_marketed(r.get("KODEX", "")),
-        })
+    # 태동기 전체를 나열하는 건 점검이 아니다 — 무엇을 착수할지 판정해서 올린다
+    emerging_all = D.emerging_launch_review(rep_board, _is_marketed)
+    _launch = [e for e in emerging_all if e["판정"] == "착수"]
     _n_em = len(emerging_all)
-    _n_idle = sum(1 for e in emerging_all if not e["집행"])
+    _n_idle = len(_launch)
     emerging = None
-    if emerging_all:
+    if _launch:
+        top = _launch[0]
+        emerging = {
+            "섹터": top["섹터"], "kodex": top["kodex"] or "KODEX 보유 상품",
+            "배지": f"착수 {len(_launch)}건" if len(_launch) > 1 else "착수 대상",
+            "peer_note": top["근거"] + " · 경쟁 8개 브랜드 모두 해당 섹터 캠페인 미집행.",
+        }
+    elif emerging_all:
         top = emerging_all[0]
         emerging = {
             "섹터": top["섹터"], "kodex": top["kodex"] or "KODEX 보유 상품",
-            "배지": "유일 태동기" if _n_em == 1 else f"태동 {_n_em}개 중 1순위",
-            "peer_note": (f'태동 {_n_em}개 중 RS모멘텀 최고({top["모멘텀"]:+.1f}). '
-                          if _n_em > 1 and top["모멘텀"] is not None else "")
-                         + (f'{_n_idle}개 섹터가 미집행 상태입니다.' if _n_idle else
-                            "태동 섹터 모두 이미 집행 중입니다."),
+            "배지": top["판정"],
+            "peer_note": top["근거"],
         }
     emerging_names = ", ".join(e["섹터"] for e in emerging_all)
     expanding_names = ", ".join(r["섹터"] for r in rep_board if r.get("단계") == "확산기")
@@ -2298,31 +2297,32 @@ with tab_report:
     # ══════════ B · C ══════════
     b1, b2 = st.columns(2, gap="large")
     with b1:
-        sub_header("B", "태동기 착수", f"태동 {len(emerging_all)}개 전체 · 미집행 {_n_idle}개")
+        sub_header("B", "태동기 착수",
+                   f"태동 {_n_em}개 판정 → 착수 {_n_idle}건")
         if emerging_all:
+            _VC = {"착수": ("#B0801F", "#FDF6E7"), "선점 검토": ("#2C63B5", "#EAF0FD"),
+                   "관찰": (MUTED, "#F2F4F7"), "집행 중": (MUTED, "#F2F4F7"),
+                   "상품 없음": (FAINT, "#F7F9FC")}
             _rows = ""
             for e in emerging_all:
-                _idle = not e["집행"]
-                _tag = ('<span style="font-size:0.64rem;font-weight:800;color:#B0801F;'
-                        'background:#FDF6E7;border-radius:4px;padding:2px 7px;">착수 대상</span>'
-                        if _idle else
-                        f'<span style="font-size:0.64rem;font-weight:700;color:{MUTED};'
-                        f'background:#F2F4F7;border-radius:4px;padding:2px 7px;">집행 중</span>')
+                _c, _bg = _VC.get(e["판정"], (MUTED, "#F2F4F7"))
                 _rows += (
-                    f'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;'
-                    f'border-bottom:1px solid #F0F2F7;">'
+                    f'<div style="padding:9px 0;border-bottom:1px solid #F0F2F7;">'
+                    f'<div style="display:flex;align-items:center;gap:9px;">'
+                    f'<span style="font-size:0.66rem;font-weight:800;color:{_c};background:{_bg};'
+                    f'border-radius:20px;padding:3px 10px;white-space:nowrap;min-width:64px;'
+                    f'text-align:center;">{e["판정"]}</span>'
                     f'<span style="flex:1;font-size:0.84rem;font-weight:700;color:{INK};">'
-                    f'{e["섹터"]}<span style="font-size:0.68rem;color:{FAINT};font-weight:500;'
-                    f'margin-left:6px;">{e["kodex"]}</span></span>'
-                    f'<span style="font-size:0.76rem;font-weight:700;color:{RED};'
-                    f'white-space:nowrap;">{e["모멘텀"]:+.1f}</span>'
-                    f'<span style="white-space:nowrap;min-width:56px;text-align:right;">{_tag}</span>'
-                    f'</div>')
+                    f'{e["섹터"]}</span>'
+                    f'<span style="font-size:0.72rem;color:{FAINT};white-space:nowrap;">'
+                    f'{e["kodex"]}</span></div>'
+                    f'<div style="font-size:0.72rem;color:{MUTED};line-height:1.55;'
+                    f'margin-top:4px;padding-left:73px;">{e["근거"]}</div></div>')
             st.markdown(
                 f'<div class="card" style="padding:6px 18px 12px;">{_rows}'
                 f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
-                f'RS모멘텀 내림차순 — 위쪽일수록 강하게 돌아서는 중. '
-                f'경쟁 8개 브랜드 모두 해당 섹터 캠페인 미집행.</div></div>',
+                f'착수 = 확산 전환이 임박했거나(모멘텀 강 + 평균선 근접) '
+                f'큰손이 조용히 매집 중인 섹터. 경쟁 8개 브랜드 모두 미집행.</div></div>',
                 unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="card"><div style="font-size:0.82rem;color:{GRAY};">'

@@ -1220,6 +1220,71 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
     return events
 
 
+# 태동기 착수 판정 기준
+EMERGING_MOM_STRONG = 5.0    # RS모멘텀 — 이 이상이면 '뚜렷하게 돌아서는 중'
+EMERGING_NEAR_CROSS = -3.0   # RS수준 — 0에 이만큼 근접하면 확산 전환 임박
+
+
+def emerging_launch_review(board: list[dict], is_marketed) -> list[dict]:
+    """태동 섹터 중 '지금 착수할 만한 곳'을 판정한다.
+
+    태동기 전체를 나열하는 건 점검이 아니다 — 무엇을 해야 하는지 골라줘야 한다.
+    착수 근거는 성격이 다른 두 가지다:
+
+      전환 임박 : 모멘텀이 강하고 RS수준이 0에 근접 — 곧 확산기로 넘어간다.
+                 콘텐츠 제작에 리드타임이 걸리므로 넘어간 뒤 시작하면 늦다.
+      조용한 매집: 외국인·연기금이 사고 개인이 파는 구간 — 가격이 아직 움직이지
+                 않았을 때 수급이 먼저 도는 신호다(가격 지표엔 없는 정보).
+
+    둘 다 아니면 '관찰'로 남긴다. 상품이 없으면 애초에 밀 수가 없으므로
+    신규 출시 검토로 넘긴다.
+    """
+    out = []
+    for r in board:
+        if r.get("단계") != "태동기":
+            continue
+        sec, kodex = r["섹터"], (r.get("KODEX") or "").strip()
+        mom, lvl = r.get("RS모멘텀"), r.get("RS수준")
+        big = (r.get("외국인13주억") or 0) + (r.get("연기금13주억") or 0)
+        indiv = r.get("개인13주억") or 0
+        row = {"섹터": sec, "kodex": kodex, "모멘텀": mom, "수준": lvl,
+               "큰손13주억": big, "개인13주억": indiv}
+
+        if not kodex:
+            row.update(판정="상품 없음", 우선순위=3,
+                       근거="해당 섹터 KODEX 상품 미보유 — 신규 출시 검토 대상")
+        elif is_marketed(kodex):
+            row.update(판정="집행 중", 우선순위=2, 근거="이미 마케팅 집행 중 — 착수 대상 아님")
+        elif mom is None or lvl is None:
+            row.update(판정="관찰", 우선순위=2, 근거="지표 산출 불가")
+        else:
+            near = lvl >= EMERGING_NEAR_CROSS
+            strong = mom >= EMERGING_MOM_STRONG
+            quiet = big > 0 and indiv < 0          # 큰손 매수 · 개인 매도
+            if strong and near:
+                row.update(판정="착수", 우선순위=0,
+                           근거=f"확산 전환 임박 — 모멘텀 {mom:+.1f}, 시장 대비 {lvl:+.1f}로 "
+                                f"평균선 회복 직전. 리드타임 감안 지금 착수")
+            elif quiet and strong:
+                row.update(판정="착수", 우선순위=0,
+                           근거=f"조용한 매집 — 외국인·연기금 {big:+,}억 순매수, 개인 {indiv:+,}억 "
+                                f"순매도. 가격({mom:+.1f})보다 수급이 먼저 돌았다")
+            elif quiet:
+                row.update(판정="선점 검토", 우선순위=1,
+                           근거=f"외국인·연기금 {big:+,}억 매집 중이나 모멘텀 {mom:+.1f}로 아직 약함 "
+                                f"— 소재 선점만 준비")
+            elif strong:
+                row.update(판정="선점 검토", 우선순위=1,
+                           근거=f"모멘텀 {mom:+.1f}로 강하나 큰손 자금은 {big:+,}억 유출 "
+                                f"— 가격만 오른 반등일 수 있어 확인 필요")
+            else:
+                row.update(판정="관찰", 우선순위=2,
+                           근거=f"모멘텀 {mom:+.1f}·시장 대비 {lvl:+.1f} — 돌아서는 초입이라 아직 이름")
+        out.append(row)
+    out.sort(key=lambda x: (x["우선순위"], -(x["모멘텀"] if x["모멘텀"] is not None else -99)))
+    return out
+
+
 def dedupe_campaigns(events: list[dict]) -> list[dict]:
     """같은 ETF의 캠페인을 하나로 묶는다 — DiD는 상품당 한 번만 돌리면 된다.
 

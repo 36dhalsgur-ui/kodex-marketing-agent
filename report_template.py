@@ -278,15 +278,17 @@ def render_report(ctx: dict) -> str:
         _ems = ctx.get("emerging_all") or []
         if len(_ems) > 1:
             _r = "".join(
-                f'<tr><td>{_esc(e["섹터"])}</td><td>{_esc(e["kodex"])}</td>'
-                f'<td class="num">{e["모멘텀"]:+.1f}</td>'
-                f'<td>{"집행 중" if e["집행"] else "<b>착수 대상</b>"}</td></tr>'
+                f'<tr><td>{"<b>" if e["판정"] == "착수" else ""}{_esc(e["판정"])}'
+                f'{"</b>" if e["판정"] == "착수" else ""}</td>'
+                f'<td>{_esc(e["섹터"])}</td><td>{_esc(e["kodex"])}</td>'
+                f'<td>{_esc(e["근거"])}</td></tr>'
                 for e in _ems)
             em_html += (
-                '<table class="mini"><thead><tr><th>섹터</th><th>KODEX 상품</th>'
-                '<th class="num">RS모멘텀</th><th>집행 상태</th></tr></thead>'
+                '<table class="mini"><thead><tr><th>판정</th><th>섹터</th>'
+                '<th>KODEX 상품</th><th>근거</th></tr></thead>'
                 f'<tbody>{_r}</tbody></table>'
-                '<p class="note">태동 국면 전체 — RS모멘텀 내림차순. 미집행 섹터가 착수 후보다.</p>')
+                '<p class="note">착수 = 확산 전환이 임박했거나(모멘텀 강 + 평균선 근접) '
+                '큰손이 조용히 매집 중인 섹터. 나열이 아니라 판정 결과다.</p>')
 
     # 05-C 신규 출시 후보
     gp = ctx.get("gap")
