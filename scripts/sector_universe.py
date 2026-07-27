@@ -105,6 +105,20 @@ def main():
         sys.exit("KRX_ID/KRX_PW 환경변수가 필요합니다.")
 
     print(f"[섹터 유니버스] {date.today().isoformat()} · {len(SECTORS)}개")
+
+    # 직전 산출물 — KRX가 간헐적으로 빈 응답을 준다(재시도 3회로도 못 넘길 때가 있다).
+    # 실패한 섹터를 빈 값으로 덮으면 수집 실패가 그대로 데이터 손실이 된다
+    # (실측: 536종목 → 421종목). 이전 값을 유지하고 언제 것인지 표시한다.
+    prev: dict[str, dict] = {}
+    prev_asof = ""
+    if OUT.exists():
+        try:
+            _p = json.loads(OUT.read_text())
+            prev_asof = _p.get("asof", "")
+            prev = {s["섹터"]: s for s in _p.get("sectors", []) if s.get("종목수")}
+        except Exception:
+            pass
+
     out = []
     for cfg in SECTORS:
         name = cfg["name"]
@@ -122,9 +136,16 @@ def main():
             row["종목수"] = len(row["종목"])
             print(f"  - {name}: {row['종목수']}종목")
         except Exception as e:
-            row["종목"], row["종목수"] = [], 0
-            row["비고"] = f"수집 실패: {type(e).__name__}"
-            print(f"  - {name}: 실패 {type(e).__name__}")
+            keep = prev.get(name)
+            if keep:
+                row["종목"] = keep["종목"]
+                row["종목수"] = keep["종목수"]
+                row["비고"] = f"수집 실패({type(e).__name__}) — {prev_asof} 수집분 유지"
+                print(f"  - {name}: 실패 {type(e).__name__} → 직전 {row['종목수']}종목 유지")
+            else:
+                row["종목"], row["종목수"] = [], 0
+                row["비고"] = f"수집 실패: {type(e).__name__}"
+                print(f"  - {name}: 실패 {type(e).__name__} (직전 데이터도 없음)")
         out.append(row)
 
     OUT.parent.mkdir(exist_ok=True)

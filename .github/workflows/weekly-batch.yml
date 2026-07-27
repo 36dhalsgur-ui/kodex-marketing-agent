@@ -18,7 +18,10 @@ concurrency:
 jobs:
   batch:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 로컬(국내 IP) 실행이 약 68분. GitHub 러너는 미국 IP라 KRX 왕복이 더 느려
+    # 60분으로는 매번 타임아웃된다(실측: 정확히 60분에 cancelled). 공개 저장소라
+    # Actions 사용량 제한이 없으므로 넉넉히 잡는다.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
 

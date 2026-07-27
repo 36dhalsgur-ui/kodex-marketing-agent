@@ -146,10 +146,16 @@ def main():
 
     # 전주 단계 (직전 산출물에서) — 브리핑의 '단계 전환' 감지용
     prev_stages: dict[str, str] = {}
+    # 직전 수급 — ETF PDF가 실패했을 때 빈 값으로 덮지 않기 위해 보관한다.
+    # 수집 실패를 데이터 손실로 만들면 안 된다(가격 판정은 되는데 수급만 사라진다).
+    prev_flows: dict[str, dict] = {}
+    prev_asof = ""
     if OUT.exists():
         try:
             prev = json.loads(OUT.read_text())
+            prev_asof = prev.get("asof", "")
             prev_stages = {r["섹터"]: r.get("단계", "") for r in prev.get("board", [])}
+            prev_flows = {r["섹터"]: r for r in prev.get("board", []) if r.get("구성종목수")}
         except Exception:
             pass
     def _weekly(s: pd.Series) -> pd.Series:
@@ -266,7 +272,16 @@ def main():
                     "구성종목수": used,
                 })
         except Exception as e:
-            row["수급비고"] = f"수급 실패: {type(e).__name__}"
+            keep = prev_flows.get(name)
+            if keep:
+                # 이번 주 수급은 못 받았지만 직전 값이라도 남긴다 — 언제 것인지 함께 표시
+                for k in ("외국인13주억", "연기금13주억", "개인13주억", "큰손13주억",
+                          "외국인1주억", "연기금1주억", "개인1주억", "구성종목수"):
+                    if k in keep:
+                        row[k] = keep[k]
+                row["수급비고"] = f"수급 실패({type(e).__name__}) — {prev_asof} 수집분 유지"
+            else:
+                row["수급비고"] = f"수급 실패: {type(e).__name__}"
 
         if prev_stages.get(name):
             row["전주단계"] = prev_stages[name]
