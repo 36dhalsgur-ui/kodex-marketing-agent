@@ -1912,14 +1912,10 @@ with tab_did:
     sub_header("01", "측정 대상 프로모션", "리워드를 건 판촉만 = DiD의 처치")
     st.markdown(
         f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
-        f'<b style="color:{INK};">프로모션 {len(campaigns)}종</b> '
-        f'(감지 {len(campaigns_raw)}건 · 분석 가능 {len(usable)}종)<br>'
-        f'이 탭이 답할 질문은 <b>“비용이 크게 들어가는 이벤트가 실제로 순매수를 움직였나”</b>입니다. '
-        f'그래서 <b>매수·인증·응모 이벤트처럼 리워드를 걸고 행동을 요구하는 판촉</b>만 처치로 씁니다. '
-        f'리워드 없는 콘텐츠 푸시(블로그 소개 글, 상품 안내 배너, 영상)는 집행 비용의 급이 달라 '
-        f'여기서 제외하고 <b>② 채널 모니터링</b>에서 봅니다.<br>'
+        f'감지 {len(campaigns_raw)}건 → <b style="color:{INK};">상품 {len(campaigns)}종</b>'
+        f' (분석 가능 {len(usable)}종) · 정기물·단발 언급 {len(others)}건은 개입으로 보지 않아 제외<br>'
         f'같은 상품을 여러 채널에 집행해도 순매수 시계열은 하나뿐이라 '
-        f'<b>DiD는 상품당 한 번</b>만 돌립니다 — 개입 시점은 <b>이벤트 시작일</b> 기준입니다.</div>',
+        f'<b>DiD는 상품당 한 번</b>만 돌립니다 — 개입 시점은 <b>가장 먼저 시작한 채널</b> 기준입니다.</div>',
         unsafe_allow_html=True,
     )
     if campaigns:
@@ -1936,9 +1932,7 @@ with tab_did:
                 f'<div style="padding:0 4px;">'
                 f'{"".join(ev_row(e, dim=True) for e in _excluded[:14])}</div>',
                 unsafe_allow_html=True)
-            st.caption("콘텐츠 푸시는 리워드가 없어 비용 구조가 다르고 효과도 완만해, 이벤트 효과와 "
-                       "섞으면 판촉의 실제 기여를 흐립니다 — ② 채널 모니터링에서 확인하세요. "
-                       "정기 리포트는 평소 반복되는 베이스라인이라 개입이 아니고, 단발 언급은 "
+            st.caption("정기 리포트는 평소 반복되는 베이스라인이라 개입이 아니고, 단발 언급은 "
                        "교육 콘텐츠에 예시로 등장한 경우가 많아 해당 ETF를 위한 마케팅으로 보기 어렵습니다.")
     st.write("")
 
