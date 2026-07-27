@@ -64,6 +64,32 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ── Streamlit 전역 단축키(C=캐시 삭제, R=재실행) 무력화
+# 본문에서 텍스트를 복사하다 ⌘를 먼저 떼면 'C'만 눌린 것으로 잡혀
+# "Clear caches" 확인창이 뜬다(실측). 데이터 조회용 대시보드에서 캐시를
+# 통째로 날리는 단축키가 오타 한 번에 걸리는 건 위험 대비 이득이 없다.
+# 입력창 안에서는 원래 동작하지 않으므로 그 바깥에서만 가로챈다.
+st.components.v1.html(
+    """
+    <script>
+    const doc = window.parent.document;
+    if (!doc.__hotkeyGuard) {
+        doc.__hotkeyGuard = true;
+        doc.addEventListener("keydown", (e) => {
+            if (e.metaKey || e.ctrlKey || e.altKey) return;   // ⌘C·^C 등은 통과
+            const t = e.target;
+            const tag = (t && t.tagName || "").toLowerCase();
+            if (tag === "input" || tag === "textarea" || (t && t.isContentEditable)) return;
+            if (["c", "C", "r", "R"].includes(e.key)) {
+                e.stopImmediatePropagation();
+            }
+        }, true);   // 캡처 단계에서 먼저 잡는다
+    }
+    </script>
+    """,
+    height=0,
+)
+
 # ── 컬러 시스템 — 삼성자산운용 브랜드 계열
 # 브랜드 블루를 정체성으로, 구조는 네이비로. 중립색은 푸른기를 살짝 섞어
 # 범용 회색조가 아니라 이 팔레트에서 고른 색으로 읽히게 한다.
