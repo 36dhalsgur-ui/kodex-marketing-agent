@@ -1171,7 +1171,12 @@ with tab_trend:
                        f'background:{BRAND_SOFT};border-radius:4px;padding:2px 6px;'
                        f'margin-left:6px;vertical-align:middle;">해외</span>'
                        if r.get("군") == "해외" else "")
-                    + f'<div style="font-size:0.68rem;color:{FAINT};">{r.get("KODEX", "")}'
+                    # 상품이 없어서 빈칸인지 수집이 실패해서 빈칸인지 구분되게 명시한다.
+                    # 국면은 KRX 섹터지수로 판정하므로 KODEX 상품이 없어도 진단은 나온다.
+                    + (f'<div style="font-size:0.68rem;color:{FAINT};">{r["KODEX"]}'
+                       if r.get("KODEX") else
+                       f'<div style="font-size:0.68rem;color:{COOL};font-weight:700;">'
+                       f'KODEX 상품 없음 · 라인업 공백')
                     + (f' · {note}' if note else "") + '</div></td>'
                     + (
                         f'<td class="num"><b style="font-size:0.98rem;">{signed(r["RS수준"])}</b>'
@@ -1225,7 +1230,10 @@ with tab_trend:
             f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:14px;">'
             f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다. '
-            f'수급(13주 순매수)은 판정과 별개로 <b>자금이 실제로 어디로 움직였는지</b> 보여주는 보조 지표입니다.</div>'
+            f'수급(13주 순매수)은 판정과 별개로 <b>자금이 실제로 어디로 움직였는지</b> 보여주는 보조 지표입니다.<br>'
+            f'가격은 <b>KRX 섹터지수</b>(해외는 대표 ETF)로 재므로 '
+            f'<b style="color:{NAVY};">KODEX 상품이 없는 섹터도 진단됩니다</b> — '
+            f'그 공백이 ④ 리포트의 신규 출시 후보로 넘어갑니다.</div>'
             f"{groups_html}</div>",
             unsafe_allow_html=True,
         )
