@@ -1231,8 +1231,9 @@ with tab_trend:
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:14px;">'
             f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다. '
             f'수급(13주 순매수)은 판정과 별개로 <b>자금이 실제로 어디로 움직였는지</b> 보여주는 보조 지표입니다.<br>'
-            f'가격은 <b>KRX 섹터지수</b>(해외는 대표 ETF)로 재므로 '
-            f'<b style="color:{NAVY};">KODEX 상품이 없는 섹터도 진단됩니다</b> — '
+            f'가격 출처는 섹터군마다 다릅니다 — <b>KRX섹터 17개는 KRX 공식 섹터지수</b>, '
+            f'KRX 지수가 없는 <b>테마 5개(방산·2차전지·조선·AI전력·원자력)와 해외 4개는 해당 KODEX ETF</b> 종가. '
+            f'그래서 <b style="color:{NAVY};">KODEX 상품이 없는 섹터(방송통신)도 지수로 진단됩니다</b> — '
             f'그 공백이 ④ 리포트의 신규 출시 후보로 넘어갑니다.</div>'
             f"{groups_html}</div>",
             unsafe_allow_html=True,
@@ -1437,8 +1438,13 @@ with tab_trend:
     sub_header("05", "섹터 유니버스", "위 판정이 어떤 종목 묶음을 근거로 했는지 확인")
     st.markdown(
         f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:12px;">'
-        f'KRX 섹터지수는 <b>지수 구성종목</b>, 테마는 <b>KODEX ETF 구성내역(PDF·비중 포함)</b> 기준입니다 — '
-        f'자의적 종목 선별 없이 공식 공시 명부를 그대로 사용합니다.</div>',
+        f'아래 명부는 <b>수급(순매수) 집계 대상</b>입니다 — 국면 판정에 쓰는 가격과는 출처가 다릅니다.<br>'
+        f'국내 <b>KRX섹터 17개</b>는 지수 구성종목, <b>테마 5개</b>는 해당 KODEX ETF의 구성내역(PDF)을 '
+        f'그대로 씁니다. 자의적 종목 선별은 없습니다. '
+        f'<b>해외 4개</b>는 구성종목이 미국 주식이라 KRX 투자자별 순매수가 없어 수급을 집계하지 않고, '
+        f'KRX가 비중도 주지 않아 종목명만 표시됩니다.<br>'
+        f'표의 <b>비중</b>은 구성 확인용입니다 — 순매수는 구성종목 값을 '
+        f'<b>비중 가중 없이 단순 합산</b>합니다.</div>',
         unsafe_allow_html=True)
     _uni_data = load_sector_universe()
     _uni_secs = _uni_data.get("sectors", [])
