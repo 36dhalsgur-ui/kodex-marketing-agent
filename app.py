@@ -500,6 +500,11 @@ def load_youtube():
 
 
 @st.cache_data(ttl=1800)
+def load_issuer_news():
+    return D.fetch_issuer_news(n_per_issuer=3)
+
+
+@st.cache_data(ttl=1800)
 def load_blogs():
     return D.fetch_blogs(n_per_blog=6)
 
@@ -1615,48 +1620,51 @@ with tab_channel:
 
         # ── ④ 운용사 뉴스 이슈 (외부 언론)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-        sub_header("05", "운용사 뉴스 이슈", "자체 채널이 아닌 외부 언론이 다룬 브랜드 이슈")
+        _inews = load_issuer_news()
+        _in_fail = getattr(D, "ISSUER_NEWS_STATUS", {})
+        _n_art = sum(len(v) for v in _inews.values())
+        sub_header("05", "운용사 뉴스 이슈",
+                   f"외부 언론이 다룬 브랜드 이슈 · 구글 뉴스 실시간 {_n_art}건")
 
-        BRAND_STYLE = {
-            "KODEX": "linear-gradient(135deg,#16244D 0%,#3B5BA5 100%)",
-            "TIGER": "linear-gradient(135deg,#B45309 0%,#E88D2A 100%)",
-            "ACE": "linear-gradient(135deg,#7F1D1D 0%,#C0392B 100%)",
-            "SOL": "linear-gradient(135deg,#1E40AF 0%,#3B82F6 100%)",
-            "HANARO": "linear-gradient(135deg,#166534 0%,#34B364 100%)",
-            "RISE": "linear-gradient(135deg,#854D0E 0%,#C89312 100%)",
-            "PLUS": "linear-gradient(135deg,#9A3412 0%,#D9480F 100%)",
-            "TIMEFOLIO": "linear-gradient(135deg,#1F2937 0%,#4B5563 100%)",
+        BRAND_ACCENT = {
+            "KODEX": BRAND, "TIGER": "#E88D2A", "ACE": "#C0392B", "SOL": "#2E86C1",
+            "HANARO": "#27AE60", "RISE": "#C89312", "PLUS": "#D9480F",
+            "TIMEFOLIO": "#5B6478",
         }
 
-        def issuer_card(issuer: str) -> str:
-            entries = [
-                n if isinstance(n, dict) else {"title": n, "url": news_link(f"{issuer} ETF")}
-                for n in D.ISSUER_NEWS[issuer]
-            ]
-            primary = entries[0]
-            tag = primary["title"].split("—")[0].split(",")[0].strip()
-            tag = tag if len(tag) <= 26 else tag[:25] + "…"
-            grad = BRAND_STYLE.get(issuer, BRAND_STYLE["TIMEFOLIO"])
-            html = (
-                f'<div class="yt-card">'
-                f'<a class="yt-thumb" href="{primary["url"]}" target="_blank" style="background:{grad};">'
-                f'<span class="yt-chip">NEWS BRIEF</span>'
-                f'<span><span class="yt-brand">{issuer}</span>'
-                f'<div class="yt-tag">{tag}</div></span></a>'
-                f'<div class="yt-body">'
-                f'<a class="yt-title" href="{primary["url"]}" target="_blank">{primary["title"]}</a>'
-            )
-            if len(entries) > 1:
-                html += f'<a class="yt-sub" href="{entries[1]["url"]}" target="_blank">{entries[1]["title"]} ↗</a>'
-            html += "</div></div>"
-            return html
+        def issuer_news_card(issuer: str) -> str:
+            arts = _inews.get(issuer, [])
+            acc = BRAND_ACCENT.get(issuer, MUTED)
+            if not arts:
+                body = (f'<div style="font-size:0.76rem;color:{FAINT};padding:10px 0;">'
+                        f'{"수집 실패" if issuer in _in_fail else "최근 기사 없음"}</div>')
+            else:
+                body = "".join(
+                    f'<a href="{a["url"]}" target="_blank" style="display:block;'
+                    f'text-decoration:none;padding:7px 0;'
+                    f'border-top:{"1px solid " + LINE if i else "none"};">'
+                    f'<div style="font-size:0.8rem;font-weight:600;color:{INK};'
+                    f'line-height:1.45;">{a["title"][:60]}</div>'
+                    f'<div style="font-size:0.68rem;color:{FAINT};margin-top:3px;">'
+                    f'{a["source"]}{" · " + a["date"] if a["date"] else ""}</div></a>'
+                    for i, a in enumerate(arts[:3]))
+            return (
+                f'<div class="card" style="padding:12px 16px;height:100%;'
+                f'border-top:3px solid {acc};">'
+                f'<div style="font-size:0.78rem;font-weight:800;color:{acc};'
+                f'letter-spacing:.04em;margin-bottom:6px;">{issuer}</div>'
+                f'{body}</div>')
 
-        issuer_list = getattr(D, "ISSUERS", list(D.ISSUER_NEWS.keys()))
-        for row_start in range(0, len(issuer_list), 4):
+        for row_start in range(0, len(D.ISSUERS), 4):
             row_cols = st.columns(4, gap="medium")
-            for col, issuer in zip(row_cols, issuer_list[row_start : row_start + 4]):
-                col.markdown(issuer_card(issuer), unsafe_allow_html=True)
+            for col, issuer in zip(row_cols, D.ISSUERS[row_start : row_start + 4]):
+                col.markdown(issuer_news_card(issuer), unsafe_allow_html=True)
             st.write("")
+        if _in_fail:
+            st.caption("⚠ 수집 실패 " + ", ".join(_in_fail)
+                       + " — 구글 뉴스 일시 제한입니다. 잠시 후 자동 복구됩니다.")
+        st.caption("구글 뉴스 RSS 실시간 수집 (30분 캐시) · 브랜드별 최신 3건 · "
+                   "동음이의어(SOL·PLUS 등)를 피하려고 운용사명을 함께 검색합니다.")
 
         # ── ⑤ 브랜드 검색량 (캠페인 → 관심 반응 확인)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)

@@ -500,47 +500,6 @@ NEWS_KEYWORDS = [
 for _kw in NEWS_KEYWORDS:
     _kw["url"] = news_url(_kw["키워드"] + " ETF")
 
-# 운용사별 뉴스 (제목, 검색 질의) — url은 아래에서 일괄 생성
-_ISSUER_NEWS_RAW = {
-    "KODEX": [
-        ("AI전력핵심설비 ETF 순자산 5,000억 돌파 — 데이터센터 전력주 수요 지속", "KODEX AI전력핵심설비"),
-        ("'강남역 8번출구' 시즌2 공개, 초보 투자자 대상 콘텐츠 마케팅 강화", "KODEX 강남역 8번출구"),
-    ],
-    "TIGER": [
-        ("미국배당다우존스 월배당 시리즈 라인업 확대 발표", "TIGER 미국배당다우존스"),
-        ("타깃데이트펀드(TDF) 액티브 ETF 신규 상장 예고", "TIGER TDF 액티브 ETF"),
-    ],
-    "ACE": [
-        ("KRX금현물 ETF 순자산 3조 돌파, 금 투자 열풍 수혜", "ACE KRX금현물"),
-        ("'ACE RUN' 러닝 커뮤니티 이벤트로 2030 접점 확대", "ACE RUN 한국투자신탁운용"),
-    ],
-    "SOL": [
-        ("조선TOP3플러스 순자산 1조 돌파 — K-조선 슈퍼사이클 수혜 지속", "SOL 조선TOP3플러스"),
-        ("미국배당다우존스 월배당 시리즈로 연금 투자자 공략 강화", "SOL 미국배당다우존스"),
-    ],
-    "HANARO": [
-        ("원자력iSelect, SMR 모멘텀에 기관 자금 유입 지속", "HANARO 원자력 ETF"),
-        ("퇴직연금 채널 연계 마케팅으로 라인업 확장 추진", "HANARO ETF 퇴직연금"),
-    ],
-    "RISE": [
-        ("리브랜딩 1주년 — 미국AI밸류체인 중심 해외 테마 강화", "RISE 미국AI밸류체인"),
-        ("고배당 라인업 보수 인하로 연금계좌 수요 공략", "RISE 고배당 ETF"),
-    ],
-    "PLUS": [
-        ("K방산 ETF, 방산 수출 모멘텀에 순자산 최고치 경신", "PLUS K방산"),
-        ("리브랜딩 이후 시그니처 테마 선점 전략 지속", "PLUS ETF 한화자산운용"),
-    ],
-    "TIMEFOLIO": [
-        ("액티브 ETF 수익률 상위권 석권 — 운용 역량 부각", "TIMEFOLIO 액티브 ETF"),
-        ("K바이오액티브에 기관 자금 유입 확대", "TIMEFOLIO K바이오액티브"),
-    ],
-}
-
-ISSUER_NEWS = {
-    issuer: [{"title": t, "url": news_url(q)} for t, q in items]
-    for issuer, items in _ISSUER_NEWS_RAW.items()
-}
-
 AI_INSIGHTS = [
     {
         "icon": "📈",
@@ -1897,6 +1856,67 @@ NEWS_KW_PATTERNS = [
     ("코스피", r"코스피"), ("코스닥", r"코스닥"), ("엔비디아", r"엔비디아"),
     ("비트코인", r"비트코인|가상자산"), ("상장폐지", r"상장폐지|상폐"), ("신규상장", r"신규 상장|상장[^폐]"),
 ]
+
+
+# 브랜드별 검색어 — 브랜드명만으로는 동음이의어가 섞인다.
+# (SOL=솔 음악·솔루션, PLUS=플러스 일반어, TIME=시간, RISE=상승)
+_ISSUER_NEWS_QUERY = {
+    "KODEX": "KODEX ETF",
+    "TIGER": "TIGER ETF 미래에셋",
+    "ACE": "ACE ETF 한국투자신탁운용",
+    "SOL": "SOL ETF 신한자산운용",
+    "HANARO": "HANARO ETF NH아문디",
+    "RISE": "RISE ETF KB자산운용",
+    "PLUS": "PLUS ETF 한화자산운용",
+    "TIMEFOLIO": "타임폴리오 ETF",
+}
+
+
+def _fetch_issuer_news_one(issuer: str, n: int = 3) -> list[dict]:
+    """브랜드 하나의 최신 기사 — 구글 뉴스 RSS. 키 불필요."""
+    q = _ISSUER_NEWS_QUERY.get(issuer, f"{issuer} ETF")
+    r = requests.get(
+        f"https://news.google.com/rss/search?q={quote(q)}&hl=ko&gl=KR&ceid=KR:ko",
+        headers={"User-Agent": "Mozilla/5.0"}, timeout=8,
+    )
+    r.raise_for_status()
+    root = ET.fromstring(r.content)
+    out = []
+    for it in root.findall(".//item")[:n]:
+        t, l, d = it.find("title"), it.find("link"), it.find("pubDate")
+        if t is None or not t.text:
+            continue
+        # 구글 뉴스 제목은 '기사제목 - 매체명' 형식이라 매체를 분리한다
+        title, _, source = (t.text or "").rpartition(" - ")
+        out.append({
+            "title": (title or t.text).strip(),
+            "source": source.strip(),
+            "url": l.text if l is not None else "#",
+            "date": (d.text or "")[5:16] if d is not None else "",
+        })
+    return out
+
+
+ISSUER_NEWS_STATUS: dict[str, str] = {}
+
+
+def fetch_issuer_news(n_per_issuer: int = 3) -> dict[str, list[dict]]:
+    """운용사 8개 브랜드의 최신 뉴스를 병렬 수집.
+
+    예전에는 제목이 data.py에 하드코딩돼 있어(예시 문구) 시간이 지나도 바뀌지
+    않았다 — 다른 섹션이 전부 실데이터인데 여기만 데모로 남아 있었다.
+    유튜브와 같은 이유로 동시성을 낮춘다(구글 뉴스도 과다 요청 시 429를 준다)."""
+    out: dict[str, list[dict]] = {}
+    ISSUER_NEWS_STATUS.clear()
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futures = {ex.submit(_fetch_issuer_news_one, b, n_per_issuer): b for b in ISSUERS}
+        for fut, brand in futures.items():
+            try:
+                out[brand] = fut.result()
+            except Exception as e:
+                out[brand] = []
+                ISSUER_NEWS_STATUS[brand] = f"{type(e).__name__}: {e}"
+    return out
 
 
 def fetch_news_mentions(query: str = "ETF", max_kw: int = 12):
