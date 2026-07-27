@@ -322,8 +322,9 @@ def render_report(ctx: dict) -> str:
                 f'<div class="prop-angle"><b>차별화 각도 —</b> {_esc(gp["차별화"])}</div>'
                 f'<div class="prop-verify"><span class="pv-label">담당자 검증 필요</span>{chips}</div></div>')
         gap_html += ('<p class="note">시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
-                     '공백이라고 다 채울 일이 아니라 출시 후 모을 수 있는지를 본다 — '
-                     '모일 시장이 아닌 공백은 제외했다.</p>')
+                     '시장 규모가 작으면 시장성이 부족하다고 판단해 제외한다. 선발이 1~2곳뿐인 '
+                     '테마는 규모만으로 판단할 수 없어 따로 가른다 — 이미 돈이 모였으면 선점 기회, '
+                     '그렇지 않으면 시장 미검증. 경쟁사가 한 곳도 없는 테마는 탐지되지 않는다.</p>')
 
     return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <title>KODEX 주간 마케팅 리포트 — {_esc(ctx['week'])}</title>

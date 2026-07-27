@@ -2243,7 +2243,7 @@ with tab_report:
         pass
     _stage_of = {r["섹터"]: r.get("단계", "") for r in rep_board}
     _gap_judged = D.gap_launch_review(gaps, lambda t: _stage_of.get(t, ""),
-                                      lambda n: _gap_aum.get(n))
+                                      lambda n: _gap_aum.get(n), limit=len(gaps))
     _n_gap = len(_gap_judged)
     gaps_all, _gap_dropped = D.split_actionable(_gap_judged, D.GAP_ACTIONABLE)
     # 검토 대상은 전부 상세 제안 포맷으로 — 1건만 상세하면 나머지는 판단이 안 선다
@@ -2387,8 +2387,8 @@ with tab_report:
         sub_header("C", "신규 출시 후보",
                    f"공백 {_n_gap}건 중 검토 가치 {len(gap_details)}건 · 상세 제안")
         if gap_details:
-            _GC = {"출시 검토": ("#B0801F", "#FDF6E7"), "시점 대기": ("#2C63B5", "#EAF0FD"),
-                   "차별화 필요": ("#6E4CA6", "#F3EFFA")}
+            _GC = {"출시 검토": ("#B0801F", "#FDF6E7"), "선점 기회": ("#1E7A55", "#EAF7EF"),
+                   "시점 대기": ("#2C63B5", "#EAF0FD"), "차별화 필요": ("#6E4CA6", "#F3EFFA")}
 
             def _gap_card(d: dict) -> str:
                 _c, _bg = _GC.get(d["타이밍"], (MUTED, "#F2F4F7"))
@@ -2444,11 +2444,16 @@ with tab_report:
                 with st.expander(f"더보기 {len(_rest)}건 — {_labels}"):
                     for d in _rest:
                         st.markdown(_gap_card(d), unsafe_allow_html=True)
-            st.caption(
+            st.markdown(
+                f'<div style="font-size:0.72rem;color:{FAINT};line-height:1.65;margin-top:4px;">'
                 f'시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
-                f'{D.GAP_MARKET_VIABLE:,.0f}억 미만이면 만들어도 모일 시장이 아니라 제외합니다'
+                f'시장 규모가 {D.GAP_MARKET_VIABLE:,.0f}억 미만이면 시장성이 부족하다고 판단해 제외합니다'
                 + (f' (제외 {_n_gap - len(gap_details)}건 — {_gap_dropped})' if _gap_dropped else "")
-                + f'. {gap_ctx["기준"] if gap_ctx else ""} · 신규 상장이 있을 때만 바뀝니다.')
+                + '.<br>선발이 1~2곳뿐인 테마는 시장 규모만으로 판단할 수 없어 따로 가릅니다 — '
+                + '이미 돈이 모였으면 <b>선점 기회</b>, 그렇지 않으면 <b>시장 미검증</b>. '
+                + '경쟁사가 한 곳도 없는 테마는 이 방식으로 탐지되지 않습니다.<br>'
+                + f'{gap_ctx["기준"] if gap_ctx else ""} · 신규 상장이 있을 때만 바뀝니다.</div>',
+                unsafe_allow_html=True)
         else:
             st.markdown(
                 f'<div class="card"><div style="font-size:0.82rem;color:{MUTED};line-height:1.6;">'

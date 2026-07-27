@@ -145,7 +145,12 @@ _ETF_NAMES_PATH = Path(__file__).parent / "data" / "etf_names.json"
 _LINEUP_EXCLUDE = re.compile(r"인버스|레버리지|2X|3X|곱버스|선물\(H\)|합성")
 
 
-def lineup_gaps(min_competitors: int = 3) -> list[dict]:
+# 공백 후보로 올릴 최소 경쟁사 수. 3으로 두면 '선발이 1~2곳뿐인 테마'가 통째로
+# 빠지는데(실측 13건), 그런 곳이야말로 선점 여지가 크다. 1로 낮춰 후보에 넣고
+# 경쟁사가 적을 때의 위험(시장이 검증되지 않았을 수 있다)은 판정 단계에서 가른다.
+# ※ 경쟁사가 아예 0곳인 테마는 이 방식으로 탐지할 수 없다 — 테마 목록 자체를
+#    기존 ETF 이름에서 뽑으므로, ETF가 하나도 없는 테마는 데이터에 존재하지 않는다.
+def lineup_gaps(min_competitors: int = 1) -> list[dict]:
     """전체 ETF 명단(배치 캐시)에서 'KODEX 미보유 + 경쟁사 다수 보유' 테마×시장 공백.
     반환: [{테마, 시장, 경쟁사수, 브랜드}] 경쟁사 많은 순. 캐시 없으면 빈 리스트."""
     try:
@@ -1223,7 +1228,7 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
 # 실행 대상으로 올릴 판정 — 나머지는 화면에서 뺀다.
 # 판정 결과를 전부 늘어놓으면 선별한 의미가 없고 읽는 사람이 다시 골라야 한다.
 EMERGING_ACTIONABLE = ("착수", "선점 검토")
-GAP_ACTIONABLE = ("출시 검토", "시점 대기", "차별화 필요")
+GAP_ACTIONABLE = ("출시 검토", "선점 기회", "시점 대기", "차별화 필요")
 
 
 def split_actionable(rows: list[dict], actionable: tuple[str, ...]) -> tuple[list[dict], str]:
@@ -1356,9 +1361,21 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
                "1위": top[0] if top else "", "1위순자산": top[1] if top else None,
                "점유율": share, "확인종수": len(sizes)}
 
+        n_rivals = g["경쟁사수"]
         if not sizes:
             row.update(판정="확인 필요", 우선순위=3,
                        근거="경쟁사 순자산을 확인하지 못했다 — 시장 규모 미상")
+        elif n_rivals <= 2:
+            # 선발이 1~2곳 — 경쟁사 수가 적어 시장 규모만으로는 판단할 수 없다.
+            # 아직 아무도 못 키운 것인지, 이제 열리는 시장인지가 갈린다.
+            if total >= GAP_MARKET_VIABLE:
+                row.update(판정="선점 기회", 우선순위=0,
+                           근거=f"선발 {n_rivals}곳뿐인데 이미 {total:,.0f}억을 모았다 "
+                                f"— 경쟁이 굳기 전에 들어갈 여지가 있다")
+            else:
+                row.update(판정="시장 미검증", 우선순위=3,
+                           근거=f"선발 {n_rivals}곳이 {total:,.0f}억에 그친다 "
+                                f"— 수요가 없는 것인지 아직 안 열린 것인지 확인 필요")
         elif total < GAP_MARKET_VIABLE:
             row.update(판정="보류", 우선순위=3,
                        근거=f"경쟁 {len(sizes)}종이 모은 돈이 다 합쳐 {total:,.0f}억 "
