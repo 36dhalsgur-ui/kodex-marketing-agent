@@ -2158,9 +2158,11 @@ with tab_report:
                     break
         return tot if hit else None
 
-    emerging_all = D.emerging_launch_review(rep_board, _is_marketed, _aum_of)
+    _em_judged = D.emerging_launch_review(rep_board, _is_marketed, _aum_of)
+    _n_em = len(_em_judged)
+    # 판정 결과를 전부 늘어놓으면 선별한 의미가 없다 — 실행 대상만 올린다
+    emerging_all, _em_dropped = D.split_actionable(_em_judged, D.EMERGING_ACTIONABLE)
     _launch = [e for e in emerging_all if e["판정"] == "착수"]
-    _n_em = len(emerging_all)
     _n_idle = len(_launch)
     emerging = None
     if _launch:
@@ -2225,8 +2227,10 @@ with tab_report:
     except Exception:
         pass
     _stage_of = {r["섹터"]: r.get("단계", "") for r in rep_board}
-    gaps_all = D.gap_launch_review(gaps, lambda t: _stage_of.get(t, ""),
-                                   lambda n: _gap_aum.get(n))
+    _gap_judged = D.gap_launch_review(gaps, lambda t: _stage_of.get(t, ""),
+                                      lambda n: _gap_aum.get(n))
+    _n_gap = len(_gap_judged)
+    gaps_all, _gap_dropped = D.split_actionable(_gap_judged, D.GAP_ACTIONABLE)
 
     ctx = {
         "week": event_week, "asof": _sb_all.get("asof", ""), "issued": dt.date.today().isoformat(),
@@ -2318,7 +2322,7 @@ with tab_report:
     b1, b2 = st.columns(2, gap="large")
     with b1:
         sub_header("B", "태동기 착수",
-                   f"태동 {_n_em}개 판정 → 착수 {_n_idle}건")
+                   f"태동 {_n_em}개 중 착수 가치 {len(emerging_all)}건")
         if emerging_all:
             _VC = {"착수": ("#B0801F", "#FDF6E7"), "선점 검토": ("#2C63B5", "#EAF0FD"),
                    "관찰": (MUTED, "#F2F4F7"), "집행 중": (MUTED, "#F2F4F7"),
@@ -2344,17 +2348,22 @@ with tab_report:
             st.markdown(
                 f'<div class="card" style="padding:6px 18px 12px;">{_rows}'
                 f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
-                f'착수 = 확산 전환이 임박했거나(모멘텀 강 + 평균선 근접) 큰손이 조용히 '
-                f'매집 중이고, <b>순자산이 집행 하한 {D.AUM_MARKETABLE:,.0f}억을 넘는</b> 섹터. '
-                f'국면이 좋아도 상품이 작으면 마케팅비 회수가 어렵다.</div></div>',
+                f'확산 전환이 임박했거나(모멘텀 강 + 평균선 근접) 큰손이 조용히 매집 중이고, '
+                f'<b>순자산이 집행 하한 {D.AUM_MARKETABLE:,.0f}억을 넘는</b> 섹터만 올립니다.'
+                + (f'<br>제외 {_n_em - len(emerging_all)}개 — {_em_dropped}' if _em_dropped else "")
+                + '</div></div>',
                 unsafe_allow_html=True)
         else:
-            st.markdown(f'<div class="card"><div style="font-size:0.82rem;color:{GRAY};">'
-                        f'이번 주 태동 국면 섹터가 없습니다.</div></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="card"><div style="font-size:0.82rem;color:{MUTED};line-height:1.6;">'
+                + (f'태동 {_n_em}개 모두 착수 기준에 못 미칩니다 — {_em_dropped}.<br>'
+                   f'<span style="font-size:0.74rem;color:{FAINT};">'
+                   f'국면만으로는 부족하고 순자산 {D.AUM_MARKETABLE:,.0f}억 이상이어야 합니다.</span>'
+                   if _n_em else '이번 주 태동 국면 섹터가 없습니다.')
+                + '</div></div>', unsafe_allow_html=True)
     with b2:
-        _n_go = sum(1 for g in gaps_all if g["판정"] == "출시 검토")
         sub_header("C", "신규 출시 후보",
-                   f"공백 {len(gaps_all)}건 판정 → 출시 검토 {_n_go}건")
+                   f"공백 {_n_gap}건 중 검토 가치 {len(gaps_all)}건")
         if gaps_all:
             _GC = {"출시 검토": ("#B0801F", "#FDF6E7"), "시점 대기": ("#2C63B5", "#EAF0FD"),
                    "차별화 필요": ("#6E4CA6", "#F3EFFA"), "보류": (MUTED, "#F2F4F7"),
@@ -2379,9 +2388,10 @@ with tab_report:
                 f'<div class="card" style="padding:6px 18px 12px;">{_rows}'
                 f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
                 f'시장 규모 = 그 테마에서 <b>경쟁사가 실제로 모은 순자산 합계</b>. '
-                f'{D.GAP_MARKET_VIABLE:,.0f}억 미만이면 만들어도 모일 시장이 아니고, '
-                f'1위가 {D.GAP_DOMINANCE:.0%} 넘게 독식하면 같은 구성으로 진입하기 어렵다.<br>'
-                f'{gap_ctx["기준"] if gap_ctx else ""} · 신규 상장이 있을 때만 바뀝니다.</div></div>',
+                f'{D.GAP_MARKET_VIABLE:,.0f}억 미만이면 만들어도 모일 시장이 아니라 제외합니다.'
+                + (f'<br>제외 {_n_gap - len(gaps_all)}건 — {_gap_dropped}' if _gap_dropped else "")
+                + f'<br>{gap_ctx["기준"] if gap_ctx else ""} · 신규 상장이 있을 때만 바뀝니다.'
+                + '</div></div>',
                 unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="card"><div style="font-size:0.82rem;color:{GRAY};">'

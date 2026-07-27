@@ -287,8 +287,8 @@ def render_report(ctx: dict) -> str:
                 '<table class="mini"><thead><tr><th>판정</th><th>섹터</th>'
                 '<th>KODEX 상품</th><th>근거</th></tr></thead>'
                 f'<tbody>{_r}</tbody></table>'
-                '<p class="note">착수 = 확산 전환이 임박했거나(모멘텀 강 + 평균선 근접) '
-                '큰손이 조용히 매집 중인 섹터. 나열이 아니라 판정 결과다.</p>')
+                '<p class="note">확산 전환이 임박했거나 큰손이 조용히 매집 중이고, 순자산이 '
+                '집행 하한을 넘는 섹터만 올린다. 규모 미달·관찰 섹터는 제외했다.</p>')
 
     # 05-C 신규 출시 후보
     gp = ctx.get("gap")
@@ -330,7 +330,7 @@ def render_report(ctx: dict) -> str:
                 f'<tbody>{_r}</tbody></table>'
                 '<p class="note">시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
                 '공백이라고 다 채울 일이 아니라 출시 후 모을 수 있는지를 본다 — '
-                '규모가 작으면 보류, 1위가 독식 중이면 차별화 없이는 진입이 어렵다.</p>')
+                '모일 시장이 아닌 공백은 제외했다.</p>')
 
     return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <title>KODEX 주간 마케팅 리포트 — {_esc(ctx['week'])}</title>

@@ -1220,6 +1220,23 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
     return events
 
 
+# 실행 대상으로 올릴 판정 — 나머지는 화면에서 뺀다.
+# 판정 결과를 전부 늘어놓으면 선별한 의미가 없고 읽는 사람이 다시 골라야 한다.
+EMERGING_ACTIONABLE = ("착수", "선점 검토")
+GAP_ACTIONABLE = ("출시 검토", "시점 대기", "차별화 필요")
+
+
+def split_actionable(rows: list[dict], actionable: tuple[str, ...]) -> tuple[list[dict], str]:
+    """(실행 대상, 제외 요약). 제외된 것은 개수와 사유만 한 줄로 남긴다."""
+    keep = [r for r in rows if r.get("판정") in actionable]
+    dropped = [r for r in rows if r.get("판정") not in actionable]
+    if not dropped:
+        return keep, ""
+    from collections import Counter as _C2
+    cnt = _C2(r.get("판정", "기타") for r in dropped)
+    return keep, " · ".join(f"{k} {v}" for k, v in cnt.most_common())
+
+
 # 태동기 착수 판정 기준
 EMERGING_MOM_STRONG = 5.0    # RS모멘텀 — 이 이상이면 '뚜렷하게 돌아서는 중'
 EMERGING_NEAR_CROSS = -3.0   # RS수준 — 0에 이만큼 근접하면 확산 전환 임박
