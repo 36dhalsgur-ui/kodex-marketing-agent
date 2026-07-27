@@ -1863,42 +1863,27 @@ with tab_did:
     st.write("")
 
     # ── 처치 = 프로모션만. 콘텐츠 푸시(블로그 소개 글·상품 안내 배너)는 여기서 빼고
-    # ② 채널 모니터링에 남긴다. 이 탭이 답해야 할 질문은 "돈이 크게 들어가는 이벤트가
-    # 실제로 순매수를 움직였나"이지, 글 한 편의 효과가 아니다.
+    # ② 채널 모니터링에 남긴다. 블로그 글·영상은 이 탭에서 마케팅으로 세지 않는다.
     events, _campaigns_dedup = kodex_campaigns(ch_data, youtube, blogs, netbuy_df)
     # 같은 ETF를 여러 채널에 집행하면 채널 수만큼 잡히지만, 순매수 시계열은 하나뿐이라
-    # DiD는 상품당 한 번이면 된다. 감지 내역은 아래 목록에 그대로 남긴다.
+    # DiD는 상품당 한 번이면 된다.
     campaigns = [e for e in _campaigns_dedup if e["유형"] == D.PROMO]
     _promo_names = {e["ETF"] for e in campaigns}
     campaigns_raw = [e for e in events if e["ETF"] in _promo_names and e["유형"] == D.PROMO]
-    contents = [e for e in _campaigns_dedup if e["유형"] == D.CONTENT]
-    others = [e for e in events if e["유형"] not in D.CAMPAIGN_TYPES]
     usable = [e for e in campaigns if e["분석가능"]]
 
     CH_ICON = {"홈페이지": "#6B4FBB", "유튜브": "#C2333F", "블로그": "#1E7A55",
                "이벤트": BRAND}
 
-    # 프로모션(리워드 걸린 판촉)과 콘텐츠 푸시는 급이 다르다 — 배지로 구분한다
-    TYPE_BADGE = {D.PROMO: ("#8A2E1F", "#FDF1EC"), D.CONTENT: ("#475467", "#F2F4F7")}
-
-    def ev_row(e: dict, dim: bool = False) -> str:
+    def ev_row(e: dict) -> str:
         dot = CH_ICON.get(e["채널"], "#98A2B3")
-        if dim:
-            right = f'<span style="font-size:0.68rem;color:{GRAY};">{e["유형"]} · DiD 제외</span>'
-        else:
-            right = ('<span style="font-size:0.68rem;font-weight:700;color:#1E7A55;">분석 가능</span>'
-                     if e["분석가능"] else
-                     f'<span style="font-size:0.68rem;color:{GRAY};">순매수 미연동</span>')
-        name_color = GRAY if dim else INK
-        _tc, _tbg = TYPE_BADGE.get(e.get("유형", ""), ("#98A2B3", "#F2F4F7"))
-        badge = ("" if dim else
-                 f'<span style="font-size:0.68rem;font-weight:800;color:{_tc};background:{_tbg};'
-                 f'border-radius:5px;padding:2px 7px;margin-right:7px;white-space:nowrap;">'
-                 f'{e.get("유형","")}</span>')
+        right = ('<span style="font-size:0.68rem;font-weight:700;color:#1E7A55;">분석 가능</span>'
+                 if e["분석가능"] else
+                 f'<span style="font-size:0.68rem;color:{GRAY};">순매수 미연동</span>')
+        name_color = INK
         return (
             f'<a class="kw-link" href="{e["링크"]}" target="_blank"><div class="kw-row" style="align-items:center;">'
             f'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:9px;"></span>'
-            + badge +
             f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
             f'border-radius:5px;padding:2px 7px;margin-right:9px;white-space:nowrap;">'
             + (f'{e["채널"]} +{e["채널수"]-1}' if e.get("채널수", 1) > 1 else e["채널"])
@@ -1913,7 +1898,7 @@ with tab_did:
     st.markdown(
         f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
         f'감지 {len(campaigns_raw)}건 → <b style="color:{INK};">상품 {len(campaigns)}종</b>'
-        f' (분석 가능 {len(usable)}종) · 정기물·단발 언급 {len(others)}건은 개입으로 보지 않아 제외<br>'
+        f' (분석 가능 {len(usable)}종)<br>'
         f'같은 상품을 여러 채널에 집행해도 순매수 시계열은 하나뿐이라 '
         f'<b>DiD는 상품당 한 번</b>만 돌립니다 — 개입 시점은 <b>가장 먼저 시작한 채널</b> 기준입니다.</div>',
         unsafe_allow_html=True,
@@ -1924,16 +1909,6 @@ with tab_did:
             unsafe_allow_html=True)
     else:
         st.info("측정할 프로모션이 없습니다 — 리워드를 건 매수·인증 이벤트가 감지되지 않았습니다.")
-    _excluded = contents + others
-    if _excluded:
-        with st.expander(f"처치에서 제외 {len(_excluded)}건 — 콘텐츠 푸시 {len(contents)}종 · "
-                         f"정기물·단발 언급 {len(others)}건"):
-            st.markdown(
-                f'<div style="padding:0 4px;">'
-                f'{"".join(ev_row(e, dim=True) for e in _excluded[:14])}</div>',
-                unsafe_allow_html=True)
-            st.caption("정기 리포트는 평소 반복되는 베이스라인이라 개입이 아니고, 단발 언급은 "
-                       "교육 콘텐츠에 예시로 등장한 경우가 많아 해당 ETF를 위한 마케팅으로 보기 어렵습니다.")
     st.write("")
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
@@ -2210,7 +2185,6 @@ with tab_report:
     rep_events, _rep_all = kodex_campaigns(_ch, youtube, rep_blogs, netbuy_df)
     # 리포트가 말하는 '집행'도 ③과 같이 프로모션 기준 — 콘텐츠 푸시는 ②에서 본다
     rep_campaigns = [c for c in _rep_all if c["유형"] == D.PROMO]
-    rep_contents = [c for c in _rep_all if c["유형"] == D.CONTENT]
     _week_ago_r = (dt.date.today() - dt.timedelta(days=7)).isoformat()
     _uni_r = universe_frame(netbuy_df)
 
