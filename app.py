@@ -491,9 +491,19 @@ def load_weekly_market():
     return D.fetch_weekly_market()
 
 
+def _mtime(name: str) -> float:
+    """배치 산출 JSON의 수정 시각 — 캐시 키로 써서 파일이 바뀌면 자동 무효화."""
+    p = Path(__file__).parent / "data" / name
+    return p.stat().st_mtime if p.exists() else 0.0
+
+
 @st.cache_data
-def load_netbuy():
-    """ETF 순매수 — 배치 실데이터(개인 순매수÷순자산)가 있으면 그것을, 없으면 데모."""
+def load_netbuy(mtime: float):
+    """ETF 순매수 — 배치 실데이터(개인 순매수÷순자산)가 있으면 그것을, 없으면 데모.
+
+    mtime을 캐시 키로 받는다. 주간 배치는 data/만 커밋하므로 app.py가 그대로면
+    배포본의 캐시가 폐기되지 않아 지난주 주차가 계속 보였다(실측: 홈이 7월 3주).
+    """
     flows = D.load_etf_flows()
     if flows:
         df = D.real_netbuy_frame(flows)
@@ -556,12 +566,6 @@ def load_laws():
     return D.fetch_laws()
 
 
-def _mtime(name: str) -> float:
-    """배치 산출 JSON의 수정 시각 — 캐시 키로 써서 파일이 바뀌면 자동 무효화."""
-    p = Path(__file__).parent / "data" / name
-    return p.stat().st_mtime if p.exists() else 0.0
-
-
 @st.cache_data
 def _load_json(name: str, mtime: float):
     p = Path(__file__).parent / "data" / name
@@ -620,7 +624,7 @@ with st.sidebar:
         '<div style="font-size:1.05rem;font-weight:800;margin-bottom:4px;">분석 설정</div>',
         unsafe_allow_html=True,
     )
-    netbuy_df, netbuy_live = load_netbuy()
+    netbuy_df, netbuy_live = load_netbuy(_mtime("etf_flows.json"))
     weeks = list(dict.fromkeys(netbuy_df["주차"]))
     sel_week = st.selectbox("분석 주차", weeks[1:][::-1], index=0)
     top_n = st.slider("순매수강도 TOP N", 5, 20, 15)

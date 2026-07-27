@@ -45,17 +45,15 @@ def build_lead(ctx: dict, polite: bool = False) -> str:
 
     n_dec = ctx["stage_counts"].get("쇠퇴기", 0)
     n_tot = ctx["n_sectors"]
-    bench = ctx.get("bench_ret")
     # 앞단 — 시장 상황
     market = [
         f'이번 주 국내 증시는 {n_tot}개 섹터 중 <span class="hl">{n_dec}개가 쇠퇴 국면</span>에 '
         f'진입하며 광범위한 조정을 {_e("겪었다", "겪었습니다")}.'
     ]
-    if bench is not None:
-        worst = ctx["top_dn"][0] if ctx["top_dn"] else None
-        w = (f'{_ga(_esc(worst[0]))} <b>{worst[1]:+.1f}%</b>로 낙폭이 가장 컸고, ' if worst else "")
-        market.append(f'{w}시장 대표 지수(KRX300)도 <b>{bench:+.1f}%</b> '
-                      f'동반 {_e("하락했다", "하락했습니다")}.')
+    worst = ctx["top_dn"][0] if ctx["top_dn"] else None
+    if worst:
+        market.append(f'{_ga(_esc(worst[0]))} <b>{worst[1]:+.1f}%</b>로 '
+                      f'낙폭이 가장 {_e("컸다", "컸습니다")}.')
 
     # 뒷단 — 우리 마케팅 해석
     tail = []
