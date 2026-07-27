@@ -2192,31 +2192,46 @@ with tab_report:
                       dt.date.fromtimestamp(_names_p.stat().st_mtime).isoformat())
     except Exception:
         _gap_basis = (0, "")
-    gap_ctx = None
-    if gaps:
-        g = gaps[0]
+    def _gap_detail(g: dict, judged: dict | None = None) -> dict:
+        """공백 하나를 '상세 제안' 수준으로 확장 — 가칭·경쟁 구도·차별화 각도.
+        1순위에만 붙이던 것을 검토 대상 전체에 적용한다."""
         _peers = D.gap_competitors(g["테마"], g["시장"]) if hasattr(D, "gap_competitors") else []
         _types = _C(D.etf_product_type(p) for p in _peers) if _peers else {}
         _dom = max(_types, key=_types.get) if _types else "지수추종"
         _all_same = len(_types) == 1
         _stage = next((r.get("단계", "") for r in rep_board if r["섹터"] == g["테마"]), "")
-        _srch = rep_search.get(g["테마"]) or rep_search.get("AI반도체" if g["테마"] == "반도체" else "", None)
-        gap_ctx = {
+        _srch = rep_search.get(g["테마"]) or rep_search.get(
+            "AI반도체" if g["테마"] == "반도체" else "", None)
+        j = judged or {}
+        _share, _top = j.get("점유율"), j.get("1위", "")
+        # 차별화 각도는 '왜 뚫을 수 있는가'라 판정 사유에 따라 달라진다
+        if j.get("판정") == "차별화 필요" and _share:
+            _angle = (f'1위 {_top}가 {_share:.0%}를 쥐고 있어 같은 지수를 따라가면 승산이 낮습니다. '
+                      f'세부 테마를 좁히거나 액티브·커버드콜 등 운용 방식으로 갈라야 합니다. ')
+        elif _all_same:
+            _angle = (f'경쟁 {g["경쟁사수"]}종이 전부 {_dom}이므로 액티브·세부 테마 심화로 '
+                      f'차별화 여지가 있습니다. ')
+        else:
+            _angle = f'경쟁이 {_dom} 중심이므로 다른 운용 방식으로 빈틈을 노릴 수 있습니다. '
+        return {
             "테마": g["테마"], "시장": g["시장"], "경쟁사수": g["경쟁사수"], "경쟁상품": _peers,
             "가칭": f'KODEX {g["시장"]}{g["테마"]}'.replace("한국", ""),
-            "유형요약": (f'{g["경쟁사수"]}종 모두 {_dom}' if _all_same else f'{_dom} 중심 {g["경쟁사수"]}종'),
+            "유형요약": (f'{g["경쟁사수"]}종 모두 {_dom}' if _all_same
+                      else f'{_dom} 중심 {g["경쟁사수"]}종'),
             "국면": _stage,
             "신호설명": (f'검색 {_srch:+.1f}%' if _srch is not None else "검색 신호 없음")
                         + (f' · 국면상 {_stage}' if _stage else ""),
             "기준": f"전체 ETF {_gap_basis[0]:,}종 · {_gap_basis[1]} 수집" if _gap_basis[0] else "",
             "공백수": len(gaps),
-            "타이밍": "대기" if _stage in ("과열기", "쇠퇴기") else "검토",
-            "타이밍설명": ("국면이 고점/쇠퇴 구간 — 진정 후 겨냥, 리드타임 감안 준비만 착수"
-                        if _stage in ("과열기", "쇠퇴기") else "국면 확인 후 출시 시점 판단"),
-            "차별화": (f'경쟁 {g["경쟁사수"]}종이 전부 {_dom}이므로 액티브·세부 테마 심화로 차별화 여지가 있습니다. '
-                     if _all_same else f'경쟁이 {_dom} 중심이므로 다른 운용 방식으로 빈틈을 노릴 수 있습니다. ')
-                    + "추종 지수 존재 여부와 구성종목은 담당자 검증이 필요합니다.",
+            "타이밍": j.get("판정") or ("대기" if _stage in ("과열기", "쇠퇴기") else "검토"),
+            "타이밍설명": j.get("근거") or ("국면이 고점/쇠퇴 구간 — 진정 후 겨냥, "
+                                       "리드타임 감안 준비만 착수"
+                                       if _stage in ("과열기", "쇠퇴기") else "국면 확인 후 출시 시점 판단"),
+            "시장규모억": j.get("시장규모억"), "1위": _top, "점유율": _share,
+            "차별화": _angle + "추종 지수 존재 여부와 구성종목은 담당자 검증이 필요합니다.",
         }
+
+    gap_ctx = _gap_detail(gaps[0]) if gaps else None
 
     # 공백이라고 다 채울 일이 아니다 — 출시 후 모을 수 있는지 판정한다
     _gap_aum = dict(_aum_map)
@@ -2231,6 +2246,12 @@ with tab_report:
                                       lambda n: _gap_aum.get(n))
     _n_gap = len(_gap_judged)
     gaps_all, _gap_dropped = D.split_actionable(_gap_judged, D.GAP_ACTIONABLE)
+    # 검토 대상은 전부 상세 제안 포맷으로 — 1건만 상세하면 나머지는 판단이 안 선다
+    _by_key = {(g["테마"], g["시장"]): g for g in gaps}
+    gap_details = [_gap_detail(_by_key[(j["테마"], j["시장"])], j)
+                   for j in gaps_all if (j["테마"], j["시장"]) in _by_key]
+    if gap_details:
+        gap_ctx = gap_details[0]
 
     ctx = {
         "week": event_week, "asof": _sb_all.get("asof", ""), "issued": dt.date.today().isoformat(),
@@ -2241,7 +2262,8 @@ with tab_report:
         "campaigns": rep_campaigns, "top_brand": brand_act[0] if brand_act else ("—", 0),
         "flow_top": flow_top, "did": did_ctx, "review": review, "review_read": review_read,
         "emerging": emerging, "emerging_names": emerging_names, "expanding_names": expanding_names,
-        "gap": gap_ctx, "gaps_all": gaps_all, "emerging_all": emerging_all,
+        "gap": gap_ctx, "gaps_all": gaps_all, "gap_details": gap_details,
+        "emerging_all": emerging_all,
         "search": rep_search,
     }
 
@@ -2363,39 +2385,66 @@ with tab_report:
                 + '</div></div>', unsafe_allow_html=True)
     with b2:
         sub_header("C", "신규 출시 후보",
-                   f"공백 {_n_gap}건 중 검토 가치 {len(gaps_all)}건")
-        if gaps_all:
+                   f"공백 {_n_gap}건 중 검토 가치 {len(gap_details)}건 · 상세 제안")
+        if gap_details:
             _GC = {"출시 검토": ("#B0801F", "#FDF6E7"), "시점 대기": ("#2C63B5", "#EAF0FD"),
-                   "차별화 필요": ("#6E4CA6", "#F3EFFA"), "보류": (MUTED, "#F2F4F7"),
-                   "확인 필요": (RED, "#FDECEB")}
-            _rows = ""
-            for g in gaps_all:
-                _c, _bg = _GC.get(g["판정"], (MUTED, "#F2F4F7"))
-                _mk = (f'{g["시장규모억"]:,.0f}억' if g["시장규모억"] else "—")
-                _rows += (
-                    f'<div style="padding:9px 0;border-bottom:1px solid #F0F2F7;">'
-                    f'<div style="display:flex;align-items:center;gap:9px;">'
-                    f'<span style="font-size:0.66rem;font-weight:800;color:{_c};background:{_bg};'
-                    f'border-radius:20px;padding:3px 10px;white-space:nowrap;min-width:70px;'
-                    f'text-align:center;">{g["판정"]}</span>'
-                    f'<span style="flex:1;font-size:0.84rem;font-weight:700;color:{INK};">'
-                    f'{g["테마"]} × {g["시장"]}</span>'
-                    f'<span style="font-size:0.72rem;color:{FAINT};white-space:nowrap;">'
-                    f'시장 {_mk} · 경쟁 {g["경쟁사수"]}종</span></div>'
-                    f'<div style="font-size:0.72rem;color:{MUTED};line-height:1.55;'
-                    f'margin-top:4px;padding-left:79px;">{g["근거"]}</div></div>')
-            st.markdown(
-                f'<div class="card" style="padding:6px 18px 12px;">{_rows}'
-                f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
-                f'시장 규모 = 그 테마에서 <b>경쟁사가 실제로 모은 순자산 합계</b>. '
-                f'{D.GAP_MARKET_VIABLE:,.0f}억 미만이면 만들어도 모일 시장이 아니라 제외합니다.'
-                + (f'<br>제외 {_n_gap - len(gaps_all)}건 — {_gap_dropped}' if _gap_dropped else "")
-                + f'<br>{gap_ctx["기준"] if gap_ctx else ""} · 신규 상장이 있을 때만 바뀝니다.'
-                + '</div></div>',
-                unsafe_allow_html=True)
+                   "차별화 필요": ("#6E4CA6", "#F3EFFA")}
+            for d in gap_details:
+                _c, _bg = _GC.get(d["타이밍"], (MUTED, "#F2F4F7"))
+                _mk = f'{d["시장규모억"]:,.0f}억' if d.get("시장규모억") else "—"
+                _lead = (f'{d["1위"]} {d["점유율"]:.0%}'
+                         if d.get("1위") and d.get("점유율") else "—")
+                st.markdown(
+                    f'<div class="card" style="padding:14px 18px;margin-bottom:12px;'
+                    f'border-left:3px solid {_c};">'
+                    # 제목 — 가칭 상품명이 제안의 얼굴
+                    f'<div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;">'
+                    f'<span style="font-size:0.62rem;font-weight:800;color:{FAINT};'
+                    f'letter-spacing:.1em;">신규 상품 후보</span>'
+                    f'<span style="font-size:1rem;font-weight:800;color:{INK};">'
+                    f'{d["가칭"]}<span style="font-size:0.72rem;color:{FAINT};'
+                    f'font-weight:600;"> (가칭)</span></span>'
+                    f'<span style="margin-left:auto;font-size:0.66rem;font-weight:800;'
+                    f'color:{_c};background:{_bg};border-radius:20px;padding:3px 10px;'
+                    f'white-space:nowrap;">{d["타이밍"]}</span></div>'
+                    # 근거 3칸 — 시장 / 경쟁 / 신호
+                    f'<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:11px;'
+                    f'padding:10px 0;border-top:1px solid {LINE};border-bottom:1px solid {LINE};">'
+                    f'<div style="flex:1;min-width:120px;">'
+                    f'<div style="font-size:0.64rem;color:{FAINT};font-weight:700;">시장 규모</div>'
+                    f'<div style="font-size:0.86rem;font-weight:800;color:{INK};margin-top:2px;">'
+                    f'{_mk}</div>'
+                    f'<div style="font-size:0.68rem;color:{MUTED};">경쟁 {d["경쟁사수"]}종이 모은 순자산</div></div>'
+                    f'<div style="flex:1;min-width:120px;">'
+                    f'<div style="font-size:0.64rem;color:{FAINT};font-weight:700;">경쟁 구도</div>'
+                    f'<div style="font-size:0.86rem;font-weight:800;color:{INK};margin-top:2px;">'
+                    f'{_lead}</div>'
+                    f'<div style="font-size:0.68rem;color:{MUTED};">{d["유형요약"]}</div></div>'
+                    f'<div style="flex:1;min-width:120px;">'
+                    f'<div style="font-size:0.64rem;color:{FAINT};font-weight:700;">시장 신호</div>'
+                    f'<div style="font-size:0.86rem;font-weight:800;color:{INK};margin-top:2px;">'
+                    f'{d["국면"] or "국면 미상"}</div>'
+                    f'<div style="font-size:0.68rem;color:{MUTED};">{d["신호설명"]}</div></div></div>'
+                    # 판정 근거 + 차별화 각도
+                    f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.6;margin-top:10px;">'
+                    f'<b style="color:{_c};">{d["타이밍"]}</b> — {d["타이밍설명"]}</div>'
+                    f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.6;margin-top:6px;">'
+                    f'<b style="color:{INK};">차별화 각도</b> — {d["차별화"]}</div>'
+                    + (f'<div style="font-size:0.68rem;color:{FAINT};margin-top:8px;">'
+                       f'경쟁 상품 · {" / ".join(d["경쟁상품"][:4])}</div>'
+                       if d.get("경쟁상품") else "")
+                    + '</div>', unsafe_allow_html=True)
+            st.caption(
+                f'시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
+                f'{D.GAP_MARKET_VIABLE:,.0f}억 미만이면 만들어도 모일 시장이 아니라 제외합니다'
+                + (f' (제외 {_n_gap - len(gap_details)}건 — {_gap_dropped})' if _gap_dropped else "")
+                + f'. {gap_ctx["기준"] if gap_ctx else ""} · 신규 상장이 있을 때만 바뀝니다.')
         else:
-            st.markdown(f'<div class="card"><div style="font-size:0.82rem;color:{GRAY};">'
-                        f'라인업 공백 계산 불가 — 배치 실행 후 표시됩니다.</div></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="card"><div style="font-size:0.82rem;color:{MUTED};line-height:1.6;">'
+                + (f'공백 {_n_gap}건 모두 출시 기준에 못 미칩니다 — {_gap_dropped}.'
+                   if _n_gap else '라인업 공백 계산 불가 — 배치 실행 후 표시됩니다.')
+                + '</div></div>', unsafe_allow_html=True)
     st.write("")
 
     # ══════════ DiD 요약 ══════════

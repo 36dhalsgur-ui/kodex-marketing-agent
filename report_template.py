@@ -290,47 +290,40 @@ def render_report(ctx: dict) -> str:
                 '<p class="note">확산 전환이 임박했거나 큰손이 조용히 매집 중이고, 순자산이 '
                 '집행 하한을 넘는 섹터만 올린다. 규모 미달·관찰 섹터는 제외했다.</p>')
 
-    # 05-C 신규 출시 후보
-    gp = ctx.get("gap")
+    # 05-C 신규 출시 후보 — 검토 대상 전부를 상세 제안으로 (1건만 상세하면 나머지는 판단이 안 선다)
+    _details = ctx.get("gap_details") or ([ctx["gap"]] if ctx.get("gap") else [])
     gap_html = ""
-    if gp:
+    if _details:
         chips = "".join(f"<span>{_esc(c)}</span>" for c in
                         ["추종 지수 존재 확인", "구성종목 선정", "분산요건 · 단일종목 상한", "환헤지 · 보수 구조"])
-        gap_html = (
-            f'<div class="blk-label" style="margin-top:20px;"><i class="blk-c">C</i> 신규 출시 후보 — 라인업 공백 상세</div>'
-            f'<div class="proposal"><div class="prop-head"><div>'
-            f'<div class="prop-kicker">신규 상품 후보 · 상세 제안</div>'
-            f'<div class="prop-name">{_esc(gp["가칭"])} <em>(가칭)</em></div></div>'
-            f'<div class="prop-timing">출시 타이밍 <b>{_esc(gp["타이밍"])}</b><br>{_esc(gp["타이밍설명"])}</div></div>'
-            f'<div class="prop-grid">'
-            f'<div class="prop-cell"><div class="pc-k">라인업 공백</div>'
-            f'<div class="pc-v">KODEX 미보유 · 경쟁 {gp["경쟁사수"]}종</div>'
-            f'<div class="pc-d">테마×기초시장({_esc(gp["테마"])}·{_esc(gp["시장"])}) 기준</div></div>'
-            f'<div class="prop-cell"><div class="pc-k">경쟁 구도</div>'
-            f'<div class="pc-v">{_esc(gp["유형요약"])}</div>'
-            f'<div class="pc-d">{_esc(" · ".join(gp["경쟁상품"][:3]))}</div></div>'
-            f'<div class="prop-cell"><div class="pc-k">시장 신호</div>'
-            f'<div class="pc-v">{_esc(gp["테마"])} 국면 {_esc(gp["국면"] or "미상")}</div>'
-            f'<div class="pc-d">{_esc(gp["신호설명"])}</div></div></div>'
-            f'<div class="prop-angle"><b>차별화 각도 —</b> {_esc(gp["차별화"])}</div>'
-            f'<div class="prop-verify"><span class="pv-label">담당자 검증 필요</span>{chips}</div></div>')
-        # 1순위 상세 뒤에 공백 전체를 붙인다 — 나머지 후보도 같은 자리에서 검토되게
-        _gs = ctx.get("gaps_all") or []
-        if len(_gs) > 1:
-            _r = "".join(
-                f'<tr><td>{"<b>" if g["판정"] == "출시 검토" else ""}{_esc(g["판정"])}'
-                f'{"</b>" if g["판정"] == "출시 검토" else ""}</td>'
-                f'<td>{_esc(g["테마"])} × {_esc(g["시장"])}</td>'
-                f'<td class="num">{f"{g["시장규모억"]:,.0f}억" if g["시장규모억"] else "—"}</td>'
-                f'<td>{_esc(g["근거"])}</td></tr>'
-                for g in _gs)
+        gap_html = (f'<div class="blk-label" style="margin-top:20px;"><i class="blk-c">C</i> '
+                    f'신규 출시 후보 — 검토 대상 {len(_details)}건 상세</div>')
+        for gp in _details:
+            _mk = f'{gp["시장규모억"]:,.0f}억' if gp.get("시장규모억") else "—"
+            _lead = (f'{gp["1위"]} {gp["점유율"]:.0%}'
+                     if gp.get("1위") and gp.get("점유율") else _esc(gp["유형요약"]))
             gap_html += (
-                '<table class="mini"><thead><tr><th>판정</th><th>테마 × 기초시장</th>'
-                '<th class="num">시장 규모</th><th>근거</th></tr></thead>'
-                f'<tbody>{_r}</tbody></table>'
-                '<p class="note">시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
-                '공백이라고 다 채울 일이 아니라 출시 후 모을 수 있는지를 본다 — '
-                '모일 시장이 아닌 공백은 제외했다.</p>')
+                f'<div class="proposal"><div class="prop-head"><div>'
+                f'<div class="prop-kicker">신규 상품 후보 · 상세 제안</div>'
+                f'<div class="prop-name">{_esc(gp["가칭"])} <em>(가칭)</em></div></div>'
+                f'<div class="prop-timing">출시 판정 <b>{_esc(gp["타이밍"])}</b><br>'
+                f'{_esc(gp["타이밍설명"])}</div></div>'
+                f'<div class="prop-grid">'
+                f'<div class="prop-cell"><div class="pc-k">시장 규모</div>'
+                f'<div class="pc-v">{_mk}</div>'
+                f'<div class="pc-d">경쟁 {gp["경쟁사수"]}종이 그 테마에서 모은 순자산 합계</div></div>'
+                f'<div class="prop-cell"><div class="pc-k">경쟁 구도</div>'
+                f'<div class="pc-v">{_esc(_lead)}</div>'
+                f'<div class="pc-d">{_esc(gp["유형요약"])} · '
+                f'{_esc(" / ".join(gp.get("경쟁상품", [])[:3]))}</div></div>'
+                f'<div class="prop-cell"><div class="pc-k">시장 신호</div>'
+                f'<div class="pc-v">{_esc(gp["테마"])} 국면 {_esc(gp["국면"] or "미상")}</div>'
+                f'<div class="pc-d">{_esc(gp["신호설명"])}</div></div></div>'
+                f'<div class="prop-angle"><b>차별화 각도 —</b> {_esc(gp["차별화"])}</div>'
+                f'<div class="prop-verify"><span class="pv-label">담당자 검증 필요</span>{chips}</div></div>')
+        gap_html += ('<p class="note">시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
+                     '공백이라고 다 채울 일이 아니라 출시 후 모을 수 있는지를 본다 — '
+                     '모일 시장이 아닌 공백은 제외했다.</p>')
 
     return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <title>KODEX 주간 마케팅 리포트 — {_esc(ctx['week'])}</title>
