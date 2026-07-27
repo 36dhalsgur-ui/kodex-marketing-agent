@@ -454,22 +454,33 @@ def sub_header(no: str, title: str, desc: str = ""):
     )
 
 
-def criteria_list(title: str, items: list[tuple[str, str]], footer: str = "") -> str:
+def _crit_label(text: str) -> str:
+    return (f'<div style="font-size:0.66rem;letter-spacing:.08em;color:{FAINT};'
+            f'font-weight:700;margin-bottom:8px;">{text}</div>')
+
+
+def criteria_list(title: str, items: list[tuple[str, str]], footer: str = "",
+                  intro: tuple[str, str] | None = None) -> str:
     """AND 조건을 번호 매긴 목록으로 — 산문으로 쓰면 '셋 다 충족'이 안 보인다.
 
-    items = [(기준, 이유)] · footer는 구분선 아래 보조 설명."""
+    items  = [(기준, 이유)] — 이유는 기준 아래 줄에 붙는다(길어도 읽힌다).
+    intro  = (소제목, 본문 HTML) — 목록 앞에 두는 용어 정의.
+    footer = 구분선 아래 보조 설명."""
+    head = ""
+    if intro:
+        head = (_crit_label(intro[0])
+                + f'<div style="color:{MUTED};line-height:1.65;margin-bottom:14px;">'
+                  f'{intro[1]}</div>')
     rows = "".join(
-        f'<div style="display:flex;gap:9px;margin-bottom:6px;line-height:1.5;">'
+        f'<div style="display:flex;gap:10px;margin-bottom:11px;line-height:1.6;">'
         f'<span style="color:{FAINT};min-width:13px;">{i}</span>'
-        f'<span><b style="color:{INK};">{k}</b>'
-        + (f' <span style="color:{MUTED};">— {why}</span>' if why else "")
-        + '</span></div>'
+        f'<div><b style="color:{INK};">{k}</b>'
+        + (f'<div style="color:{MUTED};">{why}</div>' if why else "")
+        + '</div></div>'
         for i, (k, why) in enumerate(items, 1))
-    foot = (f'<div style="margin-top:9px;padding-top:8px;border-top:1px solid {LINE};'
-            f'color:{MUTED};">{footer}</div>' if footer else "")
-    return (f'<div style="font-size:0.78rem;">'
-            f'<div style="font-size:0.66rem;letter-spacing:.08em;color:{FAINT};'
-            f'font-weight:700;margin-bottom:8px;">{title}</div>{rows}{foot}</div>')
+    foot = (f'<div style="margin-top:12px;padding-top:10px;border-top:1px solid {LINE};'
+            f'color:{MUTED};line-height:1.6;">{footer}</div>' if footer else "")
+    return (f'<div style="font-size:0.78rem;">{head}{_crit_label(title)}{rows}{foot}</div>')
 
 
 def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
@@ -2482,14 +2493,41 @@ with tab_report:
                 + '</div>',
                 unsafe_allow_html=True)
             # 기준은 매번 읽을 것이 아니라 확인할 것 — 접어 둔다
+            _hurdle = D.AUM_MARKETABLE
             with st.expander("착수 판정 기준"):
                 st.markdown(
-                    criteria_list("착수 기준 — 셋 다 충족해야", [
-                        (f"순자산 {D.AUM_MARKETABLE:,.0f}억 이상", "캠페인비를 회수할 수 있는 규모"),
-                        (f"확산 전환 임박",
-                         f"모멘텀 {D.EMERGING_MOM_STRONG:.0f} 이상 · 평균선 근접"),
-                        ("외국인·연기금 이탈 없음", "가격만 오른 반등을 배제"),
-                    ], "하나라도 어긋나면 <b>선점 검토</b> — 소재만 준비하고 집행은 보류합니다."),
+                    criteria_list(
+                        "착수 기준 — 셋 다 충족해야",
+                        [
+                            (f"순자산 {_hurdle:,.0f}억 이상",
+                             f"운용보수는 순자산에 비례합니다. 총보수 0.15~0.45%면 "
+                             f"{_hurdle:,.0f}억에서 연 {_hurdle*0.0015:.1f}~{_hurdle*0.0045:.1f}억이고, "
+                             f"캠페인으로 순자산을 50% 키워도 증분은 "
+                             f"연 {_hurdle*0.00075:.1f}~{_hurdle*0.00225:.1f}억입니다. "
+                             f"이보다 작으면 캠페인비를 회수하기 어렵습니다."),
+                            (f"확산 전환 임박 — RS모멘텀 {D.EMERGING_MOM_STRONG:.0f} 이상, "
+                             f"RS수준 {D.EMERGING_NEAR_CROSS:.0f} 이상",
+                             "RS수준이 0을 넘는 순간 확산기가 되므로 "
+                             f"{D.EMERGING_NEAR_CROSS:.0f}은 그 직전 구간입니다. "
+                             "콘텐츠 제작에 2~4주가 걸려, 확산기에 들어간 뒤 시작하면 "
+                             "수요가 가장 큰 시기를 놓칩니다."),
+                            ("외국인·연기금 13주 순매수가 마이너스가 아닐 것",
+                             "가격은 오르는데 기관 자금이 빠지는 구간은 되돌림일 수 있습니다. "
+                             "개인 매수만으로 오른 국면에 예산을 넣으면 캠페인 도중 국면이 꺾입니다."),
+                        ],
+                        footer=("하나라도 어긋나면 <b>선점 검토</b>로 내려 소재만 준비하고 "
+                                "집행은 보류합니다.<br>①이 안 되면 <b>규모 미달</b>, "
+                                "KODEX 상품이 없으면 <b>상품 없음</b>으로 분류해 "
+                                "신규 출시 검토로 넘깁니다."),
+                        intro=("먼저 — 두 지표가 무엇인가",
+                               f'섹터의 <b style="color:{INK};">상대강도(RS)</b> = 섹터지수 ÷ KRX300. '
+                               "시장보다 잘 가는지를 봅니다.<br>"
+                               f'<b style="color:{INK};">RS수준</b>은 그 RS가 26주 평균보다 몇 % '
+                               f'위인지입니다. <b style="color:{INK};">0을 넘으면 확산기</b>로 '
+                               "판정하므로, 0에 가까울수록 전환이 가깝습니다.<br>"
+                               f'<b style="color:{INK};">RS모멘텀</b>은 RS의 4주 평균이 12주 평균보다 '
+                               "몇 % 높은지입니다. 값이 클수록 상대강도가 "
+                               f'<b style="color:{INK};">빠르게 개선되는 중</b>이라는 뜻입니다.')),
                     unsafe_allow_html=True)
         else:
             st.markdown(
@@ -2566,18 +2604,30 @@ with tab_report:
                     unsafe_allow_html=True)
             with st.expander("출시 판정 기준"):
                 st.markdown(
-                    criteria_list("출시 검토 기준 — 셋 다 충족해야", [
-                        (f"시장 규모 {D.GAP_MARKET_VIABLE:,.0f}억 이상",
-                         "경쟁사가 그 테마에서 실제로 모은 순자산 합계"),
-                        (f"1위 점유율 {D.GAP_DOMINANCE:.0%} 미만",
-                         "이미 굳은 판이면 후발이 뺏기 어렵다"),
-                        ("국면이 과열·쇠퇴가 아님", "지금 내면 늦다"),
-                    ], "선발이 <b>1~2곳뿐</b>이면 규모만으로 판단할 수 없어 따로 가릅니다 — "
-                       "이미 돈이 모였으면 <b>선점 기회</b>, 아니면 <b>시장 미검증</b>."),
+                    criteria_list(
+                        "출시 검토 기준 — 셋 다 충족해야",
+                        [
+                            (f"시장 규모 {D.GAP_MARKET_VIABLE:,.0f}억 이상",
+                             "그 테마의 경쟁사 ETF 순자산을 모두 더한 값으로, 시장에 실제로 모인 "
+                             f"돈입니다. 경쟁사 전체가 {D.GAP_MARKET_VIABLE:,.0f}억을 못 모았다면 "
+                             "후발로 진입해 확보할 몫은 그보다 작아 상장·운용 고정비를 "
+                             "감당하기 어렵습니다."),
+                            (f"1위 점유율 {D.GAP_DOMINANCE:.0%} 미만",
+                             "ETF는 거래량이 많을수록 호가 스프레드가 좁아지고, 그것이 다시 "
+                             "거래량을 부릅니다. 선발이 과반을 넘긴 시장에서는 같은 지수를 "
+                             "추종하는 후발 상품이 점유율을 가져오기 어렵습니다."),
+                            ("국면이 과열기·쇠퇴기가 아닐 것",
+                             "지수 산출과 상장 승인에 수개월이 걸립니다. 이미 과열·쇠퇴 국면인 "
+                             "테마는 상장 시점에 수요가 빠진 뒤일 가능성이 큽니다."),
+                        ],
+                        footer=("선발이 <b>1~2곳뿐</b>인 테마는 규모만으로 판단할 수 없습니다. "
+                                "아직 아무도 못 키운 시장인지, 이제 열리는 시장인지가 갈리기 "
+                                "때문입니다 — 이미 돈이 모였으면 <b>선점 기회</b>, 그렇지 않으면 "
+                                "<b>시장 미검증</b>으로 둡니다.")),
                     unsafe_allow_html=True)
                 st.caption(
-                    "경쟁사가 한 곳도 없는 테마는 이 방식으로 탐지되지 않습니다 — "
-                    "공백은 '경쟁사는 있는데 KODEX만 없는' 테마로 정의합니다.  \n"
+                    "공백은 '경쟁사는 있는데 KODEX만 없는' 테마로 정의합니다. 따라서 아무도 "
+                    "출시하지 않은 테마는 이 방식으로 탐지되지 않습니다.  \n"
                     + (gap_ctx["기준"] if gap_ctx else "") + " · 신규 상장이 있을 때만 바뀝니다.")
         else:
             st.markdown(
