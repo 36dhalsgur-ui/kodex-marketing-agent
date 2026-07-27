@@ -14,7 +14,24 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-PY="${PYTHON_BIN:-python3}"
+# launchd는 PATH가 최소('/usr/bin:/bin:...')라 Homebrew·Framework 파이썬이 빠진다.
+# PATH에 기대지 말고 배치에 필요한 패키지가 실제로 있는 인터프리터를 고른다.
+resolve_python() {
+    local cands=("${PYTHON_BIN:-}" python3
+        /Library/Frameworks/Python.framework/Versions/Current/bin/python3
+        /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3)
+    for c in "${cands[@]}"; do
+        [ -n "$c" ] || continue
+        if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import pandas, requests' >/dev/null 2>&1; then
+            echo "$c"; return 0
+        fi
+    done
+    return 1
+}
+PY="$(resolve_python)" || {
+    echo "✗ pandas·requests가 설치된 python3을 찾지 못했습니다." >&2
+    exit 1
+}
 log() { printf '[%s] %s\n' "$(date '+%m-%d %H:%M:%S')" "$*"; }
 
 if [ -z "${KRX_ID:-}" ] || [ -z "${KRX_PW:-}" ]; then
@@ -22,7 +39,7 @@ if [ -z "${KRX_ID:-}" ] || [ -z "${KRX_PW:-}" ]; then
     exit 1
 fi
 
-log "주간 배치 시작"
+log "주간 배치 시작 (python: $PY)"
 failed=()
 for s in weekly_batch etf_batch channel_batch sector_universe; do
     log "▶ $s"

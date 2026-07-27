@@ -8,26 +8,39 @@
 
   즉시 테스트:
     launchctl start com.kodex.weekly-batch
-    tail -f "/Users/dhalsgur36/Desktop/AI Agent/logs/weekly-batch.log"
+    tail -f "/Users/dhalsgur36/kodex-agent/logs/weekly-batch.log"
 
   해제:
     launchctl unload ~/Library/LaunchAgents/com.kodex.weekly-batch.plist
 
   ※ 지정 시각에 Mac이 꺼져 있으면 건너뛰고, 잠자기 상태였다면 깨어난 직후 실행된다.
   ※ KRX_ID/KRX_PW는 ~/.zshrc에서 읽는다 — plist에 비밀번호를 적지 않는다.
+  ※ 프로젝트를 ~/Desktop·~/Documents·~/Downloads로 옮기면 안 된다.
+     macOS TCC가 보호 폴더로 막아 launchd가 "Operation not permitted"로 실패한다
+     (터미널은 이미 권한이 있어 수동 실행만 되는 탓에 원인을 찾기 어렵다).
 -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
     <string>com.kodex.weekly-batch</string>
 
-    <!-- 로그인 셸을 거쳐야 ~/.zshrc의 KRX_ID/KRX_PW가 들어온다 -->
+    <!-- ~/.zshrc를 명시적으로 읽어야 KRX_ID/KRX_PW가 들어온다.
+         zsh -lc는 "로그인이지만 비대화형"이라 ~/.zshrc를 읽지 않는다
+         (zsh는 .zshrc를 대화형 셸에서만 읽는다). -l만 믿으면 조용히 빈 값이 된다. -->
     <key>ProgramArguments</key>
     <array>
         <string>/bin/zsh</string>
-        <string>-lc</string>
-        <string>cd "$HOME/Desktop/AI Agent" &amp;&amp; ./scripts/run_weekly.sh</string>
+        <string>-c</string>
+        <string>source "$HOME/.zshrc" &gt;/dev/null 2&gt;&amp;1; cd "$HOME/kodex-agent" &amp;&amp; ./scripts/run_weekly.sh</string>
     </array>
+
+    <!-- launchd의 PATH는 최소라 python3이 시스템 것으로 잡힌다(pandas 없음).
+         스크립트에도 자동 탐색 폴백이 있지만, 여기서 못박는 편이 빠르고 확실하다. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHON_BIN</key>
+        <string>/Library/Frameworks/Python.framework/Versions/3.12/bin/python3</string>
+    </dict>
 
     <key>StartCalendarInterval</key>
     <dict>
@@ -37,9 +50,9 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/dhalsgur36/Desktop/AI Agent/logs/weekly-batch.log</string>
+    <string>/Users/dhalsgur36/kodex-agent/logs/weekly-batch.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/dhalsgur36/Desktop/AI Agent/logs/weekly-batch.log</string>
+    <string>/Users/dhalsgur36/kodex-agent/logs/weekly-batch.log</string>
 
     <key>RunAtLoad</key>
     <false/>
