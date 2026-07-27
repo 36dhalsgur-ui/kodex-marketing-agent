@@ -1,5 +1,5 @@
 {
-  "asof": "2026-07-23",
+  "asof": "2026-07-27",
   "brands": [
     {
       "브랜드": "KODEX",
@@ -65,9 +65,9 @@
           "슬롯수": 1
         },
         {
-          "제목": "신규상장(6/23) KODEX 전고체배터리ESS TOP2플러스 ETF (종목코드 : 0209D0) 2차전지는 가고 이제 전고체배터리 시대! 신규",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFV7",
-          "NEW": false,
+          "제목": "상품안내 KODEX 차이나AI반도체TOP10 ETF (종목코드 : 0162L0) 중국의 거대 자본과 AI전략의 시너지 신규상장(6/23) KOD",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFU2",
+          "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -155,12 +155,12 @@
           "제목": "[ETF 포트폴리오] 2026년 3분기 ETF 포트폴리오",
           "링크": "https://investments.miraeasset.com/tigeretf/ko/insight/etf-insight/view.do?listCnt=8&pageIndex=1&detailsKey=705&q=",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "슬롯수": 1
         },
         {
-          "제목": "[New ETF] TIGER 미국테크 NYSE100액티브",
+          "제목": "[하반기 전망] TIGER 미국 S&P500 TIGER 미국 나스닥100",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
           "NEW": true,
@@ -168,7 +168,7 @@
           "슬롯수": 1
         },
         {
-          "제목": "[액티브 ETF] TIGER 코스닥액티브",
+          "제목": "[액티브 ETF] TIGER 미국테크 NYSE100액티브",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
           "NEW": true,
@@ -179,7 +179,7 @@
           "제목": "[월배당 ETF] TIGER 배당커버드콜액티브",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
@@ -187,7 +187,7 @@
           "제목": "[이벤트] 글로벌 반도체 ETF 매수인증 이벤트",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
         }
