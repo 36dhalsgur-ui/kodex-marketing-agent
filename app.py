@@ -454,6 +454,24 @@ def sub_header(no: str, title: str, desc: str = ""):
     )
 
 
+def criteria_list(title: str, items: list[tuple[str, str]], footer: str = "") -> str:
+    """AND 조건을 번호 매긴 목록으로 — 산문으로 쓰면 '셋 다 충족'이 안 보인다.
+
+    items = [(기준, 이유)] · footer는 구분선 아래 보조 설명."""
+    rows = "".join(
+        f'<div style="display:flex;gap:9px;margin-bottom:6px;line-height:1.5;">'
+        f'<span style="color:{FAINT};min-width:13px;">{i}</span>'
+        f'<span><b style="color:{INK};">{k}</b>'
+        + (f' <span style="color:{MUTED};">— {why}</span>' if why else "")
+        + '</span></div>'
+        for i, (k, why) in enumerate(items, 1))
+    foot = (f'<div style="margin-top:9px;padding-top:8px;border-top:1px solid {LINE};'
+            f'color:{MUTED};">{footer}</div>' if footer else "")
+    return (f'<div style="font-size:0.78rem;">'
+            f'<div style="font-size:0.66rem;letter-spacing:.08em;color:{FAINT};'
+            f'font-weight:700;margin-bottom:8px;">{title}</div>{rows}{foot}</div>')
+
+
 def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
     """차트도 타이포와 같은 수준으로 다듬는다 — 옅은 그리드, 축 라벨 축소, 제목 정렬."""
     fig.update_layout(
@@ -2193,6 +2211,10 @@ with tab_report:
     _uni_r = universe_frame(netbuy_df)
 
     from collections import Counter as _C
+    # 주간 리포트의 주차는 '이번 주'다. event_week는 ③에서 고른 캠페인의 개입
+    # 주차라서, 6월에 시작한 이벤트를 고르면 7월 리포트가 6월로 찍혔다.
+    # DiD 예시만 캠페인별 주차를 쓰고, 리포트 본문은 분석 주차를 따른다.
+    report_week = sel_week
     stage_ct = dict(_C(r.get("단계", "관망") for r in rep_board))
     ret_rows = sorted([r for r in rep_board if r.get("주간수익률") is not None],
                       key=lambda r: r["주간수익률"])
@@ -2203,7 +2225,7 @@ with tab_report:
     regime = "쇠퇴 우위 시장" if n_dec >= n_sectors / 2 else "혼조 시장"
 
     # 현재 마케팅 점검
-    review = D.review_current_marketing(rep_events, rep_board, netbuy_df, event_week)
+    review = D.review_current_marketing(rep_events, rep_board, netbuy_df, report_week)
     n_cut = sum(1 for r in review if r["판정"] == "축소")
     n_keep = sum(1 for r in review if r["판정"].startswith("지속"))
     review_read = (
@@ -2221,7 +2243,7 @@ with tab_report:
     # 자금 상위
     flow_top = []
     if netbuy_live:
-        _w = netbuy_df[netbuy_df["주차"] == event_week].dropna(subset=["매수강도"])
+        _w = netbuy_df[netbuy_df["주차"] == report_week].dropna(subset=["매수강도"])
         _w = _w[_w["매수강도"] < 40]                      # 신규상장 왜곡 제외
         flow_top = [(r["종목명"], r["매수강도"]) for _, r in _w.nlargest(4, "매수강도").iterrows()]
 
@@ -2338,7 +2360,7 @@ with tab_report:
         gap_ctx = gap_details[0]
 
     ctx = {
-        "week": event_week, "asof": _sb_all.get("asof", ""), "issued": dt.date.today().isoformat(),
+        "week": report_week, "asof": _sb_all.get("asof", ""), "issued": dt.date.today().isoformat(),
         "n_sectors": n_sectors, "n_kodex": len(kodex_list(netbuy_df)),
         "stage_counts": stage_ct, "regime": regime,
         "bench_ret": _sb_all.get("벤치주간수익률"),
@@ -2357,7 +2379,7 @@ with tab_report:
         f'<div style="background:linear-gradient(135deg,#16244D,#1F3A6E);border-radius:12px;'
         f'padding:20px 24px;color:#fff;">'
         f'<div style="font-size:0.66rem;letter-spacing:.16em;font-weight:700;opacity:.75;">'
-        f'WEEKLY SYNTHESIS · {event_week}</div>'
+        f'WEEKLY SYNTHESIS · {report_week}</div>'
         f'<div style="font-size:0.95rem;line-height:1.75;margin-top:8px;">{_lead}</div></div>',
         unsafe_allow_html=True)
     st.write("")
@@ -2454,14 +2476,21 @@ with tab_report:
                     f'margin-top:4px;padding-left:73px;">{e["근거"]}</div></div>')
             st.markdown(
                 f'<div class="card" style="padding:6px 18px 12px;">{_rows}'
-                f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
-                f'<b>착수</b>는 순자산이 집행 하한 {D.AUM_MARKETABLE:,.0f}억을 넘고, 확산 전환이 '
-                f'임박했으며(모멘텀 {D.EMERGING_MOM_STRONG:.0f} 이상 + 평균선 근접), '
-                f'외국인·연기금 자금이 빠지지 않는 섹터만 올립니다. 셋 중 하나라도 어긋나면 '
-                f'<b>선점 검토</b>로 내려 소재만 준비합니다 — 캠페인비는 되돌릴 수 없습니다.'
-                + (f'<br>제외 {_n_em - len(emerging_all)}개 — {_em_dropped}' if _em_dropped else "")
-                + '</div></div>',
+                + (f'<div style="font-size:0.7rem;color:{FAINT};margin-top:8px;">'
+                   f'제외 {_n_em - len(emerging_all)}개 — {_em_dropped}</div>'
+                   if _em_dropped else "")
+                + '</div>',
                 unsafe_allow_html=True)
+            # 기준은 매번 읽을 것이 아니라 확인할 것 — 접어 둔다
+            with st.expander("착수 판정 기준"):
+                st.markdown(
+                    criteria_list("착수 기준 — 셋 다 충족해야", [
+                        (f"순자산 {D.AUM_MARKETABLE:,.0f}억 이상", "캠페인비를 회수할 수 있는 규모"),
+                        (f"확산 전환 임박",
+                         f"모멘텀 {D.EMERGING_MOM_STRONG:.0f} 이상 · 평균선 근접"),
+                        ("외국인·연기금 이탈 없음", "가격만 오른 반등을 배제"),
+                    ], "하나라도 어긋나면 <b>선점 검토</b> — 소재만 준비하고 집행은 보류합니다."),
+                    unsafe_allow_html=True)
         else:
             st.markdown(
                 f'<div class="card"><div style="font-size:0.82rem;color:{MUTED};line-height:1.6;">'
@@ -2530,16 +2559,26 @@ with tab_report:
                 with st.expander(f"더보기 {len(_rest)}건"):
                     for d in _rest:
                         st.markdown(_gap_card(d), unsafe_allow_html=True)
-            st.markdown(
-                f'<div style="font-size:0.72rem;color:{FAINT};line-height:1.65;margin-top:4px;">'
-                f'시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
-                f'시장 규모가 {D.GAP_MARKET_VIABLE:,.0f}억 미만이면 시장성이 부족하다고 판단해 제외합니다'
-                + (f' (제외 {_n_gap - len(gap_details)}건 — {_gap_dropped})' if _gap_dropped else "")
-                + '.<br>선발이 1~2곳뿐인 테마는 시장 규모만으로 판단할 수 없어 따로 가릅니다 — '
-                + '이미 돈이 모였으면 <b>선점 기회</b>, 그렇지 않으면 <b>시장 미검증</b>. '
-                + '경쟁사가 한 곳도 없는 테마는 이 방식으로 탐지되지 않습니다.<br>'
-                + f'{gap_ctx["기준"] if gap_ctx else ""} · 신규 상장이 있을 때만 바뀝니다.</div>',
-                unsafe_allow_html=True)
+            if _gap_dropped:
+                st.markdown(
+                    f'<div style="font-size:0.72rem;color:{FAINT};margin-top:4px;">'
+                    f'제외 {_n_gap - len(gap_details)}건 — {_gap_dropped}</div>',
+                    unsafe_allow_html=True)
+            with st.expander("출시 판정 기준"):
+                st.markdown(
+                    criteria_list("출시 검토 기준 — 셋 다 충족해야", [
+                        (f"시장 규모 {D.GAP_MARKET_VIABLE:,.0f}억 이상",
+                         "경쟁사가 그 테마에서 실제로 모은 순자산 합계"),
+                        (f"1위 점유율 {D.GAP_DOMINANCE:.0%} 미만",
+                         "이미 굳은 판이면 후발이 뺏기 어렵다"),
+                        ("국면이 과열·쇠퇴가 아님", "지금 내면 늦다"),
+                    ], "선발이 <b>1~2곳뿐</b>이면 규모만으로 판단할 수 없어 따로 가릅니다 — "
+                       "이미 돈이 모였으면 <b>선점 기회</b>, 아니면 <b>시장 미검증</b>."),
+                    unsafe_allow_html=True)
+                st.caption(
+                    "경쟁사가 한 곳도 없는 테마는 이 방식으로 탐지되지 않습니다 — "
+                    "공백은 '경쟁사는 있는데 KODEX만 없는' 테마로 정의합니다.  \n"
+                    + (gap_ctx["기준"] if gap_ctx else "") + " · 신규 상장이 있을 때만 바뀝니다.")
         else:
             st.markdown(
                 f'<div class="card"><div style="font-size:0.82rem;color:{MUTED};line-height:1.6;">'
