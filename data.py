@@ -1440,8 +1440,12 @@ def dedupe_campaigns(events: list[dict]) -> list[dict]:
         rep["감지건수"] = len(evs)
         if len(chans) > 1:
             rep["근거"] = f'{rep.get("근거", "")} · {len(chans)}개 채널 동시'.strip(" ·")
+        # 정렬 기준은 '언제 시작했나'가 아니라 '얼마나 밀고 있나'.
+        # 날짜로 정렬하면 블로그 글 한 건이 기간 고지된 신규상장 이벤트를 앞선다.
+        # (배너는 게시일이 없어 수집일이 붙으므로 날짜 정렬에 특히 취약하다.)
+        rep["집행강도"] = len(chans) * 10 + (5 if board else 0) + min(len(evs), 4)
         out.append(rep)
-    out.sort(key=lambda e: e.get("date") or "", reverse=True)
+    out.sort(key=lambda e: (e["집행강도"], e.get("date") or ""), reverse=True)
     return out
 
 
