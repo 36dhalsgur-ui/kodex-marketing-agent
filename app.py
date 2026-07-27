@@ -877,49 +877,39 @@ with tab_home:
     # 예전에는 태동 섹터를 전부 나열하고 "선점 콘텐츠 검토 대상"이라고 했는데,
     # 리포트는 같은 주에 "착수 1건, 나머지 규모 미달"이라고 판정했다.
     # 홈에서 5개라고 본 사람이 리포트에서 1개를 보면 어느 쪽을 믿어야 할지 모른다.
-    _lead_parts = [
-        f'{_hn}개 섹터 중 <b>{_hdec}개가 쇠퇴 국면</b>입니다.'
-    ]
+    #
+    # 쇠퇴 개수를 앞세우지 않는다 — 마케터가 소재를 붙일 곳은 태동·확산·과열이고,
+    # 쇠퇴 몇 개인지는 바로 아래 '시장 국면' 카드에 이미 있다. 리드는 두 문장만.
+    _hact_n = sum(_hstage.get(s, 0) for s in ("태동기", "확산기", "과열기"))
+    _hmix = " · ".join(f'{s[:2]} {_hstage[s]}' for s in ("태동기", "확산기", "과열기")
+                       if _hstage.get(s))
+    _lead_parts = [f'마케팅 사정권은 <b>{_hact_n}개 섹터</b>입니다 — {_hmix}.'
+                   if _hact_n else f'{_hn}개 섹터 모두 쇠퇴·관망이라 밀 곳이 없습니다.']
     if _hbench is not None:
-        # '주간 -9.6%'는 섹터명처럼 읽혀서 '한 주 동안'으로 풀어 쓴다
-        _lead_parts.append(
-            f'시장 대표 지수(KRX300)는 한 주 동안 <b>{_hbench:+.1f}%</b> 움직였습니다.')
-    if _hdn is not None:
-        _lead_parts.append(
-            f'{D._ga(_hdn["섹터"])} <b>{_hdn["주간수익률"]:+.1f}%</b>로 낙폭이 가장 컸습니다.')
+        _lead_parts.append(f'시장(KRX300)은 한 주 <b>{_hbench:+.1f}%</b>.')
 
     # 시장 상황(앞)과 우리 액션(뒤) 사이에서만 한 번 줄을 바꾼다 — 리포트와 동일
+    # 프로모션(리워드 걸린 판촉)만 앞세운다 — 블로그 소개 글은 '집행 중'이라 말하지 않는다
     _act = []
     if PROMOS:
-        # 프로모션(리워드 걸린 판촉)만 앞세운다 — 블로그 소개 글은 '집행 중'이라 말하지 않는다
-        _cn = PROMOS[0].get("표기명", "")
-        _rest = len(CAMPAIGNS) - len(PROMOS)
-        _act.append(f'프로모션은 <b>{_cn}</b> 등 <b>{len(PROMOS)}종</b>을 집행 중이며, '
-                    + (f'리워드 없는 콘텐츠 푸시가 {_rest}종 더 있습니다.' if _rest else '콘텐츠 푸시는 없습니다.'))
+        _act.append(f'프로모션 <b>{len(PROMOS)}종</b> 집행 중')
     elif CAMPAIGNS:
-        _act.append(f'진행 중인 프로모션은 없고, 콘텐츠 푸시 <b>{len(CAMPAIGNS)}종</b>만 감지됐습니다.')
+        _act.append(f'프로모션 없음 (콘텐츠 푸시 <b>{len(CAMPAIGNS)}종</b>)')
     # 판정을 뭉뚱그리지 않는다 — '착수'와 '선점 검토'는 나가는 돈의 규모가 다르다
     _go_now = [e for e in EMERGING_GO if e["판정"] == "착수"]
     _prep = [e for e in EMERGING_GO if e["판정"] == "선점 검토"]
     if _go_now:
         _n1 = ", ".join(e["섹터"] for e in _go_now)
-        _why = (f' ({_go_now[0]["근거"].split("—")[0].strip()})' if len(_go_now) == 1 else "")
-        _s = f'태동 {len(EMERGING_JUDGED)}개 중 <b>{_n1}</b>{D._ga(_n1)[len(_n1):]} 착수 대상입니다{_why}'
-        if _prep:
-            _n2 = ", ".join(e["섹터"] for e in _prep)
-            _s += f'. {_n2}{D._eun(_n2)[len(_n2):]} 소재만 준비합니다'
-        _act.append(_s + ".")
+        _act.append(f'신규 착수 <b>{_n1}</b>'
+                    + (f' (선점 준비 {", ".join(e["섹터"] for e in _prep)})' if _prep else ""))
     elif _prep:
-        _n2 = ", ".join(e["섹터"] for e in _prep)
-        _act.append(f'태동 {len(EMERGING_JUDGED)}개 중 착수 기준을 넘긴 섹터는 없습니다 — '
-                    f'<b>{_n2}</b>{D._eun(_n2)[len(_n2):]} 소재만 준비하고 집행은 보류합니다.')
+        _act.append(f'신규 착수 대상 없음 — <b>{", ".join(e["섹터"] for e in _prep)}</b>만 소재 준비')
     elif EMERGING_JUDGED:
-        _act.append(f'태동 {len(EMERGING_JUDGED)}개는 모두 착수 기준에 못 미칩니다 '
-                    f'({EMERGING_DROPPED}).')
+        _act.append(f'신규 착수 대상 없음 ({EMERGING_DROPPED})')
     st.markdown(
         f'<div class="home-lead"><div class="hl-k">WEEKLY SNAPSHOT · {sel_week}</div>'
         f'<div class="hl-t">{" ".join(_lead_parts)}'
-        + ("<br>" + " ".join(_act) if _act else "")
+        + ("<br>" + " · ".join(_act) + "." if _act else "")
         + '</div></div>',
         unsafe_allow_html=True)
     st.write("")
@@ -953,10 +943,12 @@ with tab_home:
     # 주인공 — 과열/쇠퇴 국면 요약 (판정의 핵심)
     _hot = [r["섹터"] for r in _hrows if r.get("단계") == "과열기"]
     k1.markdown(
-        f'<div class="kpi2 lead"><div class="k">시장 국면 · 01</div>'
-        f'<div class="v">쇠퇴 {_hdec} / {_hn}</div>'
+        # 마케터가 소재를 붙일 수 있는 국면을 앞에 — 쇠퇴 개수는 보조로 내린다
+        f'<div class="kpi2 lead"><div class="k">마케팅 사정권 · 01</div>'
+        f'<div class="v">{_hact_n} / {_hn}</div>'
         f'<div class="s">태동 {_hstage.get("태동기",0)} · 확산 {_hstage.get("확산기",0)} · '
-        f'과열 {_hstage.get("과열기",0)}{" (" + ", ".join(_hot) + ")" if _hot else ""}</div></div>',
+        f'과열 {_hstage.get("과열기",0)}{" (" + ", ".join(_hot) + ")" if _hot else ""}'
+        f'<br>쇠퇴 {_hdec}</div></div>',
         unsafe_allow_html=True)
     if _hup is not None:
         k2.markdown(
