@@ -661,6 +661,43 @@ def kodex_list(df: pd.DataFrame) -> list[str]:
     return D.kodex_etfs()
 
 
+# ── ②·③·④가 공유하는 분석 파이프라인 ───────────────────────────────
+# 탭마다 따로 계산하면 같은 캠페인이 탭마다 다른 숫자로 나온다.
+# (실측: ③은 상품 5종인데 ④는 같은 상품을 채널 수만큼 세어 5'건' — 그중
+#  2개 상품의 중복이었고, 이벤트 보드를 안 읽어 3개 상품은 아예 빠졌다.)
+# 개선을 한 탭에만 반영하는 사고를 막으려면 진입점이 하나여야 한다.
+
+def kodex_campaigns(ch_data: dict, youtube: dict, blogs: dict,
+                    netbuy_df: pd.DataFrame) -> tuple[list[dict], list[dict]]:
+    """②에서 감지된 KODEX 마케팅 → (전체 이벤트, 캠페인 상품별 1건).
+
+    배너·유튜브·블로그에 더해 이벤트 보드까지 넣는다 — 이벤트는 집행 기간이
+    고지돼 있어 개입 시점을 추정이 아니라 사실로 정할 수 있다."""
+    banners = [dict(b, date=ch_data.get("asof", ""))
+               for br in ch_data.get("brands", []) if br.get("브랜드") == "KODEX"
+               for b in br.get("배너", [])]
+    board = next((b.get("이벤트목록", []) for b in ch_data.get("brands", [])
+                  if b.get("브랜드") == "KODEX"), [])
+    events = D.detect_marketing_events(
+        banners, youtube.get("KODEX", []), blogs.get("KODEX", []),
+        universe=kodex_list(netbuy_df), events_board=board)
+    campaigns = D.dedupe_campaigns([e for e in events if e["유형"] == "캠페인"])
+    return events, campaigns
+
+
+def did_verified(netbuy_df: pd.DataFrame, uni, treat: str, week: str):
+    """평행추세를 검증한 대조군으로 DiD 산출 → (진단표, 채택 대조군, 점수).
+
+    라벨(테마·기초시장)만 맞은 후보를 그대로 쓰면 개입 전에 반대로 움직인
+    종목이 섞여 DiD 부호까지 왜곡된다. 대조군 평균은 순자산 가중."""
+    diag = D.control_diagnostics(netbuy_df, treat, D.control_group(treat, uni), week)
+    controls = D.select_controls(diag)
+    weights = (uni.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
+               if uni is not None and "순자산" in uni.columns else None)
+    score = D.did_score(D.did_series(netbuy_df, treat, controls, weights=weights), week)
+    return diag, controls, score
+
+
 @st.cache_data
 def build_did_board(df: pd.DataFrame, week: str) -> pd.DataFrame:
     """전 KODEX ETF의 금주 DiD 점수 보드."""
@@ -1701,21 +1738,11 @@ with tab_did:
     st.write("")
 
     # ── 마케팅 이벤트 탐지 — 채널 수집물(배너·유튜브·블로그)이 지목한 ETF = 처치
-    _kodex_banners = [
-        dict(b, date=ch_data.get("asof", ""))
-        for br in ch_data.get("brands", []) if br.get("브랜드") == "KODEX"
-        for b in br.get("배너", [])
-    ]
-    # 이벤트 보드는 집행 기간이 명시돼 있어 개입 시점 정의가 가장 정확하다
-    _kodex_events = next((b.get("이벤트목록", []) for b in ch_data.get("brands", [])
-                          if b.get("브랜드") == "KODEX"), [])
-    events = D.detect_marketing_events(
-        _kodex_banners, youtube.get("KODEX", []), blogs.get("KODEX", []),
-        universe=kodex_list(netbuy_df), events_board=_kodex_events)
+    events, _campaigns_dedup = kodex_campaigns(ch_data, youtube, blogs, netbuy_df)
     # 같은 ETF를 여러 채널에 집행하면 채널 수만큼 잡히지만, 순매수 시계열은 하나뿐이라
     # DiD는 상품당 한 번이면 된다. 감지 내역은 아래 목록에 그대로 남긴다.
     campaigns_raw = [e for e in events if e["유형"] == "캠페인"]
-    campaigns = D.dedupe_campaigns(campaigns_raw)
+    campaigns = _campaigns_dedup
     others = [e for e in events if e["유형"] != "캠페인"]
     usable = [e for e in campaigns if e["분석가능"]]
 
@@ -1795,11 +1822,9 @@ with tab_did:
         event_week = weeks_avail[-1]
 
     _uni = universe_frame(netbuy_df)
-    _cands = D.control_group(treat, _uni)
     # 테마·기초시장이 같다는 건 '그럴듯한 이유'일 뿐 검증이 아니다.
     # 개입 이전 구간에서 실제로 나란히 움직였는지 확인하고 그 결과로 채택한다.
-    _diag = D.control_diagnostics(netbuy_df, treat, _cands, event_week)
-    auto_controls = D.select_controls(_diag)
+    _diag, auto_controls, _ = did_verified(netbuy_df, _uni, treat, event_week)
     ctrl_options = (sorted(_uni[_uni["운용사"] != "KODEX"]["종목명"].unique()) if _uni is not None
                     else sorted(n for n, _, i in D.ETF_UNIVERSE if i != "KODEX"))
     controls = st.multiselect(
@@ -2040,11 +2065,8 @@ with tab_report:
         _ch = json.loads((Path(__file__).parent / "data" / "channel_board.json").read_text())
     except Exception:
         _ch = {}
-    _rep_banners = [dict(b, date=_ch.get("asof", "")) for br in _ch.get("brands", [])
-                    if br.get("브랜드") == "KODEX" for b in br.get("배너", [])]
-    rep_events = D.detect_marketing_events(_rep_banners, youtube.get("KODEX", []),
-                                           rep_blogs.get("KODEX", []), universe=kodex_list(netbuy_df))
-    rep_campaigns = [e for e in rep_events if e["유형"] == "캠페인"]
+    # ③과 같은 파이프라인 — 탭마다 따로 계산해 숫자가 어긋나던 것을 없앤다
+    rep_events, rep_campaigns = kodex_campaigns(_ch, youtube, rep_blogs, netbuy_df)
     _week_ago_r = (dt.date.today() - dt.timedelta(days=7)).isoformat()
     _uni_r = universe_frame(netbuy_df)
 
@@ -2083,12 +2105,11 @@ with tab_report:
 
     # DiD 예시 (최근 측정 가능 건)
     did_ctx = None
-    for e in rep_events:
+    for e in rep_campaigns:
         if not e["분석가능"]:
             continue
-        _c = D.control_group(e["ETF"], _uni_r)
         _wk = e["주차"] if e["주차"] in weeks else weeks[-1]
-        _sx = D.did_score(D.did_series(netbuy_df, e["ETF"], _c), _wk)
+        _, _c, _sx = did_verified(netbuy_df, _uni_r, e["ETF"], _wk)
         if _sx.get("did") is not None and _sx.get("score") is not None:
             _z = _sx["z"]
             did_ctx = {
