@@ -752,7 +752,59 @@ def build_did_board(df: pd.DataFrame, week: str) -> pd.DataFrame:
 
 did_board = build_did_board(netbuy_df, sel_week)
 youtube = load_youtube()
+blogs = load_blogs()
 datalab_df, datalab_live = load_datalab(tuple(D.DATALAB_GROUPS))
+
+# ── 탭 공통 분석 — 홈·③·④가 같은 값을 말하도록 한 곳에서 계산한다.
+# 탭마다 따로 구하면 홈은 "태동 5개가 선점 대상", 리포트는 "착수 1건"처럼
+# 같은 주에 서로 다른 결론을 내놓는다(실측).
+_sb_path = Path(__file__).parent / "data" / "signal_board.json"
+try:
+    SIGNAL = json.loads(_sb_path.read_text())
+except Exception:
+    SIGNAL = {}
+BOARD = SIGNAL.get("board", [])
+try:
+    CHANNEL = json.loads((Path(__file__).parent / "data" / "channel_board.json").read_text())
+except Exception:
+    CHANNEL = {}
+
+_ALL_EVENTS, CAMPAIGNS = kodex_campaigns(CHANNEL, youtube, blogs, netbuy_df)
+_UNI = universe_frame(netbuy_df)
+_AUM = (netbuy_df.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
+        if "순자산" in netbuy_df.columns else {})
+REVIEW = D.review_current_marketing(_ALL_EVENTS, BOARD, netbuy_df, sel_week)
+_MARKETED = {D._norm_etf(r["표기명"]) for r in REVIEW}
+
+
+def _marketed_now(kodex_field: str) -> bool:
+    """섹터에 매핑된 KODEX 상품 중 하나라도 집행 중인가 (복수 표기 대응)."""
+    for nm in re.split(r"[·,/]", kodex_field or ""):
+        nm = nm.strip()
+        if not nm:
+            continue
+        key = D._norm_etf(nm if nm.startswith("KODEX") else f"KODEX {nm}")
+        if any(key and key in m for m in _MARKETED):
+            return True
+    return False
+
+
+def _aum_now(kodex_field: str):
+    tot, hit = 0.0, False
+    for nm in re.split(r"[·,/]", kodex_field or ""):
+        nm = nm.strip()
+        if not nm:
+            continue
+        key = D._norm_etf(nm if nm.startswith("KODEX") else f"KODEX {nm}")
+        for k, v in _AUM.items():
+            if D._norm_etf(k) == key and v is not None:
+                tot += float(v); hit = True
+                break
+    return tot if hit else None
+
+
+EMERGING_JUDGED = D.emerging_launch_review(BOARD, _marketed_now, _aum_now)
+EMERGING_GO, EMERGING_DROPPED = D.split_actionable(EMERGING_JUDGED, D.EMERGING_ACTIONABLE)
 
 # ──────────────────────────────────────────────
 # 헤더 + 지수 스트립 (2줄)
@@ -819,7 +871,10 @@ with tab_home:
     _hdn = _hret[0] if _hret else None
     _hemerge = [r["섹터"] for r in _hrows if r.get("단계") == "태동기"]
 
-    # ── 주간 종합 리드 (실데이터 기반 한 문단)
+    # ── 주간 종합 리드 — ④ 리포트와 같은 판정을 쓴다.
+    # 예전에는 태동 섹터를 전부 나열하고 "선점 콘텐츠 검토 대상"이라고 했는데,
+    # 리포트는 같은 주에 "착수 1건, 나머지 규모 미달"이라고 판정했다.
+    # 홈에서 5개라고 본 사람이 리포트에서 1개를 보면 어느 쪽을 믿어야 할지 모른다.
     _lead_parts = [
         f'{_hn}개 섹터 중 <b>{_hdec}개가 쇠퇴 국면</b>입니다.'
     ]
@@ -830,11 +885,29 @@ with tab_home:
     if _hdn is not None:
         _lead_parts.append(
             f'{D._ga(_hdn["섹터"])} <b>{_hdn["주간수익률"]:+.1f}%</b>로 낙폭이 가장 컸습니다.')
-    if _hemerge:
-        _lead_parts.append(f'태동 국면은 <b>{", ".join(_hemerge)}</b> — 선점 콘텐츠 검토 대상입니다.')
+
+    # 시장 상황(앞)과 우리 액션(뒤) 사이에서만 한 번 줄을 바꾼다 — 리포트와 동일
+    _act = []
+    if CAMPAIGNS:
+        _c0 = CAMPAIGNS[0]
+        _cn = _c0.get("표기명", "")
+        _act.append(f'현재 <b>{_cn}</b>{D._reul(_cn)[len(_cn):]} 중심으로 마케팅을 집행 중이며, '
+                    f'감지된 캠페인은 <b>{len(CAMPAIGNS)}종</b>입니다.')
+    if EMERGING_GO:
+        _names = ", ".join(e["섹터"] for e in EMERGING_GO)
+        # 근거는 '핵심 — 부연' 꼴이라 앞머리만 쓴다 ('.'로 자르면 소수점이 잘린다)
+        _why = (f' ({EMERGING_GO[0]["근거"].split("—")[0].strip()})'
+                if len(EMERGING_GO) == 1 else "")
+        _act.append(f'태동 {len(EMERGING_JUDGED)}개 중 <b>{_names}</b>{D._ga(_names)[len(_names):]} '
+                    f'착수 대상입니다{_why}.')
+    elif EMERGING_JUDGED:
+        _act.append(f'태동 {len(EMERGING_JUDGED)}개는 모두 착수 기준에 못 미칩니다 '
+                    f'({EMERGING_DROPPED}).')
     st.markdown(
         f'<div class="home-lead"><div class="hl-k">WEEKLY SNAPSHOT · {sel_week}</div>'
-        f'<div class="hl-t">{" ".join(_lead_parts)}</div></div>',
+        f'<div class="hl-t">{" ".join(_lead_parts)}'
+        + ("<br>" + " ".join(_act) if _act else "")
+        + '</div></div>',
         unsafe_allow_html=True)
     st.write("")
 
@@ -2147,47 +2220,9 @@ with tab_report:
             }
             break
 
-    # 태동기 착수 — 1순위만 보면 나머지 섹터는 검토 자체가 안 된다.
-    # 태동기 전체를 훑고, 각각 '우리 상품이 있는가 · 지금 밀고 있는가'를 붙인다.
-    _marketed = {D._norm_etf(r["표기명"]) for r in review}
-
-    def _is_marketed(kodex_field: str) -> bool:
-        """섹터에 매핑된 KODEX 상품 중 하나라도 현재 집행 중인가.
-        KODEX 열은 '반도체·미국반도체'처럼 복수 상품이 올 수 있다."""
-        for nm in re.split(r"[·,/]", kodex_field or ""):
-            nm = nm.strip()
-            if not nm:
-                continue
-            key = D._norm_etf(nm if nm.startswith("KODEX") else f"KODEX {nm}")
-            if any(key and key in m for m in _marketed):
-                return True
-        return False
-
-    # 태동기 전체를 나열하는 건 점검이 아니다 — 무엇을 착수할지 판정해서 올린다
-    # 순자산 조회 — 국면이 좋아도 상품이 작으면 마케팅비 회수가 안 된다
-    _aum_map = {}
-    if _uni_r is not None and "순자산" in netbuy_df.columns:
-        _aum_map = (netbuy_df.drop_duplicates("종목명")
-                    .set_index("종목명")["순자산"].to_dict())
-
-    def _aum_of(kodex_field: str):
-        """섹터에 매핑된 KODEX 상품의 순자산(억). 복수면 합산."""
-        tot, hit = 0.0, False
-        for nm in re.split(r"[·,/]", kodex_field or ""):
-            nm = nm.strip()
-            if not nm:
-                continue
-            key = D._norm_etf(nm if nm.startswith("KODEX") else f"KODEX {nm}")
-            for k, v in _aum_map.items():
-                if D._norm_etf(k) == key and v is not None:
-                    tot += float(v); hit = True
-                    break
-        return tot if hit else None
-
-    _em_judged = D.emerging_launch_review(rep_board, _is_marketed, _aum_of)
-    _n_em = len(_em_judged)
-    # 판정 결과를 전부 늘어놓으면 선별한 의미가 없다 — 실행 대상만 올린다
-    emerging_all, _em_dropped = D.split_actionable(_em_judged, D.EMERGING_ACTIONABLE)
+    # 홈과 같은 판정을 쓴다 (탭 상단에서 한 번 계산)
+    _n_em = len(EMERGING_JUDGED)
+    emerging_all, _em_dropped = EMERGING_GO, EMERGING_DROPPED
     _launch = [e for e in emerging_all if e["판정"] == "착수"]
     _n_idle = len(_launch)
     emerging = None
@@ -2260,7 +2295,7 @@ with tab_report:
     gap_ctx = _gap_detail(gaps[0]) if gaps else None
 
     # 공백이라고 다 채울 일이 아니다 — 출시 후 모을 수 있는지 판정한다
-    _gap_aum = dict(_aum_map)
+    _gap_aum = dict(_AUM)
     try:
         _gap_aum.update(json.loads(
             (Path(__file__).parent / "data" / "etf_flows.json").read_text()

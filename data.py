@@ -214,12 +214,28 @@ def _intensity_at(netbuy_df, name: str, week: str):
 _NEWLISTING_INTENSITY = 40.0   # 이 이상은 신규상장 첫 주 유입 왜곡으로 본다
 
 
+# ETF명은 숫자·영문으로 끝나는 경우가 많다(TOP10, S&P500, 2X, Plus). 한글이 아니라고
+# 받침 없음으로 처리하면 'TOP10를'처럼 틀린 조사가 나가므로 읽는 소리의 받침을 쓴다.
+# 숫자는 끝자리 읽기 기준 — 영·일·삼·육·칠·팔은 받침, 이·사·오·구는 없음.
+_DIGIT_JONG = {"0": 8, "1": 8, "2": 0, "3": 16, "4": 0,
+               "5": 0, "6": 1, "7": 8, "8": 8, "9": 0}
+# 영문은 알파벳 이름의 받침 (L 엘 · M 엠 · N 엔 · R 아르 · X 엑스는 없음)
+_ALPHA_JONG = {"l": 8, "m": 16, "n": 4, "r": 8}
+
+
 def _has_jong(word: str) -> int | None:
-    """마지막 글자의 받침 코드(0=없음). 한글 아니면 None."""
+    """마지막 글자의 받침 코드(0=없음). 판별 불가면 None."""
     if not word:
         return None
-    c = ord(word[-1])
-    return (c - 0xAC00) % 28 if 0xAC00 <= c <= 0xD7A3 else None
+    ch = (word.rstrip(")]》」 ") or word)[-1]
+    c = ord(ch)
+    if 0xAC00 <= c <= 0xD7A3:
+        return (c - 0xAC00) % 28
+    if ch.isdigit():
+        return _DIGIT_JONG[ch]
+    if ch.isascii() and ch.isalpha():
+        return _ALPHA_JONG.get(ch.lower(), 0)
+    return None
 
 
 def _eun(w: str) -> str:      # 은/는
