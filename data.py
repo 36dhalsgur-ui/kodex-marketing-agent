@@ -1224,8 +1224,15 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
 EMERGING_MOM_STRONG = 5.0    # RS모멘텀 — 이 이상이면 '뚜렷하게 돌아서는 중'
 EMERGING_NEAR_CROSS = -3.0   # RS수준 — 0에 이만큼 근접하면 확산 전환 임박
 
+# 마케팅 집행 최소 규모(순자산, 억). 국면이 좋아도 상품이 작으면 회수가 안 된다.
+# 운용보수는 순자산에 비례하므로, 100억짜리를 두 배로 키워도 보수 0.3% 기준
+# 연 3천만원 남짓 — 캠페인 비용을 넘기 어렵다. KODEX 순자산 중앙값이 약 1,000억이라
+# 그 3분의 1을 하한으로 둔다. 이 선을 넘지 못하면 '규모 미달'로 내린다.
+AUM_MARKETABLE = 300.0
+AUM_COMFORTABLE = 1000.0     # 이 이상이면 규모 제약 없음
 
-def emerging_launch_review(board: list[dict], is_marketed) -> list[dict]:
+
+def emerging_launch_review(board: list[dict], is_marketed, aum_of=None) -> list[dict]:
     """태동 섹터 중 '지금 착수할 만한 곳'을 판정한다.
 
     태동기 전체를 나열하는 건 점검이 아니다 — 무엇을 해야 하는지 골라줘야 한다.
@@ -1247,8 +1254,9 @@ def emerging_launch_review(board: list[dict], is_marketed) -> list[dict]:
         mom, lvl = r.get("RS모멘텀"), r.get("RS수준")
         big = (r.get("외국인13주억") or 0) + (r.get("연기금13주억") or 0)
         indiv = r.get("개인13주억") or 0
+        aum = (aum_of(kodex) if (aum_of and kodex) else None)
         row = {"섹터": sec, "kodex": kodex, "모멘텀": mom, "수준": lvl,
-               "큰손13주억": big, "개인13주억": indiv}
+               "큰손13주억": big, "개인13주억": indiv, "순자산억": aum}
 
         if not kodex:
             row.update(판정="상품 없음", 우선순위=3,
@@ -1257,18 +1265,31 @@ def emerging_launch_review(board: list[dict], is_marketed) -> list[dict]:
             row.update(판정="집행 중", 우선순위=2, 근거="이미 마케팅 집행 중 — 착수 대상 아님")
         elif mom is None or lvl is None:
             row.update(판정="관찰", 우선순위=2, 근거="지표 산출 불가")
+        elif aum_of is not None and aum is None:
+            # 상품명은 있는데 순자산이 안 잡힌다 = 상장폐지·개명 가능성.
+            # 확인 안 된 것을 착수로 올리면 없는 상품을 밀라고 하는 셈이다.
+            row.update(판정="확인 필요", 우선순위=2,
+                       근거=f"'{kodex}' 순자산 조회 불가 — 상장폐지·개명 여부 확인 후 재판정")
+        elif aum is not None and aum < AUM_MARKETABLE:
+            # 국면 판정보다 앞선다 — 아무리 좋은 국면이어도 회수가 안 되면 집행 대상이 아니다
+            row.update(판정="규모 미달", 우선순위=2,
+                       근거=f"순자산 {aum:,.0f}억으로 집행 하한({AUM_MARKETABLE:,.0f}억) 미만 "
+                            f"— 국면은 유효하나 마케팅비 대비 회수가 어렵다")
         else:
             near = lvl >= EMERGING_NEAR_CROSS
             strong = mom >= EMERGING_MOM_STRONG
             quiet = big > 0 and indiv < 0          # 큰손 매수 · 개인 매도
+            _sz = ("" if aum is None else
+                   f" 순자산 {aum:,.0f}억으로 규모도 충분하다." if aum >= AUM_COMFORTABLE else
+                   f" 다만 순자산 {aum:,.0f}억으로 크지 않아 집행 규모는 조절이 필요하다.")
             if strong and near:
                 row.update(판정="착수", 우선순위=0,
                            근거=f"확산 전환 임박 — 모멘텀 {mom:+.1f}, 시장 대비 {lvl:+.1f}로 "
-                                f"평균선 회복 직전. 리드타임 감안 지금 착수")
+                                f"평균선 회복 직전. 리드타임 감안 지금 착수.{_sz}")
             elif quiet and strong:
                 row.update(판정="착수", 우선순위=0,
                            근거=f"조용한 매집 — 외국인·연기금 {big:+,}억 순매수, 개인 {indiv:+,}억 "
-                                f"순매도. 가격({mom:+.1f})보다 수급이 먼저 돌았다")
+                                f"순매도. 가격({mom:+.1f})보다 수급이 먼저 돌았다.{_sz}")
             elif quiet:
                 row.update(판정="선점 검토", 우선순위=1,
                            근거=f"외국인·연기금 {big:+,}억 매집 중이나 모멘텀 {mom:+.1f}로 아직 약함 "
@@ -1282,6 +1303,64 @@ def emerging_launch_review(board: list[dict], is_marketed) -> list[dict]:
                            근거=f"모멘텀 {mom:+.1f}·시장 대비 {lvl:+.1f} — 돌아서는 초입이라 아직 이름")
         out.append(row)
     out.sort(key=lambda x: (x["우선순위"], -(x["모멘텀"] if x["모멘텀"] is not None else -99)))
+    return out
+
+
+# 신규 출시 판정 기준 — 공백이라고 다 채울 일이 아니다. 출시 후 모을 수 있어야 한다.
+GAP_MARKET_VIABLE = 3000.0   # 테마 시장 규모(경쟁사 순자산 합, 억). 이 미만이면 수요 자체가 작다
+GAP_MARKET_LARGE = 10000.0   # 1조 이상이면 후발이어도 파이가 크다
+GAP_DOMINANCE = 0.60         # 1위가 시장의 이 비율을 넘으면 이미 굳어진 판
+
+
+def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> list[dict]:
+    """라인업 공백 중 '실제로 출시할 만한 곳'을 판정한다.
+
+    공백 = 기회가 아니다. 경쟁사가 안 만든 게 아니라 만들었는데 안 모인 테마도
+    공백으로 잡힌다. 출시 판단에는 세 가지를 본다:
+
+      시장 규모  경쟁사들이 그 테마에서 실제로 모은 순자산 합계. 작으면 수요가 없다.
+      경쟁 구도  1위 점유율. 이미 굳어진 판이면 후발로 뺏기 어렵다.
+      국면      과열·쇠퇴면 지금 내도 늦다(리드타임 감안 준비만).
+    """
+    out = []
+    for g in gaps[:limit]:
+        theme, market = g["테마"], g["시장"]
+        peers = gap_competitors(theme, market, limit=8)
+        sizes = [(p, aum_of(p)) for p in peers]
+        sizes = [(p, v) for p, v in sizes if v is not None]
+        total = sum(v for _, v in sizes)
+        top = max(sizes, key=lambda x: x[1]) if sizes else None
+        share = (top[1] / total) if (top and total > 0) else None
+        stage = stage_of(theme) or ""
+        row = {"테마": theme, "시장": market, "경쟁사수": g["경쟁사수"],
+               "브랜드": ", ".join(f"{b} {n}" for b, n in
+                                 sorted(g["브랜드"].items(), key=lambda x: -x[1])),
+               "국면": stage, "시장규모억": total if sizes else None,
+               "1위": top[0] if top else "", "1위순자산": top[1] if top else None,
+               "점유율": share, "확인종수": len(sizes)}
+
+        if not sizes:
+            row.update(판정="확인 필요", 우선순위=3,
+                       근거="경쟁사 순자산을 확인하지 못했다 — 시장 규모 미상")
+        elif total < GAP_MARKET_VIABLE:
+            row.update(판정="보류", 우선순위=3,
+                       근거=f"경쟁 {len(sizes)}종이 모은 돈이 다 합쳐 {total:,.0f}억 "
+                            f"— 만들어도 모일 시장이 아니다")
+        elif share is not None and share >= GAP_DOMINANCE:
+            row.update(판정="차별화 필요", 우선순위=2,
+                       근거=f"시장 {total:,.0f}억 중 {top[0]}가 {share:.0%} 독식 "
+                            f"— 같은 구성으로는 후발 진입이 어렵다")
+        elif stage in ("과열기", "쇠퇴기"):
+            row.update(판정="시점 대기", 우선순위=1,
+                       근거=f"시장 {total:,.0f}억으로 규모는 되나 국면이 {stage} "
+                            f"— 리드타임 감안 준비만, 출시는 진정 후")
+        else:
+            _sz = "1조 이상 대형 시장" if total >= GAP_MARKET_LARGE else f"시장 {total:,.0f}억"
+            row.update(판정="출시 검토", 우선순위=0,
+                       근거=f"{_sz}에 KODEX만 부재 · 1위 {top[0]} {share:.0%}로 "
+                            f"독점 구도도 아니다")
+        out.append(row)
+    out.sort(key=lambda x: (x["우선순위"], -(x["시장규모억"] or 0)))
     return out
 
 

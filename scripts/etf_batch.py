@@ -176,12 +176,33 @@ def main():
         if i % 20 == 0:
             print(f"    {i}/{len(target)} 진행")
 
+    # 라인업 공백 테마의 경쟁사 순자산 — 신규 출시 판단에 쓴다.
+    # 공백은 정의상 KODEX가 없는 테마라 위 수집 대상(KODEX + 같은 테마 경쟁사)에
+    # 포함되지 않는다. 경쟁사가 그 테마에서 실제로 얼마나 모았는지를 봐야
+    # '출시할 만한 시장인가'를 판단할 수 있다.
+    tick_of = {nm: tk for tk, nm in names.items()}
+    got = {r["종목명"] for r in result}
+    gap_aum = {}
+    try:
+        for g in D.lineup_gaps():
+            for nm in D.gap_competitors(g["테마"], g["시장"], limit=8):
+                if nm in gap_aum or nm in got or nm not in tick_of:
+                    continue
+                v = fetch_aum(tick_of[nm])
+                if v is not None:
+                    gap_aum[nm] = v
+                time.sleep(0.05)
+        print(f"  라인업 공백 경쟁사 순자산 {len(gap_aum)}종")
+    except Exception as e:
+        print(f"  공백 경쟁사 순자산 수집 실패: {type(e).__name__}")
+
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps({
         "asof": date.today().isoformat(),
         "weeks": [w[0] for w in weeks],
         "지표": "개인 순매수 중심 — ETF 금융투자는 LP 설정·환매가 지배해 제외",
         "etfs": result,
+        "공백경쟁사순자산": gap_aum,
     }, ensure_ascii=False, indent=2))
     n_aum = sum(1 for r in result if r.get("순자산억"))
     print(f"[완료] {OUT} — {len(result)}종 (순자산 확보 {n_aum}종)")

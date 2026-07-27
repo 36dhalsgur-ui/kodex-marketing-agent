@@ -52,7 +52,7 @@ SECTORS = [
     {"name": "헬스케어",   "price": ("index", "5045"), "roster": ("krx_index", "5045"), "kodex": "KODEX 바이오·헬스케어"},
     {"name": "에너지화학", "price": ("index", "5048"), "roster": ("krx_index", "5048"), "kodex": "KODEX 에너지화학"},
     {"name": "철강",       "price": ("index", "5049"), "roster": ("krx_index", "5049"), "kodex": "KODEX 철강"},
-    {"name": "방송통신",   "price": ("index", "5051"), "roster": ("krx_index", "5051"), "kodex": "KODEX 미디어&엔터"},
+    {"name": "방송통신",   "price": ("index", "5051"), "roster": ("krx_index", "5051"), "kodex": ""},
     {"name": "건설",       "price": ("index", "5052"), "roster": ("krx_index", "5052"), "kodex": "KODEX 건설"},
     {"name": "증권",       "price": ("index", "5054"), "roster": ("krx_index", "5054"), "kodex": "KODEX 증권"},
     {"name": "기계장비",   "price": ("index", "5055"), "roster": ("krx_index", "5055"), "kodex": "KODEX 기계장비"},
@@ -60,7 +60,7 @@ SECTORS = [
     {"name": "운송",       "price": ("index", "5057"), "roster": ("krx_index", "5057"), "kodex": "KODEX 운송"},
     {"name": "경기소비재", "price": ("index", "5061"), "roster": ("krx_index", "5061"), "kodex": "KODEX 경기소비재"},
     {"name": "필수소비재", "price": ("index", "5062"), "roster": ("krx_index", "5062"), "kodex": "KODEX 필수소비재"},
-    {"name": "K콘텐츠",    "price": ("index", "5063"), "roster": ("krx_index", "5063"), "kodex": "KODEX Fn웹툰&드라마"},
+    {"name": "K콘텐츠",    "price": ("index", "5063"), "roster": ("krx_index", "5063"), "kodex": "KODEX K콘텐츠"},
     {"name": "정보기술",   "price": ("index", "5064"), "roster": ("krx_index", "5064"), "kodex": "KODEX IT"},
     {"name": "유틸리티",   "price": ("index", "5065"), "roster": ("krx_index", "5065"), "kodex": "KODEX 유틸리티"},
     # 2군 — 마케팅 테마 (KRX 섹터지수 부재 → KODEX ETF)

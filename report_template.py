@@ -318,16 +318,19 @@ def render_report(ctx: dict) -> str:
         _gs = ctx.get("gaps_all") or []
         if len(_gs) > 1:
             _r = "".join(
-                f'<tr><td>{_esc(g["테마"])} × {_esc(g["시장"])}</td>'
-                f'<td>{_esc(g["브랜드"])}</td><td class="num">{g["경쟁사수"]}종</td>'
-                f'<td>{_esc(g["국면"] or "—")}</td><td>{_esc(g["타이밍"])}</td></tr>'
+                f'<tr><td>{"<b>" if g["판정"] == "출시 검토" else ""}{_esc(g["판정"])}'
+                f'{"</b>" if g["판정"] == "출시 검토" else ""}</td>'
+                f'<td>{_esc(g["테마"])} × {_esc(g["시장"])}</td>'
+                f'<td class="num">{f"{g["시장규모억"]:,.0f}억" if g["시장규모억"] else "—"}</td>'
+                f'<td>{_esc(g["근거"])}</td></tr>'
                 for g in _gs)
             gap_html += (
-                '<table class="mini"><thead><tr><th>테마 × 기초시장</th><th>경쟁 브랜드</th>'
-                '<th class="num">경쟁</th><th>국면</th><th>타이밍</th></tr></thead>'
+                '<table class="mini"><thead><tr><th>판정</th><th>테마 × 기초시장</th>'
+                '<th class="num">시장 규모</th><th>근거</th></tr></thead>'
                 f'<tbody>{_r}</tbody></table>'
-                '<p class="note">KODEX 미보유 · 경쟁사 3곳 이상 보유. 국면이 과열·쇠퇴면 '
-                '대기(리드타임 감안 준비만), 그 외 검토. 신규 상장이 있을 때만 바뀐다.</p>')
+                '<p class="note">시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
+                '공백이라고 다 채울 일이 아니라 출시 후 모을 수 있는지를 본다 — '
+                '규모가 작으면 보류, 1위가 독식 중이면 차별화 없이는 진입이 어렵다.</p>')
 
     return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <title>KODEX 주간 마케팅 리포트 — {_esc(ctx['week'])}</title>
