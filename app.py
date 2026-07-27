@@ -879,38 +879,46 @@ with tab_home:
     # 홈에서 5개라고 본 사람이 리포트에서 1개를 보면 어느 쪽을 믿어야 할지 모른다.
     #
     # 쇠퇴 개수를 앞세우지 않는다 — 마케터가 소재를 붙일 곳은 태동·확산·과열이고,
-    # 쇠퇴 몇 개인지는 바로 아래 '시장 국면' 카드에 이미 있다. 리드는 두 문장만.
+    # 쇠퇴 몇 개인지는 바로 아래 '마케팅 사정권' 카드에 이미 있다.
+    # 형식은 서술형 두 문장 — 앞줄은 이번 주 시장, 뒷줄은 우리 마케팅 상태.
     _hact_n = sum(_hstage.get(s, 0) for s in ("태동기", "확산기", "과열기"))
     _hmix = " · ".join(f'{s[:2]} {_hstage[s]}' for s in ("태동기", "확산기", "과열기")
                        if _hstage.get(s))
-    _lead_parts = [f'마케팅 사정권은 <b>{_hact_n}개 섹터</b>입니다 — {_hmix}.'
-                   if _hact_n else f'{_hn}개 섹터 모두 쇠퇴·관망이라 밀 곳이 없습니다.']
-    if _hbench is not None:
-        _lead_parts.append(f'시장(KRX300)은 한 주 <b>{_hbench:+.1f}%</b>.')
 
-    # 시장 상황(앞)과 우리 액션(뒤) 사이에서만 한 번 줄을 바꾼다 — 리포트와 동일
-    # 프로모션(리워드 걸린 판촉)만 앞세운다 — 블로그 소개 글은 '집행 중'이라 말하지 않는다
-    _act = []
-    if PROMOS:
-        _act.append(f'프로모션 <b>{len(PROMOS)}종</b> 집행 중')
-    elif CAMPAIGNS:
-        _act.append(f'프로모션 없음 (콘텐츠 푸시 <b>{len(CAMPAIGNS)}종</b>)')
-    # 판정을 뭉뚱그리지 않는다 — '착수'와 '선점 검토'는 나가는 돈의 규모가 다르다
+    # ── 앞줄: 시장. 있는 조각만 이어 붙인다(벤치·섹터 수익률은 배치 실패 시 비어 있다)
+    _seg = []
+    if _hbench is not None:
+        _seg.append(f'시장이 <b>{_hbench:+.1f}%</b>로 밀린 가운데' if _hbench < 0
+                    else f'시장이 <b>{_hbench:+.1f}%</b> 오른 가운데')
+    if _hup is not None:
+        _r = _hup["주간수익률"]
+        # 전 섹터가 빠진 주에 '버텼다'고 쓰면 거짓말이 된다
+        _seg.append(f'{D._ga(_hup["섹터"])} <b>{_r:+.1f}%</b>로 '
+                    + ("버텼고" if _hbench is not None and _r >= 0 > _hbench else
+                       "가장 앞섰고" if _r >= 0 else "그나마 낙폭이 작았고"))
+    _tail = (f'밀 만한 국면은 <b>{_hact_n}개</b>({_hmix})입니다.' if _hact_n
+             else f'{_hn}개 섹터 모두 쇠퇴·관망이라 밀 곳이 없습니다.')
+    _lead_parts = [(" ".join(_seg) + ", " if _seg else "") + _tail]
+
+    # ── 뒷줄: 우리 마케팅. 프로모션(리워드 걸린 판촉)만 '집행 중'으로 센다
     _go_now = [e for e in EMERGING_GO if e["판정"] == "착수"]
-    _prep = [e for e in EMERGING_GO if e["판정"] == "선점 검토"]
-    if _go_now:
-        _n1 = ", ".join(e["섹터"] for e in _go_now)
-        _act.append(f'신규 착수 <b>{_n1}</b>'
-                    + (f' (선점 준비 {", ".join(e["섹터"] for e in _prep)})' if _prep else ""))
-    elif _prep:
-        _act.append(f'신규 착수 대상 없음 — <b>{", ".join(e["섹터"] for e in _prep)}</b>만 소재 준비')
-    elif EMERGING_JUDGED:
-        _act.append(f'신규 착수 대상 없음 ({EMERGING_DROPPED})')
+    _n1 = ", ".join(e["섹터"] for e in _go_now)
+    if PROMOS and _go_now:
+        _act = (f'프로모션 <b>{len(PROMOS)}종</b>을 집행 중이고, '
+                f'신규 착수 대상은 <b>{_n1}</b>입니다.')
+    elif PROMOS:
+        _act = f'프로모션 <b>{len(PROMOS)}종</b>은 그대로 두고, 신규 착수는 이번 주 보류합니다.'
+    elif _go_now:
+        # 진행 중인 판촉이 없는데 착수 대상이 있으면 그게 이번 주의 유일한 액션이다
+        _act = (f'진행 중인 프로모션은 없고, <b>{_n1}</b>{D._ga(_n1)[len(_n1):]} '
+                f'유일한 착수 대상입니다.')
+    else:
+        _act = ('진행 중인 프로모션도, 신규 착수 대상도 없습니다'
+                + (f' (콘텐츠 푸시 {len(CAMPAIGNS)}종).' if CAMPAIGNS else '.'))
+
     st.markdown(
         f'<div class="home-lead"><div class="hl-k">WEEKLY SNAPSHOT · {sel_week}</div>'
-        f'<div class="hl-t">{" ".join(_lead_parts)}'
-        + ("<br>" + " · ".join(_act) + "." if _act else "")
-        + '</div></div>',
+        f'<div class="hl-t">{" ".join(_lead_parts)}<br>{_act}</div></div>',
         unsafe_allow_html=True)
     st.write("")
 
