@@ -2389,12 +2389,13 @@ with tab_report:
         if gap_details:
             _GC = {"출시 검토": ("#B0801F", "#FDF6E7"), "시점 대기": ("#2C63B5", "#EAF0FD"),
                    "차별화 필요": ("#6E4CA6", "#F3EFFA")}
-            for d in gap_details:
+
+            def _gap_card(d: dict) -> str:
                 _c, _bg = _GC.get(d["타이밍"], (MUTED, "#F2F4F7"))
                 _mk = f'{d["시장규모억"]:,.0f}억' if d.get("시장규모억") else "—"
                 _lead = (f'{d["1위"]} {d["점유율"]:.0%}'
                          if d.get("1위") and d.get("점유율") else "—")
-                st.markdown(
+                return (
                     f'<div class="card" style="padding:14px 18px;margin-bottom:12px;'
                     f'border-left:3px solid {_c};">'
                     # 제목 — 가칭 상품명이 제안의 얼굴
@@ -2433,7 +2434,16 @@ with tab_report:
                     + (f'<div style="font-size:0.68rem;color:{FAINT};margin-top:8px;">'
                        f'경쟁 상품 · {" / ".join(d["경쟁상품"][:4])}</div>'
                        if d.get("경쟁상품") else "")
-                    + '</div>', unsafe_allow_html=True)
+                    + '</div>')
+
+            # 1순위만 펼치고 나머지는 접는다 — 넷을 다 펼치면 다시 혼잡해진다
+            st.markdown(_gap_card(gap_details[0]), unsafe_allow_html=True)
+            if len(gap_details) > 1:
+                _rest = gap_details[1:]
+                _labels = " · ".join(f'{d["테마"]}×{d["시장"]}' for d in _rest)
+                with st.expander(f"더보기 {len(_rest)}건 — {_labels}"):
+                    for d in _rest:
+                        st.markdown(_gap_card(d), unsafe_allow_html=True)
             st.caption(
                 f'시장 규모 = 그 테마에서 경쟁사가 실제로 모은 순자산 합계. '
                 f'{D.GAP_MARKET_VIABLE:,.0f}억 미만이면 만들어도 모일 시장이 아니라 제외합니다'
