@@ -103,7 +103,19 @@ def get_roster(kind: str, code: str) -> list[str]:
 
     if kind == "krx_index":
         return [t for t in stock.get_index_portfolio_deposit_file(code) if ok(t)]
-    pdf = stock.get_etf_portfolio_deposit_file(code)
+    # ETF PDF는 KRX가 간헐적으로 빈 응답을 준다(실측) — 재시도하지 않으면
+    # 해당 테마의 수급이 통째로 비어버린다. sector_universe.py와 같은 처리.
+    pdf = None
+    for attempt in range(3):
+        try:
+            pdf = stock.get_etf_portfolio_deposit_file(code)
+            if pdf is not None and len(pdf):
+                break
+        except Exception:
+            pass
+        time.sleep(1.5 * (attempt + 1))
+    if pdf is None or not len(pdf):
+        raise ValueError("ETF PDF 응답 없음(3회 재시도)")
     return [t for t, r in pdf.iterrows()
             if ok(t) and not NON_STOCK_PAT.search(str(r.get("구성종목명") or ""))]
 

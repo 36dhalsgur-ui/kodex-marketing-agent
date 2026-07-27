@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  주간 데이터 갱신 — macOS launchd (금요일 21:00)
+
+  설치:
+    cp scripts/launchd/com.kodex.weekly-batch.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.kodex.weekly-batch.plist
+
+  즉시 테스트:
+    launchctl start com.kodex.weekly-batch
+    tail -f "/Users/dhalsgur36/Desktop/AI Agent/logs/weekly-batch.log"
+
+  해제:
+    launchctl unload ~/Library/LaunchAgents/com.kodex.weekly-batch.plist
+
+  ※ 지정 시각에 Mac이 꺼져 있으면 건너뛰고, 잠자기 상태였다면 깨어난 직후 실행된다.
+  ※ KRX_ID/KRX_PW는 ~/.zshrc에서 읽는다 — plist에 비밀번호를 적지 않는다.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kodex.weekly-batch</string>
+
+    <!-- 로그인 셸을 거쳐야 ~/.zshrc의 KRX_ID/KRX_PW가 들어온다 -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>-lc</string>
+        <string>cd "$HOME/Desktop/AI Agent" &amp;&amp; ./scripts/run_weekly.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>5</integer>   <!-- 5 = 금요일 -->
+        <key>Hour</key><integer>21</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/dhalsgur36/Desktop/AI Agent/logs/weekly-batch.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/dhalsgur36/Desktop/AI Agent/logs/weekly-batch.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

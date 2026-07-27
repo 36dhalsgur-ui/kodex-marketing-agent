@@ -1210,10 +1210,15 @@ with tab_trend:
                        cliponaxis=False,
                        hovertemplate="%{y}<br>주간 수익률 %{x:.2f}%<extra></extra>")
             )
-            fig_th = base_layout(fig_th, height=560)
-            fig_th.update_layout(title=dict(
-                text=f"섹터별 주간 수익률  <span style='font-size:12px;color:#98A2B3'>KRX 실데이터 · {wk_range}</span>",
-                font=dict(size=15)))
+            # 높이를 섹터 수에 비례시킨다 — 560px 고정이라 섹터가 22→26개로 늘자
+            # 막대가 눌리면서 제목·상단 막대가 잘렸다 (③ 탭 차트와 같은 방식)
+            _h_th = max(560, len(srt) * 26 + 110)
+            fig_th = base_layout(fig_th, height=_h_th)
+            fig_th.update_layout(
+                title=dict(
+                    text=f"섹터별 주간 수익률  <span style='font-size:12px;color:#98A2B3'>KRX 실데이터 · {wk_range}</span>",
+                    font=dict(size=15)),
+                margin=dict(l=8, r=8, t=56, b=8))
             fig_th.update_xaxes(ticksuffix="%", range=[min(vals) * 1.35 - 0.3, max(vals) * 1.3 + 0.3])
             st.plotly_chart(fig_th, use_container_width=True)
             if wk_bench is not None:
@@ -1234,10 +1239,12 @@ with tab_trend:
                     hovertemplate="<b>%{text}</b><br>주간 수익률 %{x:.2f}%<br>외국인+연기금 주간 순매수 %{y:,.0f}억<extra></extra>",
                 )
             )
-            fig_sc = base_layout(fig_sc, height=560)
+            # 좌측 막대차트와 높이를 맞춰 두 열이 나란히 끝나게 한다
+            fig_sc = base_layout(fig_sc, height=max(560, len(wk_rows) * 26 + 110))
             fig_sc.update_layout(
                 title=dict(text="주간 수익률 × 수급 맵  <span style='font-size:12px;color:#98A2B3'>붉은색 = 외국인·연기금 순매수, 파란색 = 순매도</span>", font=dict(size=15)),
                 xaxis_title="주간 수익률(%)", yaxis_title="외국인+연기금 주간 순매수(억원)",
+                margin=dict(l=8, r=8, t=56, b=8),
             )
             fig_sc.update_xaxes(showgrid=True, gridcolor="#F0F2F7", zeroline=True, zerolinecolor="#D9DEE9")
             fig_sc.update_yaxes(zeroline=True, zerolinecolor="#D9DEE9")
