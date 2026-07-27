@@ -1442,8 +1442,11 @@ with tab_trend:
     sub_header("05", "섹터 유니버스", "위 판정이 어떤 종목 묶음을 근거로 했는지 확인")
     st.markdown(
         f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:12px;">'
-        f'KRX 섹터지수는 <b>지수 구성종목</b>, 테마는 <b>KODEX ETF 구성내역(PDF·비중 포함)</b> 기준입니다 — '
-        f'자의적 종목 선별 없이 공식 공시 명부를 그대로 사용합니다.</div>',
+        f'섹터마다 종목 명부의 출처가 다릅니다. <b>KRX 섹터지수가 있는 17개</b>는 그 지수의 '
+        f'구성종목을, <b>KRX 지수가 없는 9개</b>(방산 · 2차전지 · 조선 · AI·전력 · 원자력 · '
+        f'미국반도체 · 미국AI전력 · 미국AI테크 · 미국우주항공)는 해당 '
+        f'<b>KODEX ETF의 구성내역(PDF)</b>을 씁니다 — 어느 쪽이든 <b>공시 명부를 그대로</b> 쓰며 '
+        f'종목을 임의로 고르지 않습니다.</div>',
         unsafe_allow_html=True)
     _uni_data = load_sector_universe()
     _uni_secs = _uni_data.get("sectors", [])
@@ -1466,31 +1469,22 @@ with tab_trend:
         with u2:
             items = s.get("종목", [])
             if items:
-                has_w = any("비중" in it for it in items)
-                if has_w:
-                    rows_u = "".join(
-                        f'<div class="kw-row"><span class="kw-name">{it["종목명"]}</span>'
-                        f'<span style="flex:1;margin:0 10px;height:6px;background:#EEF1F6;border-radius:3px;'
-                        f'overflow:hidden;display:inline-block;"><span style="display:block;height:100%;'
-                        f'width:{min(100, it.get("비중", 0) * 3):.0f}%;background:{NAVY};"></span></span>'
-                        f'<span class="kw-badge" style="background:#F2F4F7;color:#475467;">'
-                        f'{it.get("비중", 0):.1f}%</span></div>'
-                        for it in items[:20])
-                    cap = "KODEX ETF 구성내역(PDF) · 비중 내림차순 · 막대는 비중 상대 길이"
-                else:
-                    # 해외 ETF는 KRX가 비중도 티커도 제공하지 않아 종목명만 남는다
-                    cells = "".join(
-                        f'<span style="display:inline-block;font-size:0.78rem;color:{INK};'
-                        f'background:#F5F6FA;border:1px solid #EAEDF3;border-radius:6px;'
-                        f'padding:4px 10px;margin:0 6px 6px 0;">{it["종목명"]}'
-                        + (f'<span style="color:{FAINT};font-size:0.68rem;margin-left:5px;">'
-                           f'{it["티커"]}</span>' if it.get("티커") else "")
-                        + '</span>'
-                        for it in items[:40])
-                    rows_u = f'<div style="padding:4px 0;">{cells}</div>'
-                    cap = ("해외 ETF 구성종목 · KRX가 해외 보유분의 비중을 제공하지 않아 종목명만 표시"
-                           if s.get("군") == "해외" else
-                           "KRX 섹터지수 구성종목 · 지수는 비중을 공개하지 않아 종목명만 표시")
+                # 이 표는 '섹터에 어떤 종목이 들어가는가'를 보는 곳이다. 비중은 목적도
+                # 아니고 수급 합산에도 쓰지 않으므로 표시하지 않는다 —
+                # 모든 군을 같은 칩 형식으로 통일한다.
+                cells = "".join(
+                    f'<span style="display:inline-block;font-size:0.78rem;color:{INK};'
+                    f'background:#F5F6FA;border:1px solid #EAEDF3;border-radius:6px;'
+                    f'padding:4px 10px;margin:0 6px 6px 0;">{it["종목명"]}'
+                    + (f'<span style="color:{FAINT};font-size:0.68rem;margin-left:5px;">'
+                       f'{it["티커"]}</span>' if it.get("티커") else "")
+                    + '</span>'
+                    for it in items[:40])
+                rows_u = f'<div style="padding:4px 0;">{cells}</div>'
+                cap = ("KODEX ETF 구성내역(PDF) · KRX가 해외 보유분의 티커를 제공하지 않아 종목명만"
+                       if s.get("군") == "해외" else
+                       "KODEX ETF 구성내역(PDF)" if s.get("군") == "테마" else
+                       "KRX 섹터지수 구성종목")
                 st.markdown(f'<div class="card" style="padding:10px 16px;">{rows_u}</div>',
                             unsafe_allow_html=True)
                 st.caption(cap)
