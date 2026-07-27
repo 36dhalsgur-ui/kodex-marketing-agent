@@ -408,6 +408,14 @@ def section_header(tag: str, title: str, desc: str):
     )
 
 
+# 가로 막대 1개가 차지하는 높이 + 제목·축·여백에 필요한 고정분.
+# 항목 수 × ROW_PX 만 잡으면 제목이 잘린다(실측) — CHROME_PX를 반드시 더한다.
+# st.container(height=…)로 스크롤 박스를 씌우는 방법도 시도했으나, Plotly가
+# 스크롤 컨테이너 안에서 폭을 0으로 측정해 resize 전까지 빈 화면이 된다(실측).
+BAR_ROW_PX = 26
+CHART_CHROME_PX = 110
+
+
 def sub_header(no: str, title: str, desc: str = ""):
     """탭 내부 소제목 — 번호 + 제목 + 한 줄 설명으로 문서 위계를 만든다."""
     st.markdown(
@@ -428,7 +436,10 @@ def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
         plot_bgcolor="white",
         paper_bgcolor="white",
         font=dict(family="Pretendard, -apple-system, sans-serif", size=12, color=MUTED),
-        title=dict(x=0, xanchor="left", font=dict(size=14.5, color=INK, weight=800), pad=dict(b=8)),
+        # y/yanchor를 명시하지 않으면 Plotly가 제목을 SVG 위쪽 밖으로 밀어 글자 윗부분이
+        # 잘린다(실측: 차트 상단보다 9px 위에 그려짐). 상단에서 일정 비율로 못박는다.
+        title=dict(x=0, xanchor="left", y=0.99, yanchor="top",
+                   font=dict(size=14.5, color=INK, weight=800), pad=dict(b=10)),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0,
                     font=dict(size=11.5), bgcolor="rgba(0,0,0,0)"),
         xaxis=dict(showgrid=False, zeroline=False, showline=True, linecolor=LINE,
@@ -1212,7 +1223,7 @@ with tab_trend:
             )
             # 높이를 섹터 수에 비례시킨다 — 560px 고정이라 섹터가 22→26개로 늘자
             # 막대가 눌리면서 제목·상단 막대가 잘렸다 (③ 탭 차트와 같은 방식)
-            _h_th = max(560, len(srt) * 26 + 110)
+            _h_th = max(420, len(srt) * BAR_ROW_PX + CHART_CHROME_PX)
             fig_th = base_layout(fig_th, height=_h_th)
             fig_th.update_layout(
                 title=dict(
@@ -1240,7 +1251,8 @@ with tab_trend:
                 )
             )
             # 좌측 막대차트와 높이를 맞춰 두 열이 나란히 끝나게 한다
-            fig_sc = base_layout(fig_sc, height=max(560, len(wk_rows) * 26 + 110))
+            _h_sc = max(420, len(wk_rows) * BAR_ROW_PX + CHART_CHROME_PX)
+            fig_sc = base_layout(fig_sc, height=_h_sc)
             fig_sc.update_layout(
                 title=dict(text="주간 수익률 × 수급 맵  <span style='font-size:12px;color:#98A2B3'>붉은색 = 외국인·연기금 순매수, 파란색 = 순매도</span>", font=dict(size=15)),
                 xaxis_title="주간 수익률(%)", yaxis_title="외국인+연기금 주간 순매수(억원)",
@@ -1851,7 +1863,8 @@ with tab_did:
                    cliponaxis=False,
                    hovertemplate="%{y}<br>매수강도 %{x:.2f}%<extra></extra>")
         )
-        fig_top = base_layout(fig_top, height=max(360, top_n * 27))
+        _h_top = max(360, top_n * BAR_ROW_PX + CHART_CHROME_PX)
+        fig_top = base_layout(fig_top, height=_h_top)
         fig_top.update_layout(title=dict(text=f"{sel_week} 순매수강도 TOP {top_n}", font=dict(size=15)))
         xmax = float(top["매수강도"].max())
         fig_top.update_xaxes(ticksuffix="%", range=[min(0, float(top["매수강도"].min()) * 1.2), xmax * 1.25])
