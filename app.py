@@ -853,7 +853,7 @@ tab_home, tab_trend, tab_channel, tab_did, tab_report, tab_reg = st.tabs(
 # ──────────────────────────────────────────────
 with tab_home:
     st.write("")
-    section_header("HOME", f"{sel_week} 요약", "이번 주 시장과 우리 마케팅의 상태를 한 화면에 — 상세는 ①~⑤ 탭에서.")
+    section_header("HOME", f"{sel_week} 요약", "이번 주 시장과 KODEX 마케팅의 상태를 한 화면에 — 상세는 ①~⑤ 탭에서.")
     st.write("")
 
     # ── 실데이터 (시그널 보드 · 순매수 · 캠페인)
@@ -885,20 +885,26 @@ with tab_home:
     _hmix = " · ".join(f'{s[:2]} {_hstage[s]}' for s in ("태동기", "확산기", "과열기")
                        if _hstage.get(s))
 
-    # ── 앞줄: 시장. 있는 조각만 이어 붙인다(벤치·섹터 수익률은 배치 실패 시 비어 있다)
+    # ── 앞줄: 시장. 지수는 KRX300이 아니라 코스피·코스닥으로 말한다 — 바로 아래
+    # 지수 스트립과 같은 값이라야 읽는 사람이 두 숫자를 대조하지 않는다.
+    # (KRX300은 섹터 국면 판정의 벤치마크로 ① 시장 트렌드에 그대로 남는다.)
     _seg = []
-    if _hbench is not None:
-        _seg.append(f'시장이 <b>{_hbench:+.1f}%</b>로 밀린 가운데' if _hbench < 0
-                    else f'시장이 <b>{_hbench:+.1f}%</b> 오른 가운데')
+    _idx = {m["name"]: m for m in load_weekly_market()}
+    _kp, _kq = _idx.get("코스피"), _idx.get("코스닥")
+    if _kp and _kq:
+        _both = (_kp["weekly"], _kq["weekly"])
+        _dir = ("오른" if min(_both) >= 0 else "밀린" if max(_both) < 0 else "엇갈린")
+        _seg.append(f'코스피 <b>{_kp["weekly"]:+.1f}%</b> · 코스닥 <b>{_kq["weekly"]:+.1f}%</b>로 '
+                    f'{_dir} 한 주')
     if _hup is not None:
+        # 섹터 수익률은 배치 주간 구간, 지수는 최근 5거래일이라 구간이 다르다.
+        # 그래서 '지수보다 강했다'처럼 둘을 견주는 표현은 쓰지 않는다.
         _r = _hup["주간수익률"]
-        # 전 섹터가 빠진 주에 '버텼다'고 쓰면 거짓말이 된다
         _seg.append(f'{D._ga(_hup["섹터"])} <b>{_r:+.1f}%</b>로 '
-                    + ("버텼고" if _hbench is not None and _r >= 0 > _hbench else
-                       "가장 앞섰고" if _r >= 0 else "그나마 낙폭이 작았고"))
-    _tail = (f'밀 만한 국면은 <b>{_hact_n}개</b>({_hmix})입니다.' if _hact_n
-             else f'{_hn}개 섹터 모두 쇠퇴·관망이라 밀 곳이 없습니다.')
-    _lead_parts = [(" ".join(_seg) + ", " if _seg else "") + _tail]
+                    + ("가장 강했고" if _r >= 0 else "낙폭이 가장 작았고"))
+    _tail = (f'마케팅 사정권은 <b>{_hact_n}개 섹터</b>({_hmix})입니다.' if _hact_n
+             else f'{_hn}개 섹터 모두 쇠퇴·관망이라 사정권에 든 섹터가 없습니다.')
+    _lead_parts = [(", ".join(_seg) + ", " if _seg else "") + _tail]
 
     # ── 뒷줄: 우리 마케팅. 프로모션(리워드 걸린 판촉)만 '집행 중'으로 센다
     _go_now = [e for e in EMERGING_GO if e["판정"] == "착수"]
