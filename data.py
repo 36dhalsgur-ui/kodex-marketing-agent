@@ -826,11 +826,17 @@ def _reg_kind(title: str) -> str:
     return "기타"
 
 
+# 보도자료 게시판은 같은 요청에도 응답이 3~10초로 널뛴다(실측). 10초로 잡으면
+# 로컬에서도 아슬아슬하고, 배포본은 해외 리전이라 왕복이 더 걸려 상시 실패한다.
+FSC_TIMEOUT = 25
+FSC_RETRY = 3
+
+
 def _fsc_page(path: str, link_pat: str, source: str, page: int) -> list[dict]:
     """금융위 게시판 한 페이지 파싱 — 제목/링크/날짜(첨부파일명 YYMMDD 또는 예고기간)."""
     from bs4 import BeautifulSoup
     r = requests.get(f"{FSC_BASE}{path}", params={"curPage": page},
-                     headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+                     headers={"User-Agent": "Mozilla/5.0"}, timeout=FSC_TIMEOUT)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
     out, seen = [], set()
@@ -885,18 +891,33 @@ def fetch_regulations(limit: int = 12) -> tuple[list[dict], dict]:
     items: list[dict] = []
     status: dict[str, dict] = {}
     for path, pat, src, pages in FSC_BOARDS:
-        got, err, seen = [], None, set()
+        got, err, seen, blank = [], None, set(), 0
         for pg in range(1, pages + 1):
-            try:
-                rows = _fsc_page(path, pat, src, pg)
-            except Exception as e:
-                err = f"{type(e).__name__}: {e}"
+            rows, last = None, None
+            for attempt in range(FSC_RETRY):   # 응답이 널뛰는 소스라 재시도가 가장 효과적
+                try:
+                    rows = _fsc_page(path, pat, src, pg)
+                    break
+                except Exception as e:
+                    last = f"{type(e).__name__}: {e}"
+                    time.sleep(1.5 * (attempt + 1))
+            if rows is None:
+                err = last
                 break
             fresh = [r for r in rows if r["제목"] not in seen]
-            if not fresh:          # 페이지네이션이 끝났거나 같은 목록이 반복됨
-                break
+            if not fresh:
+                # 1페이지가 비어도 뒤 페이지엔 목록이 살아 있는 경우가 있다(실측).
+                # 즉시 멈추지 않고 연속 2페이지가 비었을 때만 끝으로 본다.
+                blank += 1
+                if blank >= 2:
+                    break
+                continue
+            blank = 0
             seen.update(r["제목"] for r in fresh)
             got += fresh
+        if not got and err is None:
+            # 예외 없이 0건이면 조용히 비는 것 — 사유를 남겨야 화면에서 구분된다
+            err = "응답은 받았으나 목록을 찾지 못함 — 게시판 구조 변경 가능성"
         status[src] = {"수집": len(got), "관련": sum(1 for r in got if r["관련"]),
                        "오류": err if not got else None}
         items += got
