@@ -483,6 +483,94 @@ def criteria_list(title: str, items: list[tuple[str, str]], footer: str = "",
     return (f'<div style="font-size:0.78rem;">{head}{_crit_label(title)}{rows}{foot}</div>')
 
 
+def _did_method_html() -> str:
+    """③ 탭 하단 'DiD 계산 방식' — 절차·성립 조건·불성립 시 처리.
+
+    임계값은 상수에서 읽는다 — 베이스라인·Z창 등을 바꾸면 설명도 따라간다."""
+    def _step(no: int, title: str, formula: str, why: str) -> str:
+        return (f'<div style="display:flex;gap:10px;margin-bottom:12px;line-height:1.6;">'
+                f'<span style="color:{FAINT};min-width:13px;">{no}</span>'
+                f'<div><b style="color:{INK};">{title}</b>'
+                f'<div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;'
+                f'font-size:0.72rem;background:{BG_PAGE};border:1px solid {LINE};'
+                f'border-radius:6px;padding:6px 9px;margin:5px 0 4px;color:{INK};">{formula}</div>'
+                f'<div style="color:{MUTED};">{why}</div></div></div>')
+
+    steps = "".join([
+        _step(1, "매수강도로 환산", "매수강도 = 순매수액 ÷ 전주 순자산 × 100",
+              "순매수 금액을 그대로 쓰면 큰 ETF가 항상 이깁니다. 규모로 나눠 "
+              "‘자기 덩치 대비 얼마나 들어왔나’로 바꿉니다."),
+        _step(2, "Δ처치 — 처치군이 평소보다 얼마나 더 들어왔나",
+              f"Δ처치 = 개입 주 강도 − 직전 {D.BASELINE_WEEKS}주 평균",
+              f"{D.BASELINE_WEEKS}주를 베이스라인으로 삼아 그 상품의 ‘평소’를 정의합니다."),
+        _step(3, "Δ대조군 — 같은 주에 남들은 얼마나 늘었나",
+              "Δ대조군 = 대조군 각각의 Δ를 순자산 가중 평균",
+              "단순 평균을 쓰면 96억 ETF와 1,782억 ETF가 같은 무게가 되어 "
+              "소형 종목 노이즈가 그대로 섞입니다."),
+        _step(4, "DiD — 둘의 차이가 캠페인 몫", "DiD = Δ처치 − Δ대조군   (단위 %p)",
+              "시장·테마 전체에 일어난 변화가 상쇄되고 처치군에만 있었던 차이가 남습니다."),
+        _step(5, "0~100점 — 이 DiD가 평소보다 큰가",
+              f"z = (DiD − 과거 {D.ZSCORE_WINDOW}주 평균) ÷ 표준편차<br>"
+              f"점수 = 100 ÷ (1 + e^−z)",
+              "%p 값만으로는 큰지 작은지 알 수 없어 그 상품의 과거 변동폭과 견줍니다. "
+              f'<b style="color:{INK};">50점 = 평소와 같음</b>, 위로 갈수록 이례적으로 '
+              "강한 반응입니다."),
+    ])
+
+    verdicts = "".join(
+        f'<div style="display:grid;grid-template-columns:70px minmax(0,1fr);'
+        f'column-gap:10px;margin-bottom:3px;">'
+        f'<span style="color:{INK};">{k}</span><span style="color:{MUTED};">{v}</span></div>'
+        for k, v in [
+            ("양호", f"상관 {D.PARALLEL_GOOD:.2f} 이상"),
+            ("약함", f"상관 0~{D.PARALLEL_GOOD:.2f} — 채택하되 표시"),
+            ("부적합", "상관 음수 — 반대로 움직인 종목. 넣으면 DiD 부호가 뒤집혀 제외"),
+            ("검증 불가", f"개입 전 관측 {D.PARALLEL_MIN_WEEKS}주 미만이거나 값이 아예 안 움직임"),
+        ])
+
+    return (
+        f'<div style="font-size:0.78rem;">'
+        + _crit_label("먼저 — 왜 그냥 순매수를 안 보나")
+        + f'<div style="color:{MUTED};line-height:1.65;margin-bottom:16px;">'
+          f'캠페인 주에 순매수가 늘었다고 그게 캠페인 덕이라 할 수 없습니다. 그 주에 '
+          f'시장 전체가 좋았을 수도 있고, 그 테마가 뉴스로 뜬 것일 수도 있습니다.<br>'
+          f'<b style="color:{INK};">이중차분(DiD)</b>은 마케팅하지 않은 비슷한 ETF들을 '
+          f'대조군으로 두고, <b style="color:{INK};">양쪽 모두에 일어난 변화를 빼서</b> '
+          f'캠페인 몫만 남깁니다.</div>'
+        + _crit_label("계산 순서 — 다섯 단계") + steps
+        + _crit_label("대조군은 어떻게 고르나 — 두 단계")
+        + f'<div style="display:flex;gap:10px;margin-bottom:11px;line-height:1.6;">'
+          f'<span style="color:{FAINT};min-width:13px;">1</span>'
+          f'<div><b style="color:{INK};">후보 추리기 — 테마와 기초시장이 모두 같은 비KODEX ETF</b>'
+          f'<div style="color:{MUTED};">기초시장까지 맞추는 이유는, 테마만 맞추면 '
+          f'‘KODEX 미국반도체’의 대조군에 국내 반도체 ETF가 붙기 때문입니다. 두 시장은 '
+          f'환율·현지 실적에 다르게 반응해 마케팅과 무관한 차이가 효과로 오독됩니다. '
+          f'분류 실패 모음인 ‘기타’ 테마는 동질 집단이 아니라 대조군을 만들지 않습니다.'
+          f'</div></div></div>'
+        + f'<div style="display:flex;gap:10px;margin-bottom:11px;line-height:1.6;">'
+          f'<span style="color:{FAINT};min-width:13px;">2</span>'
+          f'<div><b style="color:{INK};">평행추세 검증 — 개입 전에 같이 움직였는가</b>'
+          f'<div style="color:{MUTED};">DiD가 성립하려면 “마케팅이 없었다면 둘이 같은 방향으로 '
+          f'움직였을 것”이 전제되어야 합니다. 구성종목이 비슷한지가 아니라 '
+          f'<b style="color:{INK};">개입 이전 강도 변화의 상관</b>으로 확인합니다.</div>'
+          f'<div style="margin-top:6px;">{verdicts}</div></div></div>'
+        + f'<div style="margin-top:12px;padding-top:10px;border-top:1px solid {LINE};'
+          f'color:{MUTED};line-height:1.6;">검증 가능한 후보가 하나도 없으면 미검증 후보를 '
+          f'그대로 쓰되 화면에 <b style="color:{INK};">검증 불가</b>로 표시합니다 — 검증된 것처럼 '
+          f'보이지 않게 하기 위해서입니다. 최대 5종까지 씁니다.</div>'
+        + f'<div style="margin-top:18px;">'
+        + _crit_label("측정이 안 되는 경우 — 점수 대신 사유를 표시")
+        + f'<div style="line-height:1.6;color:{MUTED};">'
+          f'<b style="color:{INK};">신규 상장</b> — 개입 이전에 거래가 있었던 주가 '
+          f'{D.MIN_BASELINE_ACTIVE}주 미만이면 측정하지 않습니다. 상장 전 순매수는 0이라 '
+          f'베이스라인이 0이 되고, 상장 첫 주 유입이 통째로 ‘효과’로 잡혀 수백 %p 허수가 '
+          f'나옵니다.<br>'
+          f'<b style="color:{INK};">대조군 없음</b> — Δ처치만 제공하고 시장 효과가 제거되지 '
+          f'않았음을 함께 표시합니다.<br>'
+          f'<b style="color:{INK};">이력 부족</b> — 과거 DiD가 4주 미만이면 Z-score를 낼 수 없어 '
+          f'점수 없이 DiD 원값만 보여줍니다.</div></div></div>')
+
+
 def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
     """차트도 타이포와 같은 수준으로 다듬는다 — 옅은 그리드, 축 라벨 축소, 제목 정렬."""
     fig.update_layout(
@@ -2188,6 +2276,11 @@ with tab_did:
         st.caption(f"베이스라인 {D.BASELINE_WEEKS}주 평균 · 라플라스 α={D.LAPLACE_ALPHA:.0f}억 · Z-score 창 {D.ZSCORE_WINDOW}주(가용분) · 대조군 = 동일 테마 비KODEX 평균")
     else:
         st.info("점수 산출 가능한 KODEX ETF가 없습니다.")
+
+    # 계산 방식은 매번 읽을 것이 아니라 확인할 것 — 탭 맨 아래에 접어 둔다
+    st.write("")
+    with st.expander("DiD 계산 방식"):
+        st.markdown(_did_method_html(), unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────
 # ④ 주간 리포트 — 데이터 기반 인사이트
