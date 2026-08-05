@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .streamlit/secrets.toml
 logs/
+
+# KRX Open API 응답 캐시 — 과거 날짜 값은 안 바뀌므로 로컬에만 둔다
+data/cache/
