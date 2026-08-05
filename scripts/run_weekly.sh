@@ -4,7 +4,7 @@
 # GitHub Actions와 macOS launchd가 이 스크립트 하나를 공유한다.
 # 두 곳에 로직을 복사하면 반드시 한쪽만 고쳐지고 갈라진다.
 #
-# 필요: KRX_ID / KRX_PW (weekly_batch·etf_batch·sector_universe)
+# 필요: KRX_API_KEY (openapi.krx.co.kr 인증키) — weekly_batch·etf_batch
 #       channel_batch는 키 없이 동작한다.
 #
 # 사용:
@@ -34,8 +34,8 @@ PY="$(resolve_python)" || {
 }
 log() { printf '[%s] %s\n' "$(date '+%m-%d %H:%M:%S')" "$*"; }
 
-if [ -z "${KRX_ID:-}" ] || [ -z "${KRX_PW:-}" ]; then
-    log "✗ KRX_ID/KRX_PW 환경변수가 없습니다 — KRX 배치 3종을 돌릴 수 없습니다."
+if [ -z "${KRX_API_KEY:-}" ]; then
+    log "✗ KRX_API_KEY 환경변수가 없습니다 — KRX 배치를 돌릴 수 없습니다."
     exit 1
 fi
 

@@ -757,7 +757,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"파일 형식 오류: {e}")
     elif netbuy_live:
-        st.caption(f"KRX 실데이터 · 개인 순매수 기준 · {netbuy_df['종목명'].nunique()}개 ETF")
+        st.caption(f"한국거래소 통계정보 · 개인 순매수 기준 · {netbuy_df['종목명'].nunique()}개 ETF")
     else:
         st.caption("미업로드 시 데모 데이터로 동작합니다.")
 
@@ -1521,7 +1521,7 @@ with tab_trend:
             fig_th = base_layout(fig_th, height=_h_th)
             fig_th.update_layout(
                 title=dict(
-                    text=f"섹터별 주간 수익률  <span style='font-size:12px;color:#98A2B3'>KRX 실데이터 · {wk_range}</span>",
+                    text=f"섹터별 주간 수익률  <span style='font-size:12px;color:#98A2B3'>한국거래소 통계정보 · {wk_range}</span>",
                     font=dict(size=15)),
                 margin=dict(l=8, r=8, t=56, b=8))
             fig_th.update_xaxes(ticksuffix="%", range=[min(vals) * 1.35 - 0.3, max(vals) * 1.3 + 0.3])
@@ -2939,7 +2939,9 @@ with tab_reg:
 
 st.write("")
 st.caption(
-    "ⓘ 시그널 보드·주간 수익률·섹터 수급·ETF 개인 순매수·순자산(KRX), 검색량(네이버 데이터랩), "
-    "뉴스(구글)·규제(금융위), 채널 콘텐츠(공식 홈페이지·유튜브·블로그 RSS)는 모두 실데이터입니다. "
-    "주간 배치: weekly_batch.py · etf_batch.py · channel_batch.py · sector_universe.py"
+    "ⓘ 시장 데이터는 **한국거래소 통계정보**를 사용한 결과입니다 "
+    "(KRX Data Marketplace OPEN API — 지수·ETF 일별시세). "
+    "검색량(네이버 데이터랩), 뉴스(구글)·규제(금융위), "
+    "채널 콘텐츠(공식 홈페이지·유튜브·블로그 RSS)도 모두 실데이터입니다. "
+    "주간 배치: weekly_batch.py · etf_batch.py · channel_batch.py"
 )

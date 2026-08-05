@@ -72,6 +72,8 @@ jobs:
       - name: 배치 실행 · 커밋 · 푸시
         if: steps.fresh.outputs.run == 'yes'
         env:
+          KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+          # KRX_ID/PW는 pykrx 시절 잔재 — channel_batch 등이 아직 참조할 수 있어 남긴다
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
           TZ: Asia/Seoul

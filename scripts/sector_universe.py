@@ -14,6 +14,7 @@
 """
 
 import json
+import re
 import sys
 import time
 import warnings
@@ -22,9 +23,12 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from weekly_batch import NON_STOCK_PAT, SECTORS  # 섹터 정의·필터 공유 (drift 방지)
+from weekly_batch import SECTORS  # 섹터 정의 공유 (drift 방지)
 
-from pykrx import stock
+
+# ETF PDF·지수 구성종목의 비주식 행 — 현금·예금·선물 등이 '010010' 같은
+# 6자리 가짜 코드로 들어온다. 코드 형식만으로는 못 거르므로 종목명으로 본다.
+NON_STOCK_PAT = re.compile(r"현금|예금|예치금|선물|스왑|채권|CD|RP|MMF|원화|외화")
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "sector_universe.json"
@@ -101,6 +105,22 @@ def overseas_members(code: str) -> list[dict]:
 
 def main():
     import os
+    # 지수 구성종목·ETF PDF는 KRX Open API에 없다(서비스 목록에 없고 후보 경로도
+    # 404로 확인 — 실측 2026-08-05). 화면 엔드포인트를 긁던 예전 방식은 이용약관
+    # 위반으로 차단됐으므로 되돌리지 않는다.
+    # 구성종목은 자주 바뀌지 않아 마지막 수집분(data/sector_universe.json)을
+    # 그대로 쓴다. 실패가 아니라 '건너뜀'이므로 정상 종료한다.
+    if not os.environ.get("SECTOR_UNIVERSE_FORCE"):
+        asof = ""
+        if OUT.exists():
+            try:
+                asof = json.loads(OUT.read_text()).get("asof", "")
+            except Exception:
+                pass
+        print("[섹터 유니버스] 건너뜀 — 구성종목은 KRX Open API가 제공하지 않습니다."
+              + (f" 마지막 수집분 {asof} 유지." if asof else ""))
+        return
+
     if not (os.environ.get("KRX_ID") and os.environ.get("KRX_PW")):
         sys.exit("KRX_ID/KRX_PW 환경변수가 필요합니다.")
 
