@@ -26,12 +26,13 @@
 import json
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import data as D  # 분류 기준을 앱과 공유 (drift 방지)
+from kis_api import INVESTOR_FIELDS, KisApiError, investor_daily, to_eok
 from krx_api import KrxApiError, snapshots, trading_dates
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,9 +58,15 @@ def _num(v) -> float | None:
 
 
 def week_label(dd: str) -> str:
-    """YYYYMMDD → '7월 4주' (앱의 주차 라벨 규칙과 동일)."""
+    """YYYYMMDD → '7월 4주' (앱의 주차 라벨 규칙과 동일).
+
+    라벨은 '그 주의 금요일'로 매긴다. 날짜 자체로 매기면 같은 주가 갈린다 —
+    2026-07-27(월)은 '7월 4주', 같은 주 금요일 07-31은 '7월 5주'가 되어
+    일별 수급을 주 단위로 합칠 때 한 주가 두 라벨로 쪼개진다(실측).
+    """
     d = date.fromisoformat(f"{dd[:4]}-{dd[4:6]}-{dd[6:]}")
-    return f"{d.month}월 {(d.day - 1) // 7 + 1}주"
+    fri = d + timedelta(days=4 - d.weekday()) if d.weekday() <= 4 else d
+    return f"{fri.month}월 {(fri.day - 1) // 7 + 1}주"
 
 
 def main():
@@ -125,6 +132,48 @@ def main():
             "주간": wk_rows[-N_WEEKS:],
         })
 
+    # ── 투자자별 순매수 (한국투자증권 KIS API)
+    # KRX Open API에는 투자자별 데이터가 없다. 좌수 기반 순유입이 '새 돈이
+    # 들어왔나'를 보는 것이라면, 이쪽은 '누가 샀나'를 본다. 마케팅은 개인을
+    # 겨냥하므로 둘은 같은 질문의 다른 면이고 함께 봐야 판단이 선다.
+    # 한 번 호출에 30영업일(약 6주)이 오므로 12주를 채우려면 두 번 부른다.
+    if os.environ.get("KIS_APP_KEY") and os.environ.get("KIS_APP_SECRET"):
+        anchors = [weeks_sorted[-1]]
+        if len(weeks_sorted) > 6:
+            anchors.append(weeks_sorted[-7])      # 30영업일 앞
+        wk_of = {}                                 # 영업일 → 주차 라벨
+        got = fail = 0
+        for i, r in enumerate(result, 1):
+            daily = {}
+            for a in anchors:
+                try:
+                    for d in investor_daily(r["티커"], a):
+                        daily[d.get("stck_bsop_date", "")] = d
+                except KisApiError:
+                    continue
+            if not daily:
+                fail += 1
+                continue
+            # 일별 → 주차 합계
+            agg: dict[str, dict[str, float]] = {}
+            for dd, d in daily.items():
+                if len(dd) != 8:
+                    continue
+                lb = wk_of.setdefault(dd, week_label(dd))
+                acc = agg.setdefault(lb, {k: 0.0 for k in INVESTOR_FIELDS})
+                for name, fld in INVESTOR_FIELDS.items():
+                    acc[name] += to_eok(d.get(fld))
+            for w in r["주간"]:
+                a = agg.get(w["주차"])
+                if a:
+                    w.update({f"{k}순매수억": round(v) for k, v in a.items()})
+            got += 1
+            if i % 100 == 0:
+                print(f"    수급 {i}/{len(result)}")
+        print(f"  투자자별 순매수 {got}종 수집 (실패 {fail}종)")
+    else:
+        print("  투자자별 순매수 건너뜀 — KIS_APP_KEY/SECRET 미설정")
+
     # 라인업 공백 테마의 경쟁사 순자산 — 신규 출시 판단에 쓴다.
     # 공백은 정의상 KODEX가 없는 테마라 위 목록(8개 브랜드)에 없을 수 있다.
     # 이제 전 종목이 한 응답에 있으므로 이름으로 바로 찾는다.
@@ -150,9 +199,11 @@ def main():
     OUT.write_text(json.dumps({
         "asof": date.today().isoformat(),
         "weeks": weeks,
-        "지표": "순유입 = Δ상장좌수 × NAV (설정·환매 기준). "
-              "장내 손바뀜인 개인 순매수와 달리 신규 유입만 잡는다.",
-        "출처": "한국거래소 통계정보 (KRX Open API · ETF 일별매매정보)",
+        "지표": "순유입 = Δ상장좌수 × NAV (설정·환매 기준, DiD 처치 지표). "
+              "개인·외국인·기관 순매수는 장내 매매 기준으로 함께 싣는다 — "
+              "순유입은 '새 돈이 들어왔나', 순매수는 '누가 샀나'를 본다.",
+        "출처": "한국거래소 통계정보 (KRX Open API · ETF 일별매매정보) · "
+              "투자자별 순매수는 한국투자증권 KIS Open API",
         "etfs": result,
         "공백경쟁사순자산": gap_aum,
     }, ensure_ascii=False, indent=2))

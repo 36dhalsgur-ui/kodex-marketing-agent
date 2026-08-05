@@ -502,7 +502,10 @@ def _did_method_html() -> str:
               "ETF는 자금이 들어오면 좌수가 늘고 빠지면 줄어듭니다(설정·환매). "
               "장내 개인 순매수는 누군가 판 것을 산 <b style=\"color:%s;\">손바뀜</b>이라 "
               "ETF 규모가 늘었다는 뜻이 아니지만, 좌수 증감은 신규 유입만 잡습니다. "
-              "금액을 그대로 쓰면 큰 ETF가 항상 이기므로 규모로 나눕니다." % INK),
+              "금액을 그대로 쓰면 큰 ETF가 항상 이기므로 규모로 나눕니다.<br>"
+              "투자자별 순매수(개인·외국인·기관)는 <b style=\"color:%s;\">'누가 샀나'</b>를 "
+              "보는 다른 지표라 차트 툴팁에 함께 싣습니다. 둘의 상관은 0.40으로, "
+              "대체재가 아니라 서로를 보완합니다." % (INK, INK)),
         _step(2, "Δ처치 — 처치군이 평소보다 얼마나 더 들어왔나",
               f"Δ처치 = 개입 주 강도 − 직전 {D.BASELINE_WEEKS}주 평균",
               f"{D.BASELINE_WEEKS}주를 베이스라인으로 삼아 그 상품의 ‘평소’를 정의합니다."),
@@ -747,7 +750,7 @@ with st.sidebar:
     netbuy_df, netbuy_live = load_netbuy(_mtime("etf_flows.json"))
     weeks = list(dict.fromkeys(netbuy_df["주차"]))
     sel_week = st.selectbox("분석 주차", weeks[1:][::-1], index=0)
-    top_n = st.slider("순매수강도 TOP N", 5, 20, 15)
+    top_n = st.slider("자금 유입강도 TOP N", 5, 20, 15)
 
     st.markdown("---")
     up = st.file_uploader("순매수 엑셀 업로드", type=["xlsx"], help="컬럼: 주차·종목명·테마·운용사·순매수액·순자산")
@@ -2123,7 +2126,7 @@ with tab_did:
     sc = D.did_score(series, event_week)
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    sub_header("03", "진단 결과", "좌: 금주 순매수강도 맥락 · 우: 처치−대조 이중차분")
+    sub_header("03", "진단 결과", "좌: 금주 자금 유입 맥락 · 우: 처치−대조 이중차분")
 
     d1, d2 = st.columns([7, 5], gap="large")
     with d1:
@@ -2134,15 +2137,19 @@ with tab_did:
             go.Bar(x=top["매수강도"], y=top["종목명"], orientation="h", marker_color=colors,
                    text=[f"{v:+.2f}%" for v in top["매수강도"]], textposition="outside",
                    cliponaxis=False,
-                   hovertemplate="%{y}<br>매수강도 %{x:.2f}%<extra></extra>")
+                   customdata=top[["순매수액", "개인순매수", "기관순매수"]].fillna(0).values,
+                   hovertemplate="%{y}<br>유입강도 %{x:.2f}%"
+                                 "<br>순유입 %{customdata[0]:,.0f}억 (설정·환매)"
+                                 "<br>개인 순매수 %{customdata[1]:,.0f}억"
+                                 "<br>기관 순매수 %{customdata[2]:,.0f}억<extra></extra>")
         )
         _h_top = max(360, top_n * BAR_ROW_PX + CHART_CHROME_PX)
         fig_top = base_layout(fig_top, height=_h_top)
-        fig_top.update_layout(title=dict(text=f"{sel_week} 순매수강도 TOP {top_n}", font=dict(size=15)))
+        fig_top.update_layout(title=dict(text=f"{sel_week} 자금 유입강도 TOP {top_n}", font=dict(size=15)))
         xmax = float(top["매수강도"].max())
         fig_top.update_xaxes(ticksuffix="%", range=[min(0, float(top["매수강도"].min()) * 1.2), xmax * 1.25])
         st.plotly_chart(fig_top, use_container_width=True)
-        st.caption(f"진한 남색 = KODEX 상품 · 분석 대상 {len(wk)}개 ETF")
+        st.caption(f"진한 남색 = KODEX 상품 · 분석 대상 {len(wk)}개 ETF · 막대는 순유입(Δ상장좌수×NAV) 기준, 막대에 마우스를 올리면 투자자별 순매수도 보입니다")
 
     with d2:
         st.markdown(
