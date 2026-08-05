@@ -1,10 +1,15 @@
 name: 주간 데이터 갱신
 
-# 금요일 21:00 KST = 금요일 12:00 UTC
-# (장 마감 15:30 후 5시간 30분 — KRX 투자자별 거래실적 확정 대기)
+# 토요일 09:00 KST = 토요일 00:00 UTC
+#
+# 로컬 launchd가 금요일 21:00 KST에 같은 계정으로 돈다. KRX 공식 계정은 동시 세션을
+# 하나만 허용해서, 두 경로가 같은 시각에 겹치면 서로의 세션을 무효화하고 이후 조회가
+# 전부 'LOGOUT'으로 실패한다(실측 2026-07-31 — 26개 섹터 중 15개 유실).
+# Actions는 로컬이 꺼져 있거나 실패했을 때의 백업이므로 12시간 뒤로 뗀다.
+# 아래 '로컬 결과 확인' 단계에서 이번 주 데이터가 이미 있으면 스스로 건너뛴다.
 on:
   schedule:
-    - cron: "0 12 * * 5"
+    - cron: "0 0 * * 6"
   workflow_dispatch: {}      # Actions 탭에서 수동 실행 가능
 
 # 데이터 커밋·푸시 권한
@@ -37,7 +42,35 @@ jobs:
           python -m pip install -q --upgrade pip
           python -m pip install -q pandas numpy requests beautifulsoup4 pykrx
 
+      # 로컬이 이미 이번 주분을 올렸으면 돌 이유가 없다. 같은 계정으로 또 로그인하면
+      # 로컬 세션까지 끊을 수 있으므로, 백업은 필요할 때만 돈다. 수동 실행은 항상 돈다.
+      - name: 로컬 결과 확인
+        id: fresh
+        env:
+          TZ: Asia/Seoul
+          EVENT: ${{ github.event_name }}
+        run: |
+          # 문자열 비교 대신 파이썬에서 날짜로 판단한다 — 셸 비교 연산자는 미묘하다.
+          run=$(python - <<'EOF'
+          import json, os
+          from datetime import date, timedelta
+          try:
+              asof = json.load(open("data/signal_board.json")).get("asof", "")
+          except Exception:
+              asof = ""
+          today = date.today()
+          friday = today - timedelta(days=(today.weekday() - 4) % 7)   # 직전(또는 오늘) 금요일
+          manual = os.environ.get("EVENT") != "schedule"
+          fresh = asof >= friday.isoformat()
+          print(f"asof={asof} · 기준 금요일={friday} · 수동={manual} · 최신={fresh}")
+          print("no" if (fresh and not manual) else "yes")
+          EOF
+          )
+          echo "$run"
+          echo "run=$(echo "$run" | tail -1)" >> "$GITHUB_OUTPUT"
+
       - name: 배치 실행 · 커밋 · 푸시
+        if: steps.fresh.outputs.run == 'yes'
         env:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
