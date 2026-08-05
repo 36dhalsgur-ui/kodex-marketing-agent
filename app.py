@@ -536,9 +536,9 @@ def _did_method_html() -> str:
 
     return (
         f'<div style="font-size:0.78rem;">'
-        + _crit_label("먼저 — 왜 그냥 순매수를 안 보나")
+        + _crit_label("먼저 — 왜 유입액을 그대로 보지 않나")
         + f'<div style="color:{MUTED};line-height:1.65;margin-bottom:16px;">'
-          f'캠페인 주에 순매수가 늘었다고 그게 캠페인 덕이라 할 수 없습니다. 그 주에 '
+          f'캠페인 주에 자금이 늘었다고 그게 캠페인 덕이라 할 수 없습니다. 그 주에 '
           f'시장 전체가 좋았을 수도 있고, 그 테마가 뉴스로 뜬 것일 수도 있습니다.<br>'
           f'<b style="color:{INK};">이중차분(DiD)</b>은 마케팅하지 않은 비슷한 ETF들을 '
           f'대조군으로 두고, <b style="color:{INK};">양쪽 모두에 일어난 변화를 빼서</b> '
@@ -568,9 +568,9 @@ def _did_method_html() -> str:
         + _crit_label("측정이 안 되는 경우 — 점수 대신 사유를 표시")
         + f'<div style="line-height:1.6;color:{MUTED};">'
           f'<b style="color:{INK};">신규 상장</b> — 개입 이전에 거래가 있었던 주가 '
-          f'{D.MIN_BASELINE_ACTIVE}주 미만이면 측정하지 않습니다. 상장 전 순매수는 0이라 '
-          f'베이스라인이 0이 되고, 상장 첫 주 유입이 통째로 ‘효과’로 잡혀 수백 %p 허수가 '
-          f'나옵니다.<br>'
+          f'{D.MIN_BASELINE_ACTIVE}주 미만이면 측정하지 않습니다. 상장 전에는 좌수 자체가 '
+          f'없어 베이스라인이 0이 되고, 상장 첫 주 유입이 통째로 ‘효과’로 잡혀 수백 %p '
+          f'허수가 나옵니다.<br>'
           f'<b style="color:{INK};">대조군 없음</b> — Δ처치만 제공하고 시장 효과가 제거되지 '
           f'않았음을 함께 표시합니다.<br>'
           f'<b style="color:{INK};">이력 부족</b> — 과거 DiD가 4주 미만이면 Z-score를 낼 수 없어 '
