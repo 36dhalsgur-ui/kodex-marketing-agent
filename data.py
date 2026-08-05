@@ -78,7 +78,11 @@ THEMES = sorted({t for _, t, _ in ETF_UNIVERSE})
 
 # ══════════════════════════════════════════════
 # ETF 실데이터 (scripts/etf_batch.py 산출) — 있으면 데모 유니버스를 대체한다
-# 매수강도 = 개인 순매수 ÷ 순자산. ETF의 금융투자는 LP 설정·환매가 지배해
+# 매수강도 = 주간 순유입(Δ상장좌수 × NAV) ÷ 순자산.
+# 예전엔 개인 순매수를 썼지만 그것은 장내 손바뀜이라 ETF 규모 변화를 뜻하지 않고,
+# KRX Open API가 투자자별 순매수를 제공하지 않아 설정·환매 기준으로 바꿨다.
+# (아래 옛 주석은 개인 순매수를 골랐던 이유 — 기록으로 남긴다)
+# 예전 기준: 개인 순매수 ÷ 순자산. ETF의 금융투자는 LP 설정·환매가 지배해
 # 마케팅 반응 지표로 부적절하므로 개인 기준을 쓴다 (실측 근거는 etf_batch.py 참조).
 # ══════════════════════════════════════════════
 _ETF_FLOWS_PATH = Path(__file__).parent / "data" / "etf_flows.json"
@@ -307,11 +311,11 @@ def review_current_marketing(events: list, board: list, netbuy_df, week: str) ->
             verdict, rank, ph = "확대", 0, phase
             why = f"{sector} {phase} — 관심이 오르는 테마라 마케팅 확대 적기."
             if inten is not None and 0 < inten < _NEWLISTING_INTENSITY:
-                why += f" 개인 순매수 {inten:+.2f}% 동반."
+                why += f" 순유입 강도 {inten:+.2f}% 동반."
         elif phase == "과열기":
             if inten is not None and inten < 0:
                 verdict, rank, ph = "축소", 3, phase
-                why = f"{sector} 과열기에 개인 순매수 {inten:+.2f}%로 이탈 — 고점 리스크. 마케팅 축소 검토."
+                why = f"{sector} 과열기에 순유입 강도 {inten:+.2f}%로 이탈 — 고점 리스크. 마케팅 축소 검토."
             else:
                 verdict, rank, ph = "지속·신중", 2, phase
                 why = f"{sector} 과열기 — 고점 리스크로 확대는 자제하고 현 수준 유지."
@@ -337,7 +341,7 @@ def build_recommendations(board: list, netbuy_df, week: str,
     각 권고: {우선순위, rank, 분류, 제목, 근거}. rank가 낮을수록 상단(적극>선점>유지>관찰>주의).
     규칙:
       - 확산기 섹터 + 보유 KODEX 상품 → 적극 마케팅 (자금 유입 동반 시 근거 강화)
-      - 현재 집행 중 캠페인 + 개인 순매수 반응 → 유지 (신규상장 왜곡은 분리 표기)
+      - 현재 집행 중 캠페인 + 순유입 반응 → 유지 (신규상장 왜곡은 분리 표기)
       - 태동기 섹터 → 선점 콘텐츠
       - 쇠퇴기 + 외국인·연기금 재매집(+) → 출시 준비 관찰
       - 검색 급등하나 과열·쇠퇴 국면 → 신규 대량 출시 주의
@@ -354,7 +358,7 @@ def build_recommendations(board: list, netbuy_df, week: str,
         inten = _intensity_at(netbuy_df, prod, week)
         why = f"{_eun(r['섹터'])} 확산 국면(상대강도 {r.get('RS수준')}) — 관심이 오르는 구간이라 보유 상품 마케팅 집중이 정석입니다."
         if inten is not None and 0 < inten < _NEWLISTING_INTENSITY:
-            why += f" 개인 순매수 강도 {inten:+.2f}%로 자금이 이미 유입 중이라 증폭 효과가 큽니다."
+            why += f" 순유입 강도 {inten:+.2f}%로 자금이 이미 유입 중이라 증폭 효과가 큽니다."
         if wr is not None and wr < -3:
             why += f" 단, 이번 주 {wr:+.1f}% 조정 중이라 방어 메시지 병행이 안전합니다."
         recs.append({"우선순위": "적극", "rank": 0, "분류": "확산기",
@@ -371,9 +375,9 @@ def build_recommendations(board: list, netbuy_df, week: str,
         if inten is not None and inten >= _NEWLISTING_INTENSITY:
             why = f"신규상장 첫 주 유입(개인 강도 {inten:+.0f}%는 상장 효과 포함). 초기 모멘텀을 확산기 진입까지 이어가는 집행 유지가 필요합니다."
         elif inten is not None and inten > 0:
-            why = f"현재 3채널 집행 중이며 개인 순매수 강도 {inten:+.2f}%로 실제 자금 반응이 확인됩니다 — 감이 아닌 데이터 근거로 유지 가치가 있습니다."
+            why = f"현재 3채널 집행 중이며 순유입 강도 {inten:+.2f}%로 실제 자금 반응이 확인됩니다 — 감이 아닌 데이터 근거로 유지 가치가 있습니다."
         else:
-            why = "현재 집행 중인 캠페인. 다음 주 개인 순매수 반응을 보고 지속 여부를 판단합니다."
+            why = "현재 집행 중인 캠페인. 다음 주 순유입 반응을 보고 지속 여부를 판단합니다."
         recs.append({"우선순위": "유지", "rank": 2, "분류": "캠페인",
                      "제목": f"{e.get('표기명', etf)} 캠페인 유지", "근거": why})
 
@@ -422,8 +426,13 @@ def build_recommendations(board: list, netbuy_df, week: str,
 
 
 def real_netbuy_frame(flows: dict) -> pd.DataFrame:
-    """배치 산출물 → 순매수 분석용 데이터프레임.
-    컬럼: 주차·종목명·테마·기초시장·운용사·순매수액(개인, 억)·순자산(억)"""
+    """배치 산출물 → 자금 유입 분석용 데이터프레임.
+    컬럼: 주차·종목명·테마·기초시장·운용사·순매수액(주간 순유입, 억)·순자산(억)
+
+    '순매수액' 열 이름은 그대로 두되 내용은 순유입(Δ상장좌수 × NAV)이다.
+    개인 순매수는 장내 손바뀜이라 ETF 규모 변화를 뜻하지 않는 데다, KRX
+    Open API가 투자자별 순매수를 제공하지 않아 좌수 기반으로 바꿨다.
+    옛 산출물도 읽을 수 있게 개인순매수억을 대체 키로 남긴다."""
     rows = []
     for e in flows.get("etfs", []):
         aum = e.get("순자산억")
@@ -431,10 +440,13 @@ def real_netbuy_frame(flows: dict) -> pd.DataFrame:
         # 배치를 다시 돌리지 않아도 분류 개선이 즉시 반영되고, 규칙이 한 곳에만 있다.
         theme, market = classify_etf(e["종목명"])
         for w in e.get("주간", []):
+            flow = w.get("순유입억")
+            if flow is None:
+                flow = w.get("개인순매수억", 0)
             rows.append({
                 "주차": w["주차"], "종목명": e["종목명"], "테마": theme,
                 "기초시장": market, "운용사": e["운용사"],
-                "순매수액": w.get("개인순매수억", 0), "순자산": aum,
+                "순매수액": flow, "순자산": aum,
             })
     df = pd.DataFrame(rows)
     if len(df):

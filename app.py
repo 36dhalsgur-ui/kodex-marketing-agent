@@ -497,9 +497,12 @@ def _did_method_html() -> str:
                 f'<div style="color:{MUTED};">{why}</div></div></div>')
 
     steps = "".join([
-        _step(1, "매수강도로 환산", "매수강도 = 순매수액 ÷ 전주 순자산 × 100",
-              "순매수 금액을 그대로 쓰면 큰 ETF가 항상 이깁니다. 규모로 나눠 "
-              "‘자기 덩치 대비 얼마나 들어왔나’로 바꿉니다."),
+        _step(1, "순유입을 강도로 환산",
+              "순유입액 = Δ상장좌수 × NAV<br>유입강도 = 순유입액 ÷ 전주 순자산 × 100",
+              "ETF는 자금이 들어오면 좌수가 늘고 빠지면 줄어듭니다(설정·환매). "
+              "장내 개인 순매수는 누군가 판 것을 산 <b style=\"color:%s;\">손바뀜</b>이라 "
+              "ETF 규모가 늘었다는 뜻이 아니지만, 좌수 증감은 신규 유입만 잡습니다. "
+              "금액을 그대로 쓰면 큰 ETF가 항상 이기므로 규모로 나눕니다." % INK),
         _step(2, "Δ처치 — 처치군이 평소보다 얼마나 더 들어왔나",
               f"Δ처치 = 개입 주 강도 − 직전 {D.BASELINE_WEEKS}주 평균",
               f"{D.BASELINE_WEEKS}주를 베이스라인으로 삼아 그 상품의 ‘평소’를 정의합니다."),
@@ -616,7 +619,7 @@ def _mtime(name: str) -> float:
 
 @st.cache_data
 def load_netbuy(mtime: float):
-    """ETF 순매수 — 배치 실데이터(개인 순매수÷순자산)가 있으면 그것을, 없으면 데모.
+    """ETF 자금 유입 — 배치 실데이터(Δ상장좌수×NAV ÷ 순자산)가 있으면 그것을, 없으면 데모.
 
     mtime을 캐시 키로 받는다. 주간 배치는 data/만 커밋하므로 app.py가 그대로면
     배포본의 캐시가 폐기되지 않아 지난주 주차가 계속 보였다(실측: 홈이 7월 3주).
@@ -757,7 +760,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"파일 형식 오류: {e}")
     elif netbuy_live:
-        st.caption(f"한국거래소 통계정보 · 개인 순매수 기준 · {netbuy_df['종목명'].nunique()}개 ETF")
+        st.caption(f"한국거래소 통계정보 · 순유입(설정·환매) 기준 · {netbuy_df['종목명'].nunique()}개 ETF")
     else:
         st.caption("미업로드 시 데모 데이터로 동작합니다.")
 
