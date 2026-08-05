@@ -98,3 +98,80 @@ def fetch(service: str, bas_dd: str, use_cache: bool = True) -> list[dict]:
     cf.parent.mkdir(parents=True, exist_ok=True)
     cf.write_text(json.dumps(rows, ensure_ascii=False))
     return rows
+
+
+# ── 주간 스냅샷 ────────────────────────────────────────────────────
+# RRG는 주간 종가만 쓴다. 일별을 전부 받을 이유가 없다.
+#   일별 53주 × 5일 × 2종 = 530회   →   주 1회씩 53 × 2종 = 106회
+# 과거 주는 캐시되므로 매주 새로 받는 건 2회뿐이다.
+#
+# 두 소스를 각자 날짜로 되짚으면 어긋난다(실측): 휴장일에 지수 API는 0건을
+# 주는데 ETF API는 행을 주되 종가가 빈 문자열이다. 그래서 ETF 쪽만 휴장일을
+# 유효한 날로 잘못 잡아 4주가 어긋났고 RS가 틀어졌다.
+# → 거래일은 지수 API로 한 번 정하고, ETF는 그 날짜에만 맞춰 받는다.
+# → 시계열 인덱스는 실제 거래일이 아니라 '그 주의 금요일'로 고정해 항상 정렬된다.
+
+_CAL_SERVICE = "idx/krx_dd_trd"
+
+
+def trading_dates(weeks: int = 53, end: "date | None" = None,
+                  max_back: int = 6) -> dict[str, str]:
+    """주별 마지막 거래일. {주금요일 YYYYMMDD: 실제 거래일 YYYYMMDD}
+
+    end 이후의 미완결 주는 담지 않는다 — 금요일이 아닌 날 실행해도
+    '마지막 완결 주'로 고정되도록 기존 배치와 같은 규칙을 지킨다.
+    """
+    from datetime import date as _date, timedelta
+    end = end or _date.today()
+    last_fri = end - timedelta(days=(end.weekday() - 4) % 7)
+    out: dict[str, str] = {}
+    for i in range(weeks):
+        fri = last_fri - timedelta(weeks=i)
+        for back in range(max_back):
+            dd = (fri - timedelta(days=back)).strftime("%Y%m%d")
+            try:
+                if fetch(_CAL_SERVICE, dd):      # 휴장일은 0건
+                    out[fri.strftime("%Y%m%d")] = dd
+                    break
+            except KrxApiError:
+                continue
+    return dict(sorted(out.items()))
+
+
+def snapshots(service: str, dates: dict[str, str]) -> dict[str, list[dict]]:
+    """정해진 거래일들의 데이터를 주금요일 키로 담는다."""
+    out: dict[str, list[dict]] = {}
+    for week, dd in dates.items():
+        try:
+            rows = fetch(service, dd)
+        except KrxApiError:
+            continue
+        if rows:
+            out[week] = rows
+    return out
+
+
+def series_from(snaps: dict[str, list[dict]], key: str, value: str,
+                match: str) -> "pd.Series":
+    """주간 스냅샷에서 한 종목·지수의 시계열을 뽑는다. 인덱스는 주금요일.
+
+    key   — 행을 식별하는 필드 (ISU_CD / IDX_NM)
+    value — 값 필드 (TDD_CLSPRC / CLSPRC_IDX)
+    match — key가 이 값과 같은 행을 고른다
+    빈 문자열·0은 값이 없는 것으로 보고 건너뛴다(휴장일 잔여 행 방어).
+    """
+    import pandas as pd
+    idx, vals = [], []
+    for week, rows in sorted(snaps.items()):
+        row = next((r for r in rows if r.get(key) == match), None)
+        if row is None:
+            continue
+        try:
+            v = float(str(row[value]).replace(",", "").strip())
+        except (KeyError, ValueError):
+            continue
+        if v <= 0:
+            continue
+        idx.append(pd.Timestamp(week))
+        vals.append(v)
+    return pd.Series(vals, index=pd.DatetimeIndex(idx)).sort_index()
