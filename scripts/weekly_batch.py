@@ -59,7 +59,7 @@ SECTORS = [
     {"name": "필수소비재", "price": ("index", "KRX 필수소비재"), "roster": ("krx_index", "5062"), "kodex": "KODEX 필수소비재"},
     {"name": "K콘텐츠",    "price": ("index", "KRX K콘텐츠"), "roster": ("krx_index", "5063"), "kodex": "KODEX K콘텐츠"},
     {"name": "정보기술",   "price": ("index", "KRX 정보기술"), "roster": ("krx_index", "5064"), "kodex": "KODEX IT"},
-    {"name": "유틸리티",   "price": ("index", "KRX 유틸리티"), "roster": ("krx_index", "5065"), "kodex": "KODEX 유틸리티"},
+    {"name": "유틸리티",   "price": ("index", "KRX 유틸리티"), "roster": ("krx_index", "5065"), "kodex": ""},  # 국내 유틸리티 ETF는 전 운용사 미보유 — 방송통신과 같은 라인업 공백
     # 2군 — 마케팅 테마 (KRX 섹터지수 부재 → KODEX ETF)
     {"name": "방산",       "price": ("etf", "0080G0"), "roster": ("etf_pdf", "0080G0"), "kodex": "KODEX 방산TOP10"},
     {"name": "2차전지",    "price": ("etf", "305720"), "roster": ("etf_pdf", "305720"), "kodex": "KODEX 2차전지산업"},
@@ -82,8 +82,11 @@ TODAY = date.today()
 # 요청 수: 주 1회씩 53주 × 2종 = 106회(첫 실행), 이후 캐시로 주 2회.
 # 한도 10,000회/일 대비 1% 수준이라 재차단 위험이 없다.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from kis_api import INVESTOR_FIELDS, KisApiError, investor_daily, to_eok  # noqa: E402
 from krx_api import KrxApiError, series_from, snapshots, trading_dates  # noqa: E402
 
+UNIVERSE = ROOT / "data" / "sector_universe.json"
+FLOW_WEEKS = 13                 # 수급 창 — 13주(분기) 순매수 합
 IDX_SVC = "idx/krx_dd_trd"      # 지수 — 섹터지수 17 + KRX 300이 한 응답에 온다
 ETF_SVC = "etp/etf_bydd_trd"    # ETF — 전 종목 시세·NAV·순자산·상장좌수
 
@@ -112,6 +115,24 @@ def main():
         sys.exit("KRX_API_KEY 환경변수가 필요합니다 (openapi.krx.co.kr 인증키).")
 
     print(f"[배치 시작] {TODAY.isoformat()} · {len(SECTORS)}개 섹터")
+
+    # SECTORS의 KODEX 상품명이 실제 상장 목록에 있는지 확인한다.
+    # 없는 이름을 두면 순자산 조회가 실패해 '확인 필요'로 빠지고, 착수 판정에서
+    # 조용히 제외된다(실측: 'KODEX 유틸리티'는 실존하지 않는데 매핑돼 있었다).
+    try:
+        import data as _D
+        _live = {_D._norm_etf(e["종목명"])
+                 for e in json.loads((ROOT / "data" / "etf_flows.json").read_text()).get("etfs", [])}
+        _miss = []
+        for c in SECTORS:
+            for one in [x.strip() for x in (c.get("kodex") or "").split("·") if x.strip()]:
+                nm = one if one.startswith("KODEX") else f"KODEX {one}"
+                if _D._norm_etf(nm) not in _live:
+                    _miss.append(f'{c["name"]}→{nm}')
+        if _miss:
+            print(f"  [경고] 실재하지 않는 KODEX 매핑 {len(_miss)}건 — {', '.join(_miss)}")
+    except Exception:
+        pass
 
     # 전주 단계 (직전 산출물에서) — 브리핑의 '단계 전환' 감지용
     prev_stages: dict[str, str] = {}
@@ -156,6 +177,61 @@ def main():
         if kind == "index":
             return series_from(isnap, "IDX_NM", "CLSPRC_IDX", code)
         return series_from(esnap, "ISU_CD", "TDD_CLSPRC", code)
+
+    # ── 구성종목 명부 — Open API에 지수 구성종목이 없어 마지막 수집분을 쓴다
+    roster: dict[str, list[str]] = {}
+    roster_asof = ""
+    try:
+        u = json.loads(UNIVERSE.read_text())
+        roster_asof = u.get("asof", "")
+        for sec in u.get("sectors", []):
+            if sec.get("군") == "해외":
+                continue
+            roster[sec["섹터"]] = [m["티커"] for m in sec.get("종목", []) if m.get("티커")]
+    except Exception as e:
+        print(f"  [경고] 구성종목 명부 읽기 실패 ({type(e).__name__}) — 수급 집계 생략")
+
+    kis_on = bool(os.environ.get("KIS_APP_KEY") and os.environ.get("KIS_APP_SECRET"))
+    n_stk = len({t for v in roster.values() for t in v})
+    print(f"  구성종목 {n_stk}종 ({roster_asof} 명부) · 수급 "
+          + ("KIS 수집" if kis_on else "건너뜀(키 미설정)"))
+
+    # 13주(65영업일)를 채우려면 30영업일 응답을 세 번 이어 붙인다.
+    # 같은 종목이 여러 섹터에 들어가므로(408종 중 71종 중복) 캐시가 꼭 필요하다.
+    _flow_cache: dict[str, tuple[dict, dict] | None] = {}
+    _anchors = [d for d in (dates.get(w) for w in sorted(dates)[::-1][:13:6]) if d]
+
+    def stock_flow(tk: str):
+        """(13주 합, 마지막 완결 주) 각각 {개인·외국인·기관·연기금: 억원}. 실패 시 None."""
+        if tk in _flow_cache:
+            return _flow_cache[tk]
+        daily: dict[str, dict] = {}
+        for a in _anchors:
+            try:
+                for d in investor_daily(tk, a):
+                    daily[d.get("stck_bsop_date", "")] = d
+            except KisApiError:
+                continue
+        if not daily:
+            _flow_cache[tk] = None
+            return None
+        lo = (week_end - timedelta(weeks=FLOW_WEEKS)).strftime("%Y%m%d")
+        w_lo, w_hi = week_start.strftime("%Y%m%d"), week_end.strftime("%Y%m%d")
+        tot = {k: 0.0 for k in INVESTOR_FIELDS}
+        wk1 = {k: 0.0 for k in INVESTOR_FIELDS}
+        for dd, d in daily.items():
+            if len(dd) != 8 or dd <= lo:
+                continue
+            for name, fld in INVESTOR_FIELDS.items():
+                v = to_eok(d.get(fld))
+                tot[name] += v
+                if w_lo <= dd <= w_hi:
+                    wk1[name] += v
+        _flow_cache[tk] = (tot, wk1)
+        return _flow_cache[tk]
+
+    FLOW_KEYS = ("외국인13주억", "연기금13주억", "개인13주억", "큰손13주억",
+                 "외국인1주억", "연기금1주억", "개인1주억", "구성종목수")
 
     board = []
     px_failed: list[str] = []
@@ -204,25 +280,57 @@ def main():
             else:
                 row.update({"단계": "관망", "비고": f"시세 실패: {type(e).__name__}"})
 
-        # ── 수급 — KRX Open API에는 투자자별 순매수(외국인·기관·개인)가 없다.
-        # 서비스 목록에 없고 후보 경로도 404로 확인됐다(실측 2026-08-05).
-        # 지우면 ①의 수급 열과 태동기 '조용한 매집' 판정이 통째로 사라지므로,
-        # 마지막으로 받은 값을 언제 것인지 밝혀 남긴다. 갱신되지 않는 값이라는
-        # 사실이 화면에 드러나야 오해가 없다.
+        # ── 수급 — 구성종목의 투자자별 순매수 합 (한국투자증권 KIS API)
+        # KRX Open API에는 투자자별 데이터가 없어 증권사 API로 받는다.
+        # 구성종목 명부는 data/sector_universe.json의 마지막 수집분을 쓴다
+        # (지수 구성종목 API도 Open API에 없다. 구성은 자주 바뀌지 않는다).
         if not cfg.get("roster"):
-            row["수급비고"] = "해외 구성종목 — KRX 투자자별 순매수 미제공"
-        else:
+            row["수급비고"] = "해외 구성종목 — 국내 투자자별 순매수 미제공"
+        elif not roster.get(name):
+            row["수급비고"] = "구성종목 명부 없음 — sector_universe.json 확인 필요"
+        elif not kis_on:
             keep = prev_flows.get(name)
             if keep:
-                for k in ("외국인13주억", "연기금13주억", "개인13주억", "큰손13주억",
-                          "외국인1주억", "연기금1주억", "개인1주억", "구성종목수"):
+                for k in FLOW_KEYS:
                     if k in keep:
                         row[k] = keep[k]
-                row["수급비고"] = (f"{keep.get('수급기준일') or prev_asof} 수집분 — "
-                                 "Open API 전환 후 투자자별 순매수는 갱신되지 않습니다")
-                row["수급기준일"] = keep.get("수급기준일") or prev_asof
+                row["수급비고"] = f"{prev_asof} 수집분 — KIS 키 미설정으로 갱신 안 됨"
             else:
-                row["수급비고"] = "투자자별 순매수 미수집 — Open API 미제공"
+                row["수급비고"] = "투자자별 순매수 미수집 — KIS_APP_KEY 미설정"
+        else:
+            acc = {k: 0.0 for k in INVESTOR_FIELDS}
+            acc1 = {k: 0.0 for k in INVESTOR_FIELDS}
+            used = 0
+            for tk in roster[name]:
+                f = stock_flow(tk)
+                if f is None:
+                    continue
+                for k in INVESTOR_FIELDS:
+                    acc[k] += f[0][k]
+                    acc1[k] += f[1][k]
+                used += 1
+            if used:
+                big = acc["외국인"] + acc["기관"]   # 외국인+기관 = 큰손
+                row.update({
+                    "외국인13주억": round(acc["외국인"]),
+                    "연기금13주억": round(acc["연기금"]),
+                    "개인13주억": round(acc["개인"]),
+                    "큰손13주억": round(big),
+                    "외국인1주억": round(acc1["외국인"]),
+                    "연기금1주억": round(acc1["연기금"]),
+                    "개인1주억": round(acc1["개인"]),
+                    "구성종목수": used,
+                    "수급기준일": TODAY.isoformat(),
+                })
+            else:
+                keep = prev_flows.get(name)
+                if keep:
+                    for k in FLOW_KEYS:
+                        if k in keep:
+                            row[k] = keep[k]
+                    row["수급비고"] = f"수급 조회 실패 — {prev_asof} 수집분 유지"
+                else:
+                    row["수급비고"] = "수급 조회 실패"
 
         if prev_stages.get(name):
             row["전주단계"] = prev_stages[name]

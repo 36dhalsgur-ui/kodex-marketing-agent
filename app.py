@@ -1362,7 +1362,8 @@ with tab_trend:
             f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:14px;">'
             f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다. '
-            f'수급(13주 순매수)은 판정과 별개로 <b>자금이 실제로 어디로 움직였는지</b> 보여주는 보조 지표입니다.<br>'
+            f'수급(13주 순매수)은 판정과 별개로 <b>자금이 실제로 어디로 움직였는지</b> 보여주는 '
+            f'보조 지표입니다 — 구성종목의 투자자별 순매수 합(한국투자증권 KIS API)입니다.<br>'
             f'가격은 <b style="color:{NAVY};">KRX 공식 섹터지수</b>로 잽니다. '
             f'다만 아래 <b>{len(_etf_priced)}개는 KRX 섹터지수가 없어 해당 KODEX ETF 종가</b>로 판정하며, '
             f'섹터명 아래에 <b>‘상품명 · 가격 기준’</b>으로 표시했습니다 — {_etf_priced_txt}.</div>'
@@ -2951,6 +2952,7 @@ st.write("")
 st.caption(
     "ⓘ 시장 데이터는 **한국거래소 통계정보**를 사용한 결과입니다 "
     "(KRX Data Marketplace OPEN API — 지수·ETF 일별시세). "
+    "투자자별 순매수는 한국투자증권 KIS Open API. "
     "검색량(네이버 데이터랩), 뉴스(구글)·규제(금융위), "
     "채널 콘텐츠(공식 홈페이지·유튜브·블로그 RSS)도 모두 실데이터입니다. "
     "주간 배치: weekly_batch.py · etf_batch.py · channel_batch.py"
