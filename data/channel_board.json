@@ -1,10 +1,17 @@
 {
-  "asof": "2026-08-01",
+  "asof": "2026-08-07",
   "brands": [
     {
       "브랜드": "KODEX",
       "홈": "https://www.kodex.com",
       "이벤트목록": [
+        {
+          "제목": "KODEX 한국, 미국 반도체 ETF 투자 이벤트",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=99",
+          "상태": "진행중",
+          "시작": "2026-08-05",
+          "종료": "2026-09-30"
+        },
         {
           "제목": "KODEX 분배금 인증 이벤트📅💙",
           "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=98",
@@ -27,6 +34,13 @@
           "종료": "2026-12-31"
         },
         {
+          "제목": "[6~8월 릴레이 이벤트] Kodex ETF 순자산 200조 돌파 기념",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=93",
+          "상태": "진행중",
+          "시작": "2026-08-03",
+          "종료": "2026-08-31"
+        },
+        {
           "제목": "Kodex ETF 증권사 이벤트 안내",
           "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=33",
           "상태": "진행중",
@@ -34,11 +48,15 @@
           "종료": "2026-12-31"
         }
       ],
+      "이벤트": {
+        "라벨": "미국S&P500 투자자를 위한 이벤트🎁 지금 확인하기",
+        "링크": "https://www.kodex.com/etf/lounge/event.do"
+      },
       "배너": [
         {
-          "제목": "신규상장(8/4) KODEX 미국CPU반도체TOP10 ETF (종목코드 : 0225V0) AI 에이전트 전성시대, CPU가 판을 바꾼다! 분배금",
+          "제목": "신규상장(8/4) KODEX 미국CPU반도체TOP10 ETF (종목코드 : 0225V0) AI 에이전트 전성시대, CPU가 판을 바꾼다! 상품안",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFV9",
-          "NEW": false,
+          "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -52,9 +70,9 @@
           "슬롯수": 1
         },
         {
-          "제목": "상품안내 KODEX AI반도체TOP2플러스 ETF (종목코드 : 395160) AI반도체 TOP2(삼성전자, SK하이닉스)에 삼성전기까지 HOT",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE9",
-          "NEW": false,
+          "제목": "미국대표지수 월배당 KODEX 미국배당커버드콜액티브 ETF KODEX 미국성장커버드콜액티브 ETF 미국 대표지수 월배당 ETF 보러가기 → HO",
+          "링크": "https://www.kodex.com/etf/theme-view.do?seq=60114&themeCd=usa%20monthly&bgColor=%23004d8a",
+          "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -65,7 +83,78 @@
     {
       "브랜드": "TIGER",
       "홈": "https://www.tigeretf.com",
-      "이벤트비고": "이벤트 수집 실패: HTTPError",
+      "이벤트목록": [
+        {
+          "제목": "TIGER ETF 미국대표지수 적립식 매수인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=183",
+          "상태": "진행중",
+          "시작": "2026-08-03",
+          "종료": "2026-12-31"
+        },
+        {
+          "제목": "상반기 개인순매수 TOP5 TIGER ETF 연금계좌 매수 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=182",
+          "상태": "진행중",
+          "시작": "2026-08-03",
+          "종료": "2026-08-31"
+        },
+        {
+          "제목": "TIGER 패밀리클럽 친구 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=181",
+          "상태": "진행중",
+          "시작": "2026-07-15",
+          "종료": "2026-08-14"
+        },
+        {
+          "제목": "TIGER ETF 증권사 거래 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=100",
+          "상태": "진행중",
+          "시작": "",
+          "종료": ""
+        },
+        {
+          "제목": "TIGER ETF 증권사 적립식 및 순매수 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=99",
+          "상태": "진행중",
+          "시작": "",
+          "종료": ""
+        },
+        {
+          "제목": "TIGER ETF 증권사 연금 및 ISA 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=97",
+          "상태": "진행중",
+          "시작": "",
+          "종료": ""
+        },
+        {
+          "제목": "TIGER 글로벌반도체 ETF 매수 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=180",
+          "상태": "종료",
+          "시작": "2026-07-06",
+          "종료": "2026-07-31"
+        },
+        {
+          "제목": "TIGER 미국우주테크 매수 인증 이벤트!",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=178",
+          "상태": "종료",
+          "시작": "2026-06-10",
+          "종료": "2026-07-10"
+        },
+        {
+          "제목": "Run Your Pace, TIGER ETF 20주년 X 큰별하프마라톤 이벤트(※당첨자 발표※)",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=177",
+          "상태": "종료",
+          "시작": "2026-05-27",
+          "종료": "2026-06-19"
+        },
+        {
+          "제목": "TIGER 미국나스닥100 ETF 순자산 10조 돌파 기념 매수 인증 이벤트!",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=176",
+          "상태": "종료",
+          "시작": "2026-05-20",
+          "종료": "2026-06-12"
+        }
+      ],
       "배너": [
         {
           "제목": "[ETF 포트폴리오] 2026년 3분기 ETF 포트폴리오",
@@ -84,6 +173,14 @@
           "슬롯수": 1
         },
         {
+          "제목": "[이벤트] 미국 대표지수 ETF 적립식 매수 이벤트",
+          "링크": "https://investments.miraeasset.com",
+          "노출": "메인 배너",
+          "NEW": true,
+          "링크유형": "홈페이지",
+          "슬롯수": 1
+        },
+        {
           "제목": "[액티브 ETF] TIGER 미국테크 NYSE100액티브",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
@@ -98,17 +195,9 @@
           "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
-        },
-        {
-          "제목": "[이벤트] 글로벌 반도체 ETF 매수인증 이벤트",
-          "링크": "https://investments.miraeasset.com",
-          "노출": "메인 배너",
-          "NEW": false,
-          "링크유형": "홈페이지",
-          "슬롯수": 1
         }
       ],
-      "비고": "수집 실패(HTTPError) — 직전 데이터 유지"
+      "순서근거": "사이트 노출 순서"
     },
     {
       "브랜드": "ACE",
@@ -160,7 +249,7 @@
           "슬롯수": 1
         }
       ],
-      "비고": "수집 실패(ReadTimeout) — 직전 데이터 유지"
+      "순서근거": "운용사 지정 우선순위"
     },
     {
       "브랜드": "SOL",
