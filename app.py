@@ -977,7 +977,7 @@ tab_home, tab_trend, tab_channel, tab_did, tab_report, tab_reg = st.tabs(
 # ──────────────────────────────────────────────
 with tab_home:
     st.write("")
-    section_header("HOME", f"{sel_week} 요약", "이번 주 시장과 KODEX 마케팅의 상태를 한 화면에.")
+    section_header("HOME", f"{sel_week} 요약", "이번 주 시장과 KODEX 마케팅의 상태를 한 화면에")
     st.write("")
 
     # ── 실데이터 (시그널 보드 · 순매수 · 캠페인)
@@ -1021,8 +1021,14 @@ with tab_home:
     _p = f'프로모션 <b>{len(PROMOS)}종</b>을 집행 중이고, ' if PROMOS else "진행 중인 프로모션은 없고, "
 
     if _go_now:
-        # 근거는 '핵심 — 부연' 꼴이라 앞머리만 쓴다. 왜 그 섹터인지가 한눈에 보여야 한다
-        _why = (f' — {_go_now[0]["근거"].split("—")[0].strip()}' if len(_go_now) == 1 else "")
+        # 근거는 '핵심 — 근거 문장들' 꼴이다. 앞머리(조용한 매집)만 쓰면 왜 그
+        # 섹터인지가 안 보이므로, 대시 뒤 첫 문장(실제 수치)까지 함께 싣는다.
+        _why = ""
+        if len(_go_now) == 1:
+            _parts = _go_now[0]["근거"].split("—", 1)
+            _kick = _parts[0].strip()
+            _fact = _parts[1].split(".")[0].strip() if len(_parts) > 1 else ""
+            _why = f' — {_kick}: {_fact}' if _fact else (f' — {_kick}' if _kick else "")
         _line1 = f'{_p}이번 주 새로 착수할 곳은 <b>{_n1}</b>입니다{_why}.'
         _line2 = (f'{_n2}{D._eun(_n2)[len(_n2):]} 소재만 준비하고 집행은 보류합니다.'
                   if _prep else "")
