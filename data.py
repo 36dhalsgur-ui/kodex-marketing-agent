@@ -1892,12 +1892,12 @@ def control_diagnostics(df: pd.DataFrame, treat: str, candidates: list[str],
         # 둘을 뭉치면 "7주인데 최소 4주 필요"처럼 앞뒤가 안 맞는 안내가 나간다.
         reason = ""
         if n_pre < PARALLEL_MIN_WEEKS:
-            verdict, reason = "검증 불가", f"개입 이전 관측 {n_pre}주 (최소 {PARALLEL_MIN_WEEKS}주 필요)"
+            verdict, reason = "검증 불가", f"집행 이전 관측 {n_pre}주 (최소 {PARALLEL_MIN_WEEKS}주 필요)"
         elif np.isnan(corr):
             if n_pre >= 2 and float(t[m].std() or 0) == 0:
-                verdict, reason = "검증 불가", "처치군이 개입 이전 내내 순매수 0 (신규 상장) — 변화가 없어 상관 계산 불가"
+                verdict, reason = "검증 불가", "처치군이 집행 이전 내내 순매수 0 (신규 상장) — 변화가 없어 상관 계산 불가"
             elif n_pre >= 2 and float(b[m].std() or 0) == 0:
-                verdict, reason = "검증 불가", "대조군 후보가 개입 이전 내내 순매수 0"
+                verdict, reason = "검증 불가", "대조군 후보가 집행 이전 내내 순매수 0"
             else:
                 verdict, reason = "검증 불가", "상관 계산 불가"
         elif corr < 0:
@@ -1991,11 +1991,11 @@ def pretrend_check(series: pd.DataFrame, week: str) -> dict:
     out = {"가능": False, "주수": int(len(vals)), "평균": None,
            "표준편차": None, "비율": None, "판정": "검증 불가", "사유": ""}
     if len(vals) < PRETREND_MIN_WEEKS:
-        out["사유"] = f"개입 이전 DiD {len(vals)}주 (최소 {PRETREND_MIN_WEEKS}주 필요)"
+        out["사유"] = f"집행 이전 DiD {len(vals)}주 (최소 {PRETREND_MIN_WEEKS}주 필요)"
         return out
     m, sd = float(vals.mean()), float(vals.std())
     if sd <= 1e-9:
-        out["사유"] = "개입 이전 DiD가 전혀 움직이지 않음 — 판정 불가"
+        out["사유"] = "집행 이전 DiD가 전혀 움직이지 않음 — 판정 불가"
         return out
     ratio = abs(m) / sd
     out.update(가능=True, 평균=round(m, 2), 표준편차=round(sd, 2), 비율=round(ratio, 2))
@@ -2003,10 +2003,10 @@ def pretrend_check(series: pd.DataFrame, week: str) -> dict:
         out["판정"] = "양호"
     elif ratio <= PRETREND_MAX * 2:
         out["판정"] = "약함"
-        out["사유"] = f"개입 전에도 대조군과 평균 {m:+.2f}%p 벌어져 있었다"
+        out["사유"] = f"집행 전에도 대조군과 평균 {m:+.2f}%p 벌어져 있었다"
     else:
         out["판정"] = "부적합"
-        out["사유"] = (f"개입 전부터 대조군보다 평균 {m:+.2f}%p 앞서 있어 "
+        out["사유"] = (f"집행 전부터 대조군보다 평균 {m:+.2f}%p 앞서 있어 "
                       f"효과와 추세를 구분할 수 없다")
     return out
 
@@ -2034,8 +2034,8 @@ def did_score(series: pd.DataFrame, week: str) -> dict:
             "available": True, "did": None, "score": None, "z": None,
             "delta_treat": None, "delta_ctrl": None,
             "pre_weeks": active, "pre_need": MIN_BASELINE_ACTIVE,
-            "fallback": f"개입 전 이력 {active}주 — 베이스라인이 부족해 DiD 측정 불가 "
-                        f"(필요 {MIN_BASELINE_ACTIVE}주)",
+            "fallback": f"이벤트 집행 전 이력 {active}주 — 베이스라인이 부족해 DiD "
+                        f"측정 불가 (필요 {MIN_BASELINE_ACTIVE}주)",
         }
     r = row.iloc[0]
     hist = series[series["주차"] != week]["DiD"].dropna().tail(ZSCORE_WINDOW)

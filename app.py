@@ -499,7 +499,7 @@ def _did_method_html() -> str:
               "투자자별 순매수(개인·외국인·기관)는 ‘누가 샀나’를 보는 다른 지표라 "
               "차트 툴팁에 함께 싣습니다." % (INK, INK)),
         _step(2, "Δ처치 — 처치군이 평소보다 얼마나 더 들어왔나",
-              f"Δ처치 = 개입 주 강도 − 직전 {D.BASELINE_WEEKS}주 평균",
+              f"Δ처치 = 집행 주 강도 − 직전 {D.BASELINE_WEEKS}주 평균",
               f"{D.BASELINE_WEEKS}주를 베이스라인으로 삼아 그 상품의 ‘평소’를 정의합니다."),
         _step(3, "Δ대조군 — 같은 주에 남들은 얼마나 늘었나",
               "Δ대조군 = 대조군 각각의 Δ를 순자산 가중 평균",
@@ -520,10 +520,10 @@ def _did_method_html() -> str:
         f'column-gap:10px;margin-bottom:3px;">'
         f'<span style="color:{INK};">{k}</span><span style="color:{MUTED};">{v}</span></div>'
         for k, v in [
-            ("양호", f"비율 {D.PRETREND_MAX:.2f} 이하 — 개입 전 DiD가 0 근처"),
+            ("양호", f"비율 {D.PRETREND_MAX:.2f} 이하 — 집행 전 DiD가 0 근처"),
             ("약함", f"비율 {D.PRETREND_MAX:.2f}~{D.PRETREND_MAX*2:.2f} — 쓰되 표시"),
-            ("부적합", "그 이상 — 개입 전부터 벌어져 있어 효과와 추세를 못 가름"),
-            ("검증 불가", f"개입 전 DiD {D.PRETREND_MIN_WEEKS}주 미만이거나 값이 아예 안 움직임"),
+            ("부적합", "그 이상 — 집행 전부터 벌어져 있어 효과와 추세를 못 가름"),
+            ("검증 불가", f"집행 전 DiD {D.PRETREND_MIN_WEEKS}주 미만이거나 값이 아예 안 움직임"),
         ])
 
     return (
@@ -547,12 +547,12 @@ def _did_method_html() -> str:
           f'</div></div></div>'
         + f'<div style="display:flex;gap:10px;margin-bottom:11px;line-height:1.6;">'
           f'<span style="color:{FAINT};min-width:13px;">2</span>'
-          f'<div><b style="color:{INK};">평행추세 검증 — 개입 전 DiD가 0 근처인가</b>'
+          f'<div><b style="color:{INK};">평행추세 검증 — 집행 전 DiD가 0 근처인가</b>'
           f'<div style="color:{MUTED};">DiD가 성립하려면 “마케팅이 없었다면 둘이 같은 방향으로 '
-          f'움직였을 것”이 전제되어야 합니다. 구성종목이 비슷한지가 아니라, 개입 '
+          f'움직였을 것”이 전제되어야 합니다. 구성종목이 비슷한지가 아니라, 이벤트 집행 '
           f'<b style="color:{INK};">이전</b> 구간의 DiD가 0 근처에서 안정적인지로 확인합니다 — '
-          f'개입 전부터 앞서 있었다면 그 차이는 효과가 아니라 원래의 추세입니다.<br>'
-          f'<b style="color:{INK};">비율 = |개입 전 DiD 평균| ÷ 표준편차</b>. DiD가 실제로 쓰는 '
+          f'집행 전부터 앞서 있었다면 그 차이는 효과가 아니라 원래의 추세입니다.<br>'
+          f'<b style="color:{INK};">비율 = |집행 전 DiD 평균| ÷ 표준편차</b>. DiD가 실제로 쓰는 '
           f'합산 대조군에 대해 재므로 검증 대상과 계산 대상이 같습니다.</div>'
           f'<div style="margin-top:6px;">{verdicts}</div></div></div>'
         + f'<div style="margin-top:12px;padding-top:10px;border-top:1px solid {LINE};'
@@ -569,7 +569,7 @@ def _did_method_html() -> str:
         + f'<div style="margin-top:18px;">'
         + _crit_label("측정이 안 되는 경우 — 점수 대신 사유를 표시")
         + f'<div style="line-height:1.6;color:{MUTED};">'
-          f'<b style="color:{INK};">신규 상장</b> — 개입 이전에 거래가 있었던 주가 '
+          f'<b style="color:{INK};">신규 상장</b> — 이벤트 집행 이전에 거래가 있었던 주가 '
           f'{D.MIN_BASELINE_ACTIVE}주 미만이면 측정하지 않습니다. 상장 전에는 좌수 자체가 '
           f'없어 베이스라인이 0이 되고, 상장 첫 주 유입이 통째로 ‘효과’로 잡혀 수백 %p '
           f'허수가 나옵니다.<br>'
@@ -1789,7 +1789,7 @@ with tab_channel:
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:12px;">'
             f'01이 <b>지금 무엇을 걸어놨는지</b>를 본다면, 여기서는 그 캠페인이 '
             f'<b>언제 시작해 언제 끝나는지</b>를 봅니다. 집행 기간이 명시돼 있어 '
-            f'③ 효과 측정에서 개입 시점을 정의하는 데 가장 적합한 신호입니다. '
+            f'③ 효과 측정에서 집행 시점을 정의하는 데 가장 적합한 신호입니다. '
             f'이벤트 보드를 파싱할 수 있는 곳은 KODEX·TIGER 2개사입니다.</div>', unsafe_allow_html=True)
         if _ev_brands:
             _today_iso = dt.date.today().isoformat()
@@ -1998,7 +1998,7 @@ with tab_did:
     section_header(
         "STEP 3 · MEASURE",
         "마케팅 효과 측정 — DiD 인과분석",
-        "개입 시점(집행 주차)을 기준으로 처치군 KODEX ETF와 동일 테마 경쟁 ETF "
+        "이벤트를 집행한 주를 기준으로 처치군 KODEX ETF와 동일 테마 경쟁 ETF "
         "평균을 비교해 시장효과를 제거합니다.",
     )
     st.write("")
@@ -2044,7 +2044,7 @@ with tab_did:
     st.write("")
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    sub_header("02", "분석 대상 지정", "처치군 ETF와 개입 주차 · 비교할 대조군")
+    sub_header("02", "분석 대상 지정", "처치군 ETF와 집행 주차 · 비교할 대조군")
 
     # ── 분석할 캠페인 선택 (처치 ETF + 개입 주차가 함께 결정된다)
     manual_mode = False
@@ -2052,7 +2052,7 @@ with tab_did:
         # 라벨은 ETF 이름만 — 개입 주차·채널은 아래 캡션과 01 목록에 이미 있다
         labels = [e["표기명"] for e in usable]
         pick = st.selectbox("분석할 마케팅 이벤트", labels,
-                            help="선택한 이벤트의 ETF가 처치군, 집행 주차가 개입 시점이 됩니다")
+                            help="선택한 이벤트의 ETF가 처치군이 되고, 그 이벤트를 집행한 주가 비교 기준 시점이 됩니다")
         ev = usable[labels.index(pick)]
         treat, event_week = ev["ETF"], ev["주차"]
     else:
@@ -2081,7 +2081,7 @@ with tab_did:
         options=ctrl_options,
         default=auto_controls,
     )
-    st.caption(f"처치군 **{treat}** · 개입 주차 **{event_week}**"
+    st.caption(f"처치군 **{treat}** · 이벤트 집행 **{event_week}**"
                + ("  (수동 지정 — 실제 마케팅 여부는 검증되지 않음)" if manual_mode
                   else "  (감지된 마케팅 집행 시점 기준)"))
     if len(controls) == 1:
@@ -2121,12 +2121,12 @@ with tab_did:
             st.markdown(
                 f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:12px;">'
                 f'DiD는 <b>"마케팅이 없었다면 처치군도 대조군과 같은 방향으로 움직였을 것"</b>을 가정합니다. '
-                f'이 가정은 <b>개입 이전 DiD가 0 근처에서 안정적인가</b>로 직접 확인합니다 — '
-                f'개입 전부터 대조군보다 앞서 있었다면 그 차이는 마케팅 효과가 아니라 원래의 추세입니다.<br>'
+                f'이 가정은 <b>이벤트 집행 이전 DiD가 0 근처에서 안정적인가</b>로 직접 확인합니다 — '
+                f'집행 전부터 대조군보다 앞서 있었다면 그 차이는 마케팅 효과가 아니라 원래의 추세입니다.<br>'
                 f'DiD가 실제로 쓰는 <b>순자산 가중 합산 대조군</b>에 대해 재므로 검증 대상과 계산 대상이 같습니다.</div>'
                 + (f'<div style="display:flex;gap:10px;margin-bottom:14px;">'
                    f'<div style="flex:1;border:1px solid {LINE};border-radius:8px;padding:10px 12px;">'
-                   f'<div style="font-size:0.66rem;color:{FAINT};font-weight:700;">개입 전 DiD 평균</div>'
+                   f'<div style="font-size:0.66rem;color:{FAINT};font-weight:700;">집행 전 DiD 평균</div>'
                    f'<div style="font-size:1.05rem;font-weight:800;color:{INK};">{_pt["평균"]:+.2f}%p</div></div>'
                    f'<div style="flex:1;border:1px solid {LINE};border-radius:8px;padding:10px 12px;">'
                    f'<div style="font-size:0.66rem;color:{FAINT};font-weight:700;">주간 변동폭</div>'
@@ -2217,21 +2217,22 @@ with tab_did:
             _listed = netbuy_df.loc[netbuy_df["종목명"] == treat, "첫주차"].dropna()
             _listed = _listed.iloc[0] if len(_listed) else None
             if _listed:
-                _why = (f'이 ETF는 <b>{_listed}</b>에 상장했고 개입도 '
-                        f'<b>{event_week}</b>라, 비교할 이전 기간이 없습니다. '
-                        f'(순유입은 상장좌수 증감이라 상장 첫 주에는 값이 나오지 '
-                        f'않고, 유입 기록은 그다음 주부터 시작합니다.)')
+                _why = (f'이 ETF는 <b>{_listed}</b>에 상장했고, 이벤트도 같은 주에 '
+                        f'시작했습니다. 상품이 없던 기간과는 비교할 수 없으니 '
+                        f'‘평소’가 존재하지 않습니다 — 이 경우 첫 주 유입은 마케팅 '
+                        f'효과가 아니라 신규 상장 그 자체입니다.')
             else:
                 _first = weeks_avail[0] if weeks_avail else "?"
-                _why = (f'수집 구간이 <b>{_first}</b>부터라 개입(<b>{event_week}</b>) '
-                        f'앞에 {_pw}주치만 있습니다.')
+                _why = (f'수집 구간이 <b>{_first}</b>부터라 이벤트 집행'
+                        f'(<b>{event_week}</b>) 앞에 {_pw}주치만 있습니다.')
             st.markdown(
                 f'<div class="did-result" style="background:#5B6478;">'
                 f'<div class="did-result-label">측정 불가</div>'
                 f'<div class="did-result-val" style="font-size:1.2rem;">'
-                f'개입 전 이력 {_pw}주 '
+                f'이벤트 집행 전 이력 {_pw}주 '
                 f'<span style="font-size:0.85rem;opacity:0.75;">(필요 {_pn}주)</span></div>'
-                f'<div class="did-result-note">DiD는 개입 전후를 비교합니다. {_why}</div>'
+                f'<div class="did-result-note">DiD는 <b>이벤트를 집행하기 전과 후</b>를 '
+                f'비교해 효과를 가려냅니다. {_why}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -2343,7 +2344,7 @@ with tab_did:
             marker_color=[NAVY if w == event_week else "#C7CFDF" for w in series["주차"]],
         ))
         fig_did = base_layout(fig_did, height=220)
-        fig_did.update_layout(title=dict(text=f"주차별 DiD 추이 (진한 막대 = 개입 주차 {event_week})", font=dict(size=14)),
+        fig_did.update_layout(title=dict(text=f"주차별 DiD 추이 (진한 막대 = 집행 주차 {event_week})", font=dict(size=14)),
                               margin=dict(l=10, r=10, t=40, b=10))
         fig_did.update_yaxes(ticksuffix="%p")
         st.plotly_chart(fig_did, use_container_width=True)
