@@ -579,8 +579,10 @@ def _did_method_html() -> str:
           f'허수가 나옵니다.<br>'
           f'<b style="color:{INK};">대조군 없음</b> — Δ처치만 제공하고 시장 효과가 제거되지 '
           f'않았음을 함께 표시합니다.<br>'
-          f'<b style="color:{INK};">이력 부족</b> — 과거 DiD가 4주 미만이면 Z-score를 낼 수 없어 '
-          f'점수 없이 DiD 원값만 보여줍니다.</div></div>'
+          f'<b style="color:{INK};">이력 부족</b> — 이벤트 이전 DiD가 '
+          f'{D.ZSCORE_MIN_HIST}주 미만이면 점수 없이 DiD 원값만 보여줍니다. 표본이 그보다 '
+          f'적으면 변동폭 추정이 흔들려 점수가 사실상 난수가 됩니다(실측: 참조 6주면 '
+          f'반도체 점수 90점, 8주 이상이면 62~68점).</div></div>'
         + f'<div style="margin-top:18px;">'
         + _crit_label("알고 쓰는 한계")
         + f'<div style="line-height:1.6;color:{MUTED};">'
@@ -2333,12 +2335,10 @@ with tab_did:
                     f'background:rgba(255,255,255,0.85);"></div></div>'
                     f'<div style="display:flex;justify-content:space-between;font-size:0.6rem;opacity:0.6;margin-top:3px;">'
                     f'<span>0 · 평소보다 낮음</span><span>50 · 평소와 같음</span><span>100 · 평소보다 높음</span></div>'
-                    f'<div class="did-result-note">{vsay}<br>'
-                    f'<span style="opacity:0.7;">변동폭은 이벤트 이전 {sc["n_hist"]}주의 '
-                    f'DiD로 잽니다. '
-                    f'자금 흐름의 출렁임은 시기마다 달라(실측 1.6~1.7배) 조용하던 시기가 '
-                    f'기준이면 점수가 높게, 요동치던 시기가 기준이면 낮게 나올 수 있습니다.'
-                    f'</span></div></div>',
+                    # 국면 한계는 아래 'DiD 계산 방식 > 알고 쓰는 한계'에 있다.
+                    # 점수 바로 밑에 두면 점수를 보자마자 의심하라는 말이 되고,
+                    # 같은 내용이 화면에 세 번 나온다.
+                    f'<div class="did-result-note">{vsay}</div></div>',
                     unsafe_allow_html=True,
                 )
                 with st.expander("점수 해석 기준"):

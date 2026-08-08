@@ -1143,6 +1143,11 @@ def fetch_datalab(client_id: str | None = None, client_secret: str | None = None
 LAPLACE_ALPHA = 10.0   # 억원 — 소형 ETF 변화율 폭발 방지
 BASELINE_WEEKS = 8
 ZSCORE_WINDOW = 15     # 권장 15주 (데이터 부족 시 가용 주차 사용)
+# 점수를 낼 최소 표본. 4주로 잰 표준편차는 오차가 40%대라 z가 사실상 난수가 된다 —
+# 실측 2026-08-08: 참조 6주면 KODEX 반도체 점수가 90점, 8주 이상이면 62~68점으로
+# 안정된다(폭 29점 → 6점). 계산 방식(평균·표준편차)의 문제가 아니라 표본 수 문제라,
+# 중앙값 중심이나 MAD로 바꿔도 나아지지 않았다.
+ZSCORE_MIN_HIST = 8
 
 
 # ── 마케팅 이벤트 탐지 — DiD의 '처치'를 채널 수집물에서 정의한다 ──────────
@@ -2107,7 +2112,7 @@ def did_score(series: pd.DataFrame, week: str) -> dict:
     if result["did"] is None:
         result["fallback"] = "대조군 없음 — Δ처치(시장효과 미제거)만 제공"
         return result
-    if len(hist) >= 4 and hist.std() > 1e-9:
+    if len(hist) >= ZSCORE_MIN_HIST and hist.std() > 1e-9:
         z = (result["did"] - hist.mean()) / hist.std()
         result["z"] = round(float(z), 2)
         result["score"] = round(100 / (1 + math.exp(-z)), 1)
@@ -2116,7 +2121,8 @@ def did_score(series: pd.DataFrame, week: str) -> dict:
         result["base_std"] = round(float(hist.std()), 2)
         result["n_hist"] = int(len(hist))
     else:
-        result["fallback"] = f"이력 {len(hist)}주 — Z-score 산출에 부족(최소 4주), DiD 원값만 제공"
+        result["fallback"] = (f"이력 {len(hist)}주 — 점수 산출에 부족"
+                              f"(최소 {ZSCORE_MIN_HIST}주), DiD 원값만 제공")
     return result
 
 
