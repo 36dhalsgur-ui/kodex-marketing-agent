@@ -1579,7 +1579,14 @@ with tab_trend:
 
     # ══════════ 섹터 유니버스 — 국면 판정의 근거가 된 종목 묶음 ══════════
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    sub_header("05", "섹터 유니버스", "위 판정이 어떤 종목 묶음을 근거로 했는지 확인")
+    # 명부 수집일은 부제에 붙인다. 이 명부는 보기용이 아니라 수급 열(13주 순매수)을
+    # 합산하는 기준이라 '언제 것인지'가 숫자의 전제가 된다. 섹션 맨 아래 캡션에
+    # 두면 위 표와 멀어 연결이 안 보인다(실제로 혼동 발생).
+    _uni_data = load_sector_universe()
+    _uni_asof = _uni_data.get("asof", "")
+    sub_header("05", "섹터 유니버스",
+               "위 판정이 어떤 종목 묶음을 근거로 했는지 확인"
+               + (f" · {_uni_asof} 기준" if _uni_asof else ""))
     st.markdown(
         f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:12px;">'
         f'섹터마다 종목 명부의 출처가 다릅니다. <b>KRX 섹터지수가 있는 17개</b>는 그 지수의 '
@@ -1588,7 +1595,6 @@ with tab_trend:
         f'<b>KODEX ETF의 구성내역(PDF)</b>을 씁니다 — 어느 쪽이든 <b>공시 명부를 그대로</b> 쓰며 '
         f'종목을 임의로 고르지 않습니다.</div>',
         unsafe_allow_html=True)
-    _uni_data = load_sector_universe()
     _uni_secs = _uni_data.get("sectors", [])
     if _uni_secs:
         _by_name = {s["섹터"]: s for s in _uni_secs}
@@ -1630,17 +1636,6 @@ with tab_trend:
                 st.caption(cap)
             else:
                 st.info(s.get("비고", "구성종목을 수집하지 못했습니다."))
-        # 구성종목은 KRX Open API에 해당 서비스가 없어 주간 갱신되지 않는다.
-        # '주간 배치'라고 적으면 매주 새로 받는 것처럼 읽혀, 실제로는 고정된
-        # 스냅샷이라는 사실이 가려진다. 며칠 전 것인지까지 같이 밝힌다.
-        _uni_asof = _uni_data.get("asof", "")
-        try:
-            _age = f" ({(dt.date.today() - dt.date.fromisoformat(_uni_asof)).days}일 전)"
-        except ValueError:
-            _age = ""
-        st.caption(
-            f"구성종목 **{_uni_asof}** 수집{_age} · KRX Open API가 구성종목을 제공하지 않아 "
-            "주간 갱신 없이 마지막 수집분을 씁니다 — 지수·ETF 구성은 자주 바뀌지 않습니다")
     else:
         st.info("섹터 유니버스 데이터가 없습니다 — 로컬에서 `python scripts/sector_universe.py` 실행 후 커밋하면 표시됩니다.")
 
