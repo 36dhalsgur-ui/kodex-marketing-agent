@@ -2478,24 +2478,32 @@ with tab_report:
         _w = _w[_w["매수강도"] < 40]                      # 신규상장 왜곡 제외
         flow_top = [(r["종목명"], r["매수강도"]) for _, r in _w.nlargest(4, "매수강도").iterrows()]
 
-    # DiD 예시 (최근 측정 가능 건)
-    did_ctx = None
+    # ③이 잰 이벤트를 전부 싣는다. 대표 1건만 보여주면 '이번 주 마케팅이 통했나'에
+    # 답이 안 된다 — 어떤 건 통하고 어떤 건 아닌 게 이 섹션의 핵심 정보다.
+    # 측정 못 한 건도 사유와 함께 남긴다(빠지면 집행 건수와 수가 안 맞는다).
+    def _verdict_of(z):
+        return ("이례적으로 강함" if z >= 1.65 else "평소보다 강함" if z >= 1.0 else
+                "다소 강함" if z >= 0.5 else "평소와 차이 없음" if z > -0.5 else "평소보다 부진")
+
+    did_all = []
     for e in rep_campaigns:
-        if not e["분석가능"]:
-            continue
         _wk = e["주차"] if e["주차"] in weeks else weeks[-1]
-        _, _c, _sx, _ = did_verified(netbuy_df, _uni_r, e["ETF"], _wk)
-        if _sx.get("did") is not None and _sx.get("score") is not None:
-            _z = _sx["z"]
-            did_ctx = {
-                "name": e["표기명"], "channel": e["채널"], "week": _wk,
-                "dt": _sx["delta_treat"], "dc": _sx["delta_ctrl"], "did": _sx["did"],
-                "score": _sx["score"], "base_mean": _sx["base_mean"],
-                "base_std": _sx["base_std"], "n_hist": _sx["n_hist"],
-                "verdict": ("이례적으로 강함" if _z >= 1.65 else "평소보다 강함" if _z >= 1.0 else
-                            "다소 강함" if _z >= 0.5 else "평소와 차이 없음" if _z > -0.5 else "평소보다 부진"),
-            }
-            break
+        _row = {"name": e["표기명"], "channel": e["채널"], "week": _wk,
+                "did": None, "score": None, "verdict": "", "reason": ""}
+        if not e["분석가능"]:
+            _row["reason"] = "순매수 데이터 미연동"
+        else:
+            _, _c, _sx, _ = did_verified(netbuy_df, _uni_r, e["ETF"], _wk)
+            if _sx.get("did") is not None and _sx.get("score") is not None:
+                _row.update(dt=_sx["delta_treat"], dc=_sx["delta_ctrl"], did=_sx["did"],
+                            score=_sx["score"], base_mean=_sx["base_mean"],
+                            base_std=_sx["base_std"], n_hist=_sx["n_hist"],
+                            n_ctrl=len(_c), verdict=_verdict_of(_sx["z"]))
+            else:
+                _row["reason"] = _sx.get("fallback") or "측정 불가"
+        did_all.append(_row)
+    # PDF는 대표 1건 형식을 그대로 쓰므로 첫 측정 가능 건을 남긴다
+    did_ctx = next((r for r in did_all if r["did"] is not None), None)
 
     # 홈과 같은 판정을 쓴다 (탭 상단에서 한 번 계산)
     _n_em = len(EMERGING_JUDGED)
@@ -2616,7 +2624,8 @@ with tab_report:
         "bench_ret": _sb_all.get("벤치주간수익률"),
         "top_up": top_up, "top_dn": top_dn,
         "campaigns": rep_campaigns, "top_brand": brand_act[0] if brand_act else ("—", 0),
-        "flow_top": flow_top, "did": did_ctx, "review": review, "review_read": review_read,
+        "flow_top": flow_top, "did": did_ctx, "did_all": did_all,
+        "review": review, "review_read": review_read,
         "emerging": emerging, "emerging_names": emerging_names, "expanding_names": expanding_names,
         "gap": gap_ctx, "gaps_all": gaps_all, "gap_details": gap_details,
         "emerging_all": emerging_all,
@@ -2877,25 +2886,45 @@ with tab_report:
                 + '</div></div>', unsafe_allow_html=True)
     st.write("")
 
-    # ══════════ DiD 요약 ══════════
-    if did_ctx:
-        sub_header("D", "마케팅 효과 검증", "③에서 측정한 이번 주 대표 사례")
-        st.markdown(
-            f'<div class="card" style="padding:14px 18px;">'
-            f'<div style="font-size:0.82rem;color:{GRAY};margin-bottom:8px;">'
-            f'측정 사례 <b style="color:{INK};">{did_ctx["name"]}</b> · {did_ctx["channel"]} · {did_ctx["week"]}</div>'
-            f'<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
-            f'<span style="font-size:0.8rem;">Δ처치 <b>{did_ctx["dt"]:+.2f}%p</b></span>'
-            f'<span style="color:{FAINT};">−</span>'
-            f'<span style="font-size:0.8rem;">Δ대조군 <b>{did_ctx["dc"]:+.2f}%p</b></span>'
-            f'<span style="color:{FAINT};">=</span>'
-            f'<span style="font-size:0.9rem;color:{NAVY};">DiD <b>{did_ctx["did"]:+.2f}%p</b></span>'
-            f'<span style="margin-left:auto;font-size:0.86rem;font-weight:800;color:{NAVY};">'
-            f'{did_ctx["score"]:.0f}점 · {did_ctx["verdict"]}</span></div>'
-            f'<div style="font-size:0.72rem;color:{GRAY};margin-top:8px;">'
-            f'이 ETF의 평소 DiD 변동폭 ±{did_ctx["base_std"]:.2f}%p '
-            f'(이벤트 이전 {did_ctx["n_hist"]}주 기준) · 50점 = 평소 변동폭 안'
-            f'</div></div>', unsafe_allow_html=True)
+    # ══════════ DiD 요약 — ③이 잰 이벤트 전 건 ══════════
+    if did_all:
+        _n_ok = sum(1 for r in did_all if r["did"] is not None)
+        sub_header("D", "마케팅 효과 검증",
+                   f"집행 {len(did_all)}건 중 측정 {_n_ok}건")
+        _rows = ""
+        for r in did_all:
+            if r["did"] is None:
+                _rows += (
+                    f'<div class="kw-row" style="align-items:center;">'
+                    f'<span class="kw-name" style="flex:1;min-width:0;overflow:hidden;'
+                    f'text-overflow:ellipsis;white-space:nowrap;font-size:0.83rem;'
+                    f'font-weight:600;color:{MUTED};">{r["name"]}</span>'
+                    f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;'
+                    f'margin:0 10px;">{r["week"]}</span>'
+                    f'<span style="font-size:0.72rem;color:{FAINT};white-space:nowrap;'
+                    f'flex:none;">{r["reason"]}</span></div>')
+                continue
+            _vc = ("#2E9E62" if r["score"] >= 73 else NAVY if r["score"] >= 62
+                   else MUTED if r["score"] >= 38 else "#7A8595")
+            _rows += (
+                f'<div class="kw-row" style="align-items:center;">'
+                f'<span class="kw-name" style="flex:1;min-width:0;overflow:hidden;'
+                f'text-overflow:ellipsis;white-space:nowrap;font-size:0.83rem;'
+                f'font-weight:700;color:{INK};">{r["name"]}</span>'
+                f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;'
+                f'margin:0 10px;">{r["week"]}</span>'
+                f'<span style="font-size:0.8rem;color:{NAVY};white-space:nowrap;'
+                f'min-width:74px;text-align:right;">DiD <b>{r["did"]:+.2f}%p</b></span>'
+                f'<span style="font-size:0.82rem;font-weight:800;color:{_vc};'
+                f'white-space:nowrap;min-width:44px;text-align:right;">{r["score"]:.0f}점</span>'
+                f'<span style="font-size:0.74rem;color:{_vc};white-space:nowrap;'
+                f'min-width:96px;text-align:right;">{r["verdict"]}</span></div>')
+        st.markdown(f'<div class="card" style="padding:6px 18px 10px;">{_rows}</div>',
+                    unsafe_allow_html=True)
+        # 계산 방식은 ③에서 설명했다. 여기서는 '이 숫자를 어떻게 읽나'만 적는다.
+        st.caption("DiD가 양수면 같은 기간 경쟁 ETF보다 자금을 더 받았다는 뜻입니다. "
+                   "점수는 그 값이 이 ETF에서 이례적인지를 보여줍니다 — 38~62점은 평소 "
+                   "범위라 효과로 보기 어렵고, 73점을 넘어야 효과가 있었다고 볼 만합니다.")
         st.write("")
 
     # ══════════ PDF 내보내기 ══════════

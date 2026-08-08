@@ -255,7 +255,24 @@ def render_report(ctx: dict) -> str:
             f'<div class="t">DiD</div><div class="v down">{did["did"]:+.2f}%p</div></div></div>'
             f'<p class="rz">이 ETF의 평소 DiD 변동폭(±{did["base_std"]:.2f}%p)과 견주면 '
             f'<b>{did["score"]:.0f}점 / 100 · {_esc(did["verdict"])}</b>. '
-            f'50점이 "평소 변동폭 안"이며, 그보다 낮으면 평소만 못했다는 뜻이다.</p>')
+            f'DiD가 양수면 같은 기간 경쟁 ETF보다 자금을 더 받았다는 뜻이고, '
+            f'점수 38~62는 평소 범위라 효과로 보기 어렵다.</p>')
+        # 대표 1건만 실으면 '어떤 건 통하고 어떤 건 아닌지'가 빠진다 — 전 건을 표로 잇는다
+        _rest = [r for r in (ctx.get("did_all") or []) if r is not did]
+        if _rest:
+            _tr = "".join(
+                f'<tr><td>{_esc(r["name"])}</td><td>{_esc(r["week"])}</td>'
+                + (f'<td class="num">{r["did"]:+.2f}%p</td>'
+                   f'<td class="num">{r["score"]:.0f}점</td>'
+                   f'<td>{_esc(r["verdict"])}</td>'
+                   if r["did"] is not None else
+                   f'<td class="num">—</td><td class="num">—</td>'
+                   f'<td>{_esc(r["reason"])}</td>')
+                + '</tr>' for r in _rest)
+            did_html += (
+                '<table class="mini"><thead><tr><th>ETF</th><th>집행</th>'
+                '<th class="num">DiD</th><th class="num">점수</th><th>판정</th>'
+                '</tr></thead><tbody>' + _tr + '</tbody></table>')
     else:
         did_html = ('<p>이번 주 측정 가능한 캠페인이 없다 — 이벤트 이전 이력이 부족하거나, '
                     '구성종목이 충분히 비슷한 경쟁 ETF가 없어 비교가 성립하지 않는다.</p>')
