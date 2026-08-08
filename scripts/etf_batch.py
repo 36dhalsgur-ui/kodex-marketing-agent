@@ -90,6 +90,7 @@ def main():
     # 종목별 시계열로 뒤집는다 — {티커: {주: 행}}
     by_tk: dict[str, dict[str, dict]] = {}
     latest_name: dict[str, str] = {}
+    first_wk: dict[str, str] = {}
     for wk in weeks_sorted:
         for r in snaps[wk]:
             tk = r.get("ISU_CD")
@@ -97,6 +98,7 @@ def main():
                 continue
             by_tk.setdefault(tk, {})[wk] = r
             latest_name[tk] = r.get("ISU_NM", "")
+            first_wk.setdefault(tk, week_label(wk))
 
     result = []
     for tk, series in by_tk.items():
@@ -130,6 +132,11 @@ def main():
             # 공시 기초지수명 — 대조군 선정에서 '무엇을 담는 상품인지'의 공식 근거.
             # 상품명 키워드만 보면 커버드콜 풀에 코스피200·팔란티어·금이 섞인다.
             "기초지수": last.get("IDX_IND_NM", "") or "",
+            # 데이터에 처음 등장한 주 = 사실상 상장 주. 첫 주는 Δ좌수를 낼 직전 주가
+            # 없어 순유입 행이 한 주 늦게 시작하는데, 이걸 '수집 시작'으로 오해하면
+            # '수집은 7월 4주부터인데 개입은 7월 3주'라는 앞뒤 안 맞는 설명이 된다.
+            # 관측 구간 첫 주부터 있던 종목은 상장 시점을 알 수 없으므로 None.
+            "첫주차": first_wk.get(tk) if first_wk.get(tk) != week_label(weeks_sorted[0]) else None,
             "순자산억": round(aum / 1e8) if aum else None,
             # 상장 직후엔 직전 주가 없어 Δ가 안 나온다. 그래도 목록에는 남긴다 —
             # 빼면 라인업·공백 분석과 캠페인 이름 매칭에서 사라진다(실측 2026-08-08:

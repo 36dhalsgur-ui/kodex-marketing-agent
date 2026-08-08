@@ -446,7 +446,7 @@ def real_netbuy_frame(flows: dict) -> pd.DataFrame:
             rows.append({
                 "주차": None, "종목명": e["종목명"], "테마": theme,
                 "기초시장": market, "운용사": e["운용사"],
-                "기초지수": e.get("기초지수", ""),
+                "기초지수": e.get("기초지수", ""), "첫주차": e.get("첫주차"),
                 "순매수액": float("nan"), "순자산": aum,
                 "개인순매수": None, "외국인순매수": None, "기관순매수": None,
             })
@@ -458,7 +458,7 @@ def real_netbuy_frame(flows: dict) -> pd.DataFrame:
             rows.append({
                 "주차": w["주차"], "종목명": e["종목명"], "테마": theme,
                 "기초시장": market, "운용사": e["운용사"],
-                "기초지수": e.get("기초지수", ""),
+                "기초지수": e.get("기초지수", ""), "첫주차": e.get("첫주차"),
                 "순매수액": flow, "순자산": aum,
                 # 장내 매매 주체 — 순유입(설정·환매)과 다른 면을 본다.
                 # 순유입: '새 돈이 들어왔나' / 개인 순매수: '개인이 샀나'.
