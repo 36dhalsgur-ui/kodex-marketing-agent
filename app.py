@@ -2185,46 +2185,59 @@ with tab_did:
             f'<div style="font-size:0.9rem;font-weight:800;color:{INK};margin-bottom:8px;">'
             f'DiD 진단 <span style="font-size:0.72rem;color:{FAINT};font-weight:600;">'
             f'8주 베이스라인 대비</span></div>', unsafe_allow_html=True)
-        # 신규 상장 등으로 베이스라인이 없으면 단계 카드 대신 사유를 명확히 알린다
+        # 베이스라인이 없으면 STEP 카드를 아예 그리지 않는다. 예전에는 같은 '측정 불가'가
+        # 라벨·값·사유·문단·캡션·STEP1·STEP2로 일곱 번 반복됐다.
         no_baseline = sc.get("did") is None and sc.get("delta_treat") is None and sc.get("fallback")
         if no_baseline:
+            _pw, _pn = sc.get("pre_weeks", 0), sc.get("pre_need", D.MIN_BASELINE_ACTIVE)
+            # 원인을 데이터로 짚는다. 예전 문구는 무조건 '신규 상장 등으로'라고 적어,
+            # 12주 창 맨 앞에 걸린 기존 상품까지 신규 상장으로 설명했다.
+            _first = weeks_avail[0] if weeks_avail else "?"
+            _why = (f'수집 구간이 <b>{_first}</b>부터라 개입(<b>{event_week}</b>) 앞에 '
+                    f'{_pw}주치만 있습니다.' if _pw else
+                    f'수집 구간(<b>{_first}</b>~)에 개입(<b>{event_week}</b>) 이전 거래 기록이 '
+                    f'없습니다.')
             st.markdown(
                 f'<div class="did-result" style="background:#5B6478;">'
                 f'<div class="did-result-label">측정 불가</div>'
-                f'<div class="did-result-val" style="font-size:1.35rem;">DiD 산출 안 함</div>'
-                f'<div class="did-result-note">{sc["fallback"]}<br><br>'
-                f'DiD는 <b>개입 전과 후를 비교</b>하는 방법이라, 상장 직후처럼 "이전"이 존재하지 않으면 '
-                f'성립하지 않습니다. 이 경우 첫 주 유입은 마케팅 효과가 아니라 상품 출시 그 자체입니다.'
-                f'</div></div>',
+                f'<div class="did-result-val" style="font-size:1.2rem;">'
+                f'개입 전 이력 {_pw}주 '
+                f'<span style="font-size:0.85rem;opacity:0.75;">(필요 {_pn}주)</span></div>'
+                f'<div class="did-result-note">DiD는 개입 전후를 비교합니다. {_why}</div>'
+                f'</div>',
                 unsafe_allow_html=True,
             )
-            st.caption("신규 상장 캠페인은 동일 시기 상장한 경쟁 ETF와 초기 유입을 비교하는 별도 지표가 적합합니다.")
-        s1c, s2c = st.columns(2)
-        dt_v = sc.get("delta_treat")
-        dc_v = sc.get("delta_ctrl")
-        s1c.markdown(
-            f'<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
-            f'<div class="did-step-name">Δ처치 (베이스라인 대비)</div>'
-            f'<div class="did-step-val">{dt_v:+.2f}%p</div>'
-            f'<div class="did-step-desc">{treat[:20]}<br>금주 강도 − 직전 8주 평균</div></div>'
-            if dt_v is not None else
-            ('<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
-             '<div class="did-step-name">산출 불가</div>'
-             f'<div class="did-step-desc">{treat[:20]}<br>비교할 직전 8주 베이스라인이 없습니다</div></div>'),
-            unsafe_allow_html=True,
-        )
-        s2c.markdown(
-            f'<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
-            f'<div class="did-step-name">Δ대조군 평균</div>'
-            f'<div class="did-step-val">{dc_v:+.2f}%p</div>'
-            f'<div class="did-step-desc">{len(controls)}개 경쟁 ETF 평균<br>= 시장이 원래 움직인 만큼</div></div>'
-            if dc_v is not None else
-            ('<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
-             f'<div class="did-step-name">{"산출 불가" if no_baseline else "대조군 없음"}</div>'
-             f'<div class="did-step-desc">{f"대조군 {len(controls)}개는 지정됨 — 처치군 베이스라인이 없어 계산 불가" if no_baseline else "경쟁 ETF를 지정하면 시장효과가 제거됩니다"}</div></div>'),
-            unsafe_allow_html=True,
-        )
-        st.write("")
+            st.write("")
+        else:
+            s1c, s2c = st.columns(2)
+            dt_v = sc.get("delta_treat")
+            dc_v = sc.get("delta_ctrl")
+            s1c.markdown(
+                f'<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
+                f'<div class="did-step-name">Δ처치 (베이스라인 대비)</div>'
+                f'<div class="did-step-val">{dt_v:+.2f}%p</div>'
+                f'<div class="did-step-desc">{treat[:20]}<br>금주 강도 − 직전 8주 평균</div></div>'
+                if dt_v is not None else
+                # 사유 없이 값만 비는 경우(선택 주차에 데이터 없음) — 포맷이 터지지 않게 막는다
+                ('<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
+                 '<div class="did-step-name">산출 불가</div>'
+                 f'<div class="did-step-desc">{treat[:20]}<br>'
+                 f'{event_week} 유입 데이터가 없습니다</div></div>'),
+                unsafe_allow_html=True,
+            )
+            s2c.markdown(
+                f'<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
+                f'<div class="did-step-name">Δ대조군 평균</div>'
+                f'<div class="did-step-val">{dc_v:+.2f}%p</div>'
+                f'<div class="did-step-desc">{len(controls)}개 경쟁 ETF 평균<br>'
+                f'= 시장이 원래 움직인 만큼</div></div>'
+                if dc_v is not None else
+                ('<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
+                 '<div class="did-step-name">대조군 없음</div>'
+                 '<div class="did-step-desc">경쟁 ETF를 지정하면 시장효과가 제거됩니다</div></div>'),
+                unsafe_allow_html=True,
+            )
+            st.write("")
         if sc.get("did") is not None:
             score = sc.get("score")
             if score is not None:
@@ -2285,10 +2298,10 @@ with tab_did:
                     f'<div class="did-result-note">{sc["fallback"]}</div></div>',
                     unsafe_allow_html=True,
                 )
-        elif dt_v is not None:
+        elif sc.get("delta_treat") is not None:
             st.markdown(
                 f'<div class="did-result"><div class="did-result-label">단순 변화량 (대조군 없음)</div>'
-                f'<div class="did-result-val">Δ{dt_v:+.2f}%p</div>'
+                f'<div class="did-result-val">Δ{sc["delta_treat"]:+.2f}%p</div>'
                 f'<div class="did-result-note">시장효과가 제거되지 않은 값입니다. 대조군을 지정하세요.</div></div>',
                 unsafe_allow_html=True,
             )

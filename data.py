@@ -1822,17 +1822,22 @@ def did_score(series: pd.DataFrame, week: str) -> dict:
     if row.empty:
         return {"available": False}
 
-    # 신규 상장 가드 — 개입 이전 기간에 거래 자체가 없었다면 DiD는 성립하지 않는다.
+    # 베이스라인 가드 — 개입 이전 기간에 거래 자체가 없었다면 DiD는 성립하지 않는다.
     # (상장 전 순매수는 0이므로 베이스라인이 0이 되고, 상장 첫 주 유입이
     #  통째로 '효과'로 계산돼 수백 %p 같은 허수가 나온다 — 실측 확인)
+    # 사유는 둘이다: 상품이 그때 없었거나(신규 상장), 수집 구간이 개입보다
+    # 늦게 시작했거나. 화면이 둘을 구분해 말할 수 있게 숫자를 실어 보낸다 —
+    # 예전에는 무조건 '신규 상장 등으로'라고 적어, 12주 창 맨 앞에 걸린
+    # 기존 상품까지 신규 상장으로 설명했다(실측 2026-08-08: 미국S&P500·나스닥100).
     prior = series[series.index < row.index[0]]["처치강도"]
     active = int((prior.fillna(0) != 0).sum())
     if active < MIN_BASELINE_ACTIVE:
         return {
             "available": True, "did": None, "score": None, "z": None,
             "delta_treat": None, "delta_ctrl": None,
-            "fallback": f"개입 이전 거래 이력 {active}주 — 신규 상장 등으로 베이스라인이 없어 "
-                        f"DiD 측정 불가 (최소 {MIN_BASELINE_ACTIVE}주 필요)",
+            "pre_weeks": active, "pre_need": MIN_BASELINE_ACTIVE,
+            "fallback": f"개입 전 이력 {active}주 — 베이스라인이 부족해 DiD 측정 불가 "
+                        f"(필요 {MIN_BASELINE_ACTIVE}주)",
         }
     r = row.iloc[0]
     hist = series[series["주차"] != week]["DiD"].dropna().tail(ZSCORE_WINDOW)
