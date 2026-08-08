@@ -752,7 +752,8 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     netbuy_df, netbuy_live = load_netbuy(_mtime("etf_flows.json"))
-    weeks = list(dict.fromkeys(netbuy_df["주차"]))
+    # 상장 직후 종목은 주차 없이 유니버스에만 실린다 — 주차 선택지에서 뺀다
+    weeks = [w for w in dict.fromkeys(netbuy_df["주차"]) if isinstance(w, str)]
     sel_week = st.selectbox("분석 주차", weeks[1:][::-1], index=0)
     top_n = st.slider("자금 유입강도 TOP N", 5, 20, 15)
 
@@ -761,7 +762,7 @@ with st.sidebar:
     if up is not None:
         try:
             netbuy_df = D.add_intensity(pd.read_excel(up))
-            weeks = list(dict.fromkeys(netbuy_df["주차"]))
+            weeks = [w for w in dict.fromkeys(netbuy_df["주차"]) if isinstance(w, str)]
             netbuy_live = True
             st.success("업로드 데이터로 분석합니다.")
         except Exception as e:
