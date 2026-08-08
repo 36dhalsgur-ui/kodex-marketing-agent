@@ -199,14 +199,6 @@ st.markdown(
         line-height: 1.3; letter-spacing: -.01em; }}
     .kpi2 .s {{ font-size: 0.74rem; color: {MUTED}; margin-top: 4px; line-height: 1.5; }}
 
-    /* 홈 — 워크플로 스텝 */
-    .flow {{ display: flex; gap: 8px; flex-wrap: wrap; }}
-    .flow-step {{ flex: 1; min-width: 150px; background: {BG_CARD}; border: 1px solid {LINE};
-        border-radius: 10px; padding: 12px 14px; position: relative; }}
-    .flow-step .no {{ font-size: 0.66rem; font-weight: 800; color: {BRAND}; letter-spacing: .06em; }}
-    .flow-step .nm {{ font-size: 0.86rem; font-weight: 800; color: {INK}; margin: 2px 0 3px; }}
-    .flow-step .ds {{ font-size: 0.71rem; color: {MUTED}; line-height: 1.5; }}
-
     /* 헤더 — 아이덴티티 + 데이터 신선도 상태를 한 줄에 (모니터링 도구의 기본 정보) */
     .apphead {{
         display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
@@ -985,7 +977,7 @@ tab_home, tab_trend, tab_channel, tab_did, tab_report, tab_reg = st.tabs(
 # ──────────────────────────────────────────────
 with tab_home:
     st.write("")
-    section_header("HOME", f"{sel_week} 요약", "이번 주 시장과 KODEX 마케팅의 상태를 한 화면에 — 상세는 ①~⑤ 탭에서.")
+    section_header("HOME", f"{sel_week} 요약", "이번 주 시장과 KODEX 마케팅의 상태를 한 화면에.")
     st.write("")
 
     # ── 실데이터 (시그널 보드 · 순매수 · 캠페인)
@@ -1126,23 +1118,16 @@ with tab_home:
         f'<div class="s">8개 브랜드 · 최근 7일</div></div>', unsafe_allow_html=True)
     st.write("")
 
-    # ── 워크플로 (문장 나열 → 스텝)
-    # 번호는 원문자(①) 대신 숫자 — 원문자가 아이콘 폰트로 대체돼 깨지는 환경이 있다
-    _steps = [
-        ("01", "시장 트렌드", "섹터 국면·수익률·검색량으로 시장 방향 진단"),
-        ("02", "채널 모니터링", "8개 브랜드 배너·유튜브·블로그로 경쟁 마케팅 감지"),
-        ("03", "효과 측정", "감지된 캠페인의 순매수 효과를 DiD로 검증"),
-        ("04", "주간 리포트", "종합 브리핑·다음 주 액션 도출"),
-        ("05", "규제 동향", "금융위 발표·법령 시행일 점검"),
-    ]
-    st.markdown(
-        f'<div style="font-size:0.7rem;color:{FAINT};font-weight:600;letter-spacing:.06em;'
-        f'margin-bottom:6px;">워크플로</div>'
-        f'<div class="flow">'
-        + "".join(f'<div class="flow-step"><div class="no">{n}</div>'
-                  f'<div class="nm">{t}</div><div class="ds">{d}</div></div>'
-                  for n, t, d in _steps)
-        + '</div>', unsafe_allow_html=True)
+    # ── 워크플로 — 카드로 두면 시장 현황과 같은 위계로 읽혀 이번 주 상황을 가린다.
+    # 탭 구성 안내는 매주 바뀌지 않는 정보이므로 데이터 출처와 함께 각주로 내린다.
+    st.write("")
+    st.caption(
+        "탭 구성 — ① 시장 트렌드: 섹터 국면·수익률·검색량으로 방향 진단 · "
+        "② 채널 모니터링: 8개 브랜드 배너·유튜브·블로그로 경쟁 마케팅 감지 · "
+        "③ 마케팅 효과 측정: 감지된 캠페인의 자금 유입 효과를 DiD로 검증 · "
+        "④ 주간 리포트: 종합 브리핑·다음 주 액션 도출 · "
+        "⑤ 규제 동향: 금융위 발표·법령 시행일 점검"
+    )
 
 # ──────────────────────────────────────────────
 # ① 시장 트렌드
