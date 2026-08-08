@@ -2219,8 +2219,11 @@ with tab_did:
             elif _listed:
                 _why = f'이 ETF는 <b>{_listed}</b>에 상장해 이벤트 앞이 {_pw}주뿐입니다.'
             else:
+                # '수집이 5월 4주부터라'는 그때 상장한 것처럼 읽힌다(실측 오해).
+                # 이 종목은 훨씬 전부터 있었고, 우리가 최근 N주만 받아오는 것뿐이다.
                 _first = weeks_avail[0] if weeks_avail else "?"
-                _why = f'수집이 <b>{_first}</b>부터라 이벤트 앞이 {_pw}주뿐입니다.'
+                _why = (f'데이터를 최근 {len(weeks_avail)}주(<b>{_first}</b>~)만 모아 '
+                        f'이벤트 앞이 {_pw}주뿐입니다.')
             st.markdown(
                 f'<div class="did-result" style="background:#5B6478;">'
                 f'<div class="did-result-label">측정 불가</div>'
