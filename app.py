@@ -848,33 +848,6 @@ def did_verified(netbuy_df: pd.DataFrame, uni, treat: str, week: str):
     return diag, controls, D.did_score(series, week), D.pretrend_check(series, week)
 
 
-@st.cache_data
-def build_did_board(df: pd.DataFrame, week: str) -> pd.DataFrame:
-    """전 KODEX ETF의 금주 DiD 점수 보드."""
-    uni = universe_frame(df)
-    rows = []
-    for name in kodex_list(df):
-        controls = D.control_group(name, uni)
-        s = D.did_series(df, name, controls)
-        sc = D.did_score(s, week)
-        if not sc.get("available"):
-            continue
-        rows.append(
-            {
-                "종목명": name,
-                "대조군 수": len(controls),
-                "Δ처치(%p)": round(sc["delta_treat"], 2) if sc["delta_treat"] is not None else None,
-                "Δ대조군(%p)": round(sc["delta_ctrl"], 2) if sc["delta_ctrl"] is not None else None,
-                "DiD(%p)": round(sc["did"], 2) if sc["did"] is not None else None,
-                "z": sc["z"],
-                "score": sc["score"],
-                "비고": sc["fallback"] or "",
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-did_board = build_did_board(netbuy_df, sel_week)
 youtube = load_youtube()
 blogs = load_blogs()
 datalab_df, datalab_live = load_datalab(tuple(D.DATALAB_GROUPS))
@@ -1080,8 +1053,6 @@ with tab_home:
 
     # ── KPI — 이번 주 주목할 것 하나를 주인공으로
     _top_flow = wk.nlargest(1, "매수강도").iloc[0] if len(wk) else None
-    _scored = (did_board.dropna(subset=["score"]).sort_values("score", ascending=False)
-               if len(did_board) else did_board)
     _yt_week = sum(1 for vs in youtube.values() for v in vs
                    if v.get("published", "") >= (dt.date.today() - dt.timedelta(days=7)).isoformat())
 
@@ -2045,7 +2016,7 @@ with tab_did:
             f'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:9px;"></span>'
             f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
             f'border-radius:5px;padding:2px 7px;margin-right:9px;white-space:nowrap;">'
-            + (f'{e["채널"]} +{e["채널수"]-1}' if e.get("채널수", 1) > 1 else e["채널"])
+            + e["채널"]
             + '</span>'
             f'<span class="kw-name" style="flex:1;font-size:0.83rem;font-weight:700;color:{name_color};">{e["표기명"]}</span>'
             f'<span style="font-size:0.7rem;color:#98A2B3;margin-right:10px;white-space:nowrap;">{e["근거"]}</span>'
@@ -2333,17 +2304,6 @@ with tab_did:
                               margin=dict(l=10, r=10, t=40, b=10))
         fig_did.update_yaxes(ticksuffix="%p")
         st.plotly_chart(fig_did, use_container_width=True)
-
-    st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    sub_header("04", "전체 KODEX ETF 점수 보드", "캠페인 유무와 무관하게 전 종목의 금주 DiD를 나열")
-    if len(did_board):
-        st.dataframe(
-            did_board.sort_values("score", ascending=False, na_position="last").rename(columns={"score": "효과점수(0~100)"}),
-            use_container_width=True, hide_index=True,
-        )
-        st.caption(f"베이스라인 {D.BASELINE_WEEKS}주 평균 · 라플라스 α={D.LAPLACE_ALPHA:.0f}억 · Z-score 창 {D.ZSCORE_WINDOW}주(가용분) · 대조군 = 동일 테마 비KODEX 평균")
-    else:
-        st.info("점수 산출 가능한 KODEX ETF가 없습니다.")
 
     # 계산 방식은 매번 읽을 것이 아니라 확인할 것 — 탭 맨 아래에 접어 둔다
     st.write("")
