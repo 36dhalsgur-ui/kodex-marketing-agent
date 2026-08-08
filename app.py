@@ -9,7 +9,6 @@ import datetime as dt
 import hashlib
 import importlib
 import json
-import math
 import re
 from pathlib import Path
 from urllib.parse import quote
@@ -2183,7 +2182,16 @@ with tab_did:
     _w = (_uni.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
           if _uni is not None and "순자산" in _uni.columns else None)
     series = D.did_series(netbuy_df, treat, controls, weights=_w)
-    sc = D.did_score(series, event_week)
+    # 측정 시점은 '집행 기간 안 가장 최근 주'다. 집행 시작 주만 재면 6월에 시작한
+    # 이벤트가 10주 뒤에도 6월 값을 보고한다. ④와 같은 함수를 써서 두 탭이
+    # 다른 숫자를 말하지 않게 한다.
+    _end_wk = D.week_label_of(ev.get("종료") or "") if not manual_mode else ""
+    sc = D.did_latest(netbuy_df, treat, controls, event_week,
+                      end_week=_end_wk or None, weights=_w, week_order=weeks_avail)
+    if not sc.get("available"):
+        # 집행 전 구간이 없어 사건연구가 안 되는 건은 기존 경로로 사유를 받는다
+        sc = D.did_score(series, event_week)
+    measure_week = sc.get("week", event_week)
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
     sub_header("03", "진단 결과")
@@ -2194,7 +2202,10 @@ with tab_did:
         # 선택한 캠페인과 무관한 목록이라 '진단 결과'라는 자리에 겉돌았다.
         # 같은 자리에 비교 대상만 두면 DiD 숫자가 왜 그 값인지 막대로 읽힌다.
         _cmp = [treat] + list(controls)
-        _cw = wk[wk["종목명"].isin(_cmp)].set_index("종목명")
+        # 차트는 측정 주 기준이어야 한다. 예전에는 사이드바에서 고른 주(wk)의
+        # 값을 그리면서 제목엔 집행 주차를 적어, 둘이 다르면 제목이 거짓이 됐다.
+        _mw = netbuy_df[netbuy_df["주차"] == measure_week].dropna(subset=["매수강도"])
+        _cw = _mw[_mw["종목명"].isin(_cmp)].set_index("종목명")
         _rows_c = [(n, float(_cw.loc[n, "매수강도"]))
                    for n in _cmp if n in _cw.index and pd.notna(_cw.loc[n, "매수강도"])]
         if _rows_c:
@@ -2215,14 +2226,14 @@ with tab_did:
                               "<br>순자산 %{customdata[1]:,.0f}억<extra></extra>"))
             fig_cmp = base_layout(fig_cmp, height=max(300, len(_names) * BAR_ROW_PX + CHART_CHROME_PX))
             fig_cmp.update_layout(title=dict(
-                text=f"{event_week} 처치군 vs 대조군 유입강도", font=dict(size=15)))
+                text=f"{measure_week} 처치군 vs 대조군 유입강도", font=dict(size=15)))
             _lo, _hi = min(_vals + [0]), max(_vals + [0])
             fig_cmp.update_xaxes(ticksuffix="%", range=[_lo * 1.3 - 1, _hi * 1.3 + 1])
             st.plotly_chart(fig_cmp, use_container_width=True)
             st.caption("진한 남색 = 처치군, 회색 = 대조군, "
                        "DiD는 Δ처치군에서 Δ대조군의 순자산 가중평균을 뺀 값")
         else:
-            st.info(f"{event_week}에 처치군·대조군의 유입 데이터가 없습니다.")
+            st.info(f"{measure_week}에 처치군·대조군의 유입 데이터가 없습니다.")
 
     with d2:
         st.markdown(
@@ -2287,7 +2298,7 @@ with tab_did:
                 f'<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
                 f'<div class="did-step-name">{treat[:22]}</div>'
                 f'<div class="did-step-val">{dt_v:+.2f}%p</div>'
-                f'<div class="did-step-desc">직전 {D.BASELINE_WEEKS}주 평균보다 '
+                f'<div class="did-step-desc">집행 전 {D.BASELINE_WEEKS}주 평균보다 '
                 f'{_flow(dt_v)}</div></div>'
                 if dt_v is not None else
                 # 사유 없이 값만 비는 경우(선택 주차에 데이터 없음) — 포맷이 터지지 않게 막는다
@@ -2340,9 +2351,11 @@ with tab_did:
                 # '평소'가 STEP 카드(직전 8주 평균)와 겹쳐 헷갈렸다. 여기서 재는 것은
                 # 수준이 아니라 'DiD가 평소 얼마나 출렁이는가'라 이름을 변동폭으로 나눈다.
                 # 평소 평균은 거의 항상 0 근처라 정보가 없어 뺐다.
-                base_txt = (f'이 ETF의 평소 변동폭 ±{sc["base_std"]:.2f}%p '
-                            f'(이벤트 이전 {sc["n_hist"]}주 DiD 기준)'
-                            if sc.get("base_std") is not None else "")
+                _mtag = (f'{measure_week} · 집행 {sc["n_run"]}주차 · '
+                         if sc.get("n_run") else "")
+                base_txt = (f'{_mtag}이 ETF의 평소 DiD 변동폭 ±{sc["base_std"]:.2f}%p '
+                            f'(집행 이전 {sc["n_hist"]}주 기준)'
+                            if sc.get("base_std") is not None else _mtag.rstrip(" ·"))
                 st.markdown(
                     f'<div class="did-result">'
                     f'<div class="did-result-label">DiD {sc["did"]:+.2f}%p · {base_txt}</div>'
@@ -2505,24 +2518,19 @@ with tab_report:
             did_all.append(_row)
             continue
         _ctrls = D.control_group(e["ETF"], _uni_r) if _uni_r is not None else []
-        _es = D.event_study(netbuy_df, e["ETF"], _ctrls, _wk, weights=_wts)
-        _pre = _es[_es["구간"] == "전"]["DiD"] if len(_es) else []
-        _post = _es[_es["구간"] == "후"] if len(_es) else []
-        if not len(_post) or len(_pre) < D.ZSCORE_MIN_HIST or float(_pre.std()) < 1e-9:
+        _sx = D.did_latest(netbuy_df, e["ETF"], _ctrls, _wk,
+                           end_week=D.week_label_of(e.get("종료") or "") or None,
+                           weights=_wts, week_order=weeks)
+        if not _sx.get("available"):
             _sx = D.did_score(D.did_series(netbuy_df, e["ETF"], _ctrls, weights=_wts), _wk)
+        if _sx.get("did") is not None and _sx.get("score") is not None:
+            _row.update(dt=_sx["delta_treat"], dc=_sx["delta_ctrl"], did=_sx["did"],
+                        score=_sx["score"], week=_sx.get("week", _wk),
+                        n_run=_sx.get("n_run", 0), base_mean=_sx.get("base_mean"),
+                        base_std=_sx.get("base_std"), n_hist=_sx.get("n_hist"),
+                        n_ctrl=len(_ctrls), verdict=_verdict_of(_sx["z"]))
+        else:
             _row["reason"] = _sx.get("fallback") or "측정 불가"
-            did_all.append(_row)
-            continue
-        # 종료된 이벤트는 마지막 집행 주까지만 본다 — 끝난 뒤 주를 재면 효과가 아니다
-        _endw = D.week_label_of(e.get("종료") or "") or weeks[-1]
-        _cand = _post[_post["주차"].apply(
-            lambda w: weeks.index(w) <= weeks.index(_endw) if _endw in weeks else True)]
-        _use = (_cand if len(_cand) else _post).iloc[-1]
-        _z = (_use["DiD"] - float(_pre.mean())) / float(_pre.std())
-        _row.update(did=float(_use["DiD"]), score=round(100 / (1 + math.exp(-_z)), 1),
-                    week=_use["주차"], n_run=int(_use["상대주차"]) + 1,
-                    base_std=round(float(_pre.std()), 2), n_hist=len(_pre),
-                    n_ctrl=len(_ctrls), verdict=_verdict_of(_z))
         did_all.append(_row)
     # PDF는 대표 1건 형식을 그대로 쓰므로 첫 측정 가능 건을 남긴다
     did_ctx = next((r for r in did_all if r["did"] is not None), None)
@@ -2947,8 +2955,8 @@ with tab_report:
         st.caption("DiD가 양수면 같은 기간 경쟁 ETF보다 자금을 더 받았다는 뜻입니다. "
                    "점수는 그 값이 이 ETF에서 이례적인지를 보여줍니다 — 38~62점은 평소 "
                    "범위라 효과로 보기 어렵고, 73점을 넘어야 효과가 있었다고 볼 만합니다.  \n"
-                   "집행 기간 안의 가장 최근 주를 잰 값입니다. 주차별 추이와 집행 시점 "
-                   "값은 ③에서 봅니다.")
+                   "집행 기간 안의 가장 최근 주를 잰 값이며, ③과 같은 기준입니다. "
+                   "대조군 구성과 평행추세 검증은 ③에서 봅니다.")
         st.write("")
 
     # ══════════ PDF 내보내기 ══════════

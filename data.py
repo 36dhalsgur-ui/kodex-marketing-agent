@@ -1881,8 +1881,51 @@ def event_study(df: pd.DataFrame, treat: str, controls: list[str], event_week: s
         dc = (float(np.average(vals, weights=ws)) if sum(ws) > 0
               else float(np.mean(vals)))
         rows.append({"주차": weeks[i], "상대주차": i - ei,
+                     "Δ처치": float(dt), "Δ대조군": float(dc),
                      "DiD": float(dt - dc), "구간": "전" if i < ei else "후"})
     return pd.DataFrame(rows)
+
+
+def did_latest(df: pd.DataFrame, treat: str, controls: list[str], event_week: str,
+               end_week: str | None = None, weights: dict[str, float] | None = None,
+               week_order: list[str] | None = None) -> dict:
+    """집행 기간 안 '가장 최근 주'의 DiD와 점수. 기준선은 집행 전 8주 고정.
+
+    화면이 매주 갱신되는데 집행 시작 주만 재면, 6월에 시작한 이벤트가 10주 뒤에도
+    6월 값을 보고한다(실측: 미국나스닥100 집행 첫 주 28점 / 최신 주 71점 —
+    결론이 뒤집힌다). 기준선이 고정이라 어느 주를 재든 같은 '평소'와 비교된다.
+
+    ③과 ④가 같은 값을 말하도록 계산은 여기 한 곳에만 둔다.
+    반환은 did_score와 같은 모양 — available·did·score·z·delta_*·base_std·n_hist에
+    측정 주차(week)와 집행 몇 주차인지(n_run)를 더한다.
+    """
+    es = event_study(df, treat, controls, event_week, weights=weights)
+    if not len(es):
+        return {"available": False, "fallback": "집행 전 구간이 없어 기준선을 만들 수 없습니다"}
+    pre = es[es["구간"] == "전"]["DiD"].dropna()
+    post = es[es["구간"] == "후"]
+    if not len(post):
+        return {"available": False, "fallback": "집행 이후 주가 아직 없습니다"}
+
+    order = week_order or list(dict.fromkeys(df["주차"]))
+    if end_week and end_week in order:
+        # 종료된 이벤트는 마지막 집행 주까지만 본다 — 끝난 뒤 주는 효과가 아니다
+        keep = post[post["주차"].apply(
+            lambda w: w in order and order.index(w) <= order.index(end_week))]
+        post = keep if len(keep) else post
+    r = post.iloc[-1]
+    out = {"available": True, "week": r["주차"], "n_run": int(r["상대주차"]) + 1,
+           "delta_treat": float(r["Δ처치"]), "delta_ctrl": float(r["Δ대조군"]),
+           "did": float(r["DiD"]), "score": None, "z": None, "fallback": None}
+    if len(pre) < ZSCORE_MIN_HIST or float(pre.std()) < 1e-9:
+        out["fallback"] = (f"집행 전 DiD {len(pre)}주 — 점수 산출에 부족"
+                           f"(최소 {ZSCORE_MIN_HIST}주), DiD 원값만 제공")
+        return out
+    z = (out["did"] - float(pre.mean())) / float(pre.std())
+    out.update(z=round(float(z), 2), score=round(100 / (1 + math.exp(-z)), 1),
+               base_mean=round(float(pre.mean()), 2),
+               base_std=round(float(pre.std()), 2), n_hist=int(len(pre)))
+    return out
 
 
 def _smoothed_intensity(df: pd.DataFrame) -> pd.DataFrame:
