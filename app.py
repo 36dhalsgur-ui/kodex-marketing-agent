@@ -498,14 +498,14 @@ def _did_method_html() -> str:
 
     steps = "".join([
         _step(1, "순유입을 강도로 환산",
-              "순유입액 = Δ상장좌수 × NAV<br>유입강도 = 순유입액 ÷ 전주 순자산 × 100",
+              "순유입액 = Δ상장좌수 × NAV<br>유입강도 = 순유입액 ÷ 그 주의 전주 순자산 × 100",
               "ETF는 자금이 들어오면 좌수가 늘고 빠지면 줄어듭니다(설정·환매). "
               "장내 개인 순매수는 누군가 판 것을 산 <b style=\"color:%s;\">손바뀜</b>이라 "
-              "ETF 규모가 늘었다는 뜻이 아니지만, 좌수 증감은 신규 유입만 잡습니다. "
-              "금액을 그대로 쓰면 큰 ETF가 항상 이기므로 규모로 나눕니다.<br>"
-              "투자자별 순매수(개인·외국인·기관)는 <b style=\"color:%s;\">'누가 샀나'</b>를 "
-              "보는 다른 지표라 차트 툴팁에 함께 싣습니다. 둘의 상관은 0.40으로, "
-              "대체재가 아니라 서로를 보완합니다." % (INK, INK)),
+              "ETF 규모가 늘었다는 뜻이 아니지만, 좌수 증감은 신규 유입만 잡습니다.<br>"
+              "금액을 <b style=\"color:%s;\">그 주의 순자산</b>으로 나눠 ‘자기 규모 대비 얼마나 "
+              "들어왔나’로 바꿉니다.<br>"
+              "투자자별 순매수(개인·외국인·기관)는 ‘누가 샀나’를 보는 다른 지표라 "
+              "차트 툴팁에 함께 싣습니다." % (INK, INK)),
         _step(2, "Δ처치 — 처치군이 평소보다 얼마나 더 들어왔나",
               f"Δ처치 = 개입 주 강도 − 직전 {D.BASELINE_WEEKS}주 평균",
               f"{D.BASELINE_WEEKS}주를 베이스라인으로 삼아 그 상품의 ‘평소’를 정의합니다."),
@@ -528,10 +528,10 @@ def _did_method_html() -> str:
         f'column-gap:10px;margin-bottom:3px;">'
         f'<span style="color:{INK};">{k}</span><span style="color:{MUTED};">{v}</span></div>'
         for k, v in [
-            ("양호", f"상관 {D.PARALLEL_GOOD:.2f} 이상"),
-            ("약함", f"상관 0~{D.PARALLEL_GOOD:.2f} — 채택하되 표시"),
-            ("부적합", "상관 음수 — 반대로 움직인 종목. 넣으면 DiD 부호가 뒤집혀 제외"),
-            ("검증 불가", f"개입 전 관측 {D.PARALLEL_MIN_WEEKS}주 미만이거나 값이 아예 안 움직임"),
+            ("양호", f"비율 {D.PRETREND_MAX:.2f} 이하 — 개입 전 DiD가 0 근처"),
+            ("약함", f"비율 {D.PRETREND_MAX:.2f}~{D.PRETREND_MAX*2:.2f} — 쓰되 표시"),
+            ("부적합", "그 이상 — 개입 전부터 벌어져 있어 효과와 추세를 못 가름"),
+            ("검증 불가", f"개입 전 DiD {D.PRETREND_MIN_WEEKS}주 미만이거나 값이 아예 안 움직임"),
         ])
 
     return (
@@ -555,15 +555,20 @@ def _did_method_html() -> str:
           f'</div></div></div>'
         + f'<div style="display:flex;gap:10px;margin-bottom:11px;line-height:1.6;">'
           f'<span style="color:{FAINT};min-width:13px;">2</span>'
-          f'<div><b style="color:{INK};">평행추세 검증 — 개입 전에 같이 움직였는가</b>'
+          f'<div><b style="color:{INK};">평행추세 검증 — 개입 전 DiD가 0 근처인가</b>'
           f'<div style="color:{MUTED};">DiD가 성립하려면 “마케팅이 없었다면 둘이 같은 방향으로 '
-          f'움직였을 것”이 전제되어야 합니다. 구성종목이 비슷한지가 아니라 '
-          f'<b style="color:{INK};">개입 이전 강도 변화의 상관</b>으로 확인합니다.</div>'
+          f'움직였을 것”이 전제되어야 합니다. 구성종목이 비슷한지가 아니라, 개입 '
+          f'<b style="color:{INK};">이전</b> 구간의 DiD가 0 근처에서 안정적인지로 확인합니다 — '
+          f'개입 전부터 앞서 있었다면 그 차이는 효과가 아니라 원래의 추세입니다.<br>'
+          f'<b style="color:{INK};">비율 = |개입 전 DiD 평균| ÷ 표준편차</b>. DiD가 실제로 쓰는 '
+          f'합산 대조군에 대해 재므로 검증 대상과 계산 대상이 같습니다.</div>'
           f'<div style="margin-top:6px;">{verdicts}</div></div></div>'
         + f'<div style="margin-top:12px;padding-top:10px;border-top:1px solid {LINE};'
-          f'color:{MUTED};line-height:1.6;">검증 가능한 후보가 하나도 없으면 미검증 후보를 '
-          f'그대로 쓰되 화면에 <b style="color:{INK};">검증 불가</b>로 표시합니다 — 검증된 것처럼 '
-          f'보이지 않게 하기 위해서입니다. 최대 5종까지 씁니다.</div>'
+          f'color:{MUTED};line-height:1.6;">대조군은 같은 테마·기초시장 후보 중 '
+          f'<b style="color:{INK};">순자산이 큰 순으로 최대 5종</b>을 합칩니다. 소형 종목의 '
+          f'설정·환매는 한 번에 크게 튀어 합산 평균을 흔들기 때문입니다. 예전에는 후보별 '
+          f'Δ상관으로 걸렀는데, 순유입은 종목 간 상관이 원래 낮아(실측: 후보의 46%가 음의 '
+          f'상관) 그 기준으로는 대부분이 탈락했습니다. 상관은 참고 지표로만 남겼습니다.</div>'
         + f'<div style="margin-top:18px;">'
         + _crit_label("측정이 안 되는 경우 — 점수 대신 사유를 표시")
         + f'<div style="line-height:1.6;color:{MUTED};">'
@@ -575,7 +580,6 @@ def _did_method_html() -> str:
           f'않았음을 함께 표시합니다.<br>'
           f'<b style="color:{INK};">이력 부족</b> — 과거 DiD가 4주 미만이면 Z-score를 낼 수 없어 '
           f'점수 없이 DiD 원값만 보여줍니다.</div></div></div>')
-
 
 def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
     """차트도 타이포와 같은 수준으로 다듬는다 — 옅은 그리드, 축 라벨 축소, 제목 정렬."""
@@ -839,16 +843,17 @@ def kodex_campaigns(ch_data: dict, youtube: dict, blogs: dict,
 
 
 def did_verified(netbuy_df: pd.DataFrame, uni, treat: str, week: str):
-    """평행추세를 검증한 대조군으로 DiD 산출 → (진단표, 채택 대조군, 점수).
+    """대조군을 합쳐 DiD 산출 → (진단표, 채택 대조군, 점수, 평행추세).
 
-    라벨(테마·기초시장)만 맞은 후보를 그대로 쓰면 개입 전에 반대로 움직인
-    종목이 섞여 DiD 부호까지 왜곡된다. 대조군 평균은 순자산 가중."""
+    평행추세는 개별 후보의 상관이 아니라 '합산 대조군 대비 사전 추세'로 본다.
+    DiD가 실제로 쓰는 대상(순자산 가중 합산)에 대해 검증해야 검증과 계산이 맞는다.
+    진단표의 상관은 후보별 참고 지표로 남긴다."""
     diag = D.control_diagnostics(netbuy_df, treat, D.control_group(treat, uni), week)
     controls = D.select_controls(diag)
     weights = (uni.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
                if uni is not None and "순자산" in uni.columns else None)
-    score = D.did_score(D.did_series(netbuy_df, treat, controls, weights=weights), week)
-    return diag, controls, score
+    series = D.did_series(netbuy_df, treat, controls, weights=weights)
+    return diag, controls, D.did_score(series, week), D.pretrend_check(series, week)
 
 
 @st.cache_data
@@ -2079,7 +2084,7 @@ with tab_did:
     _uni = universe_frame(netbuy_df)
     # 테마·기초시장이 같다는 건 '그럴듯한 이유'일 뿐 검증이 아니다.
     # 개입 이전 구간에서 실제로 나란히 움직였는지 확인하고 그 결과로 채택한다.
-    _diag, auto_controls, _ = did_verified(netbuy_df, _uni, treat, event_week)
+    _diag, auto_controls, _, _pt = did_verified(netbuy_df, _uni, treat, event_week)
     ctrl_options = (sorted(_uni[_uni["운용사"] != "KODEX"]["종목명"].unique()) if _uni is not None
                     else sorted(n for n, _, i in D.ETF_UNIVERSE if i != "KODEX"))
     controls = st.multiselect(
@@ -2111,17 +2116,38 @@ with tab_did:
                 f'<td style="padding:6px 10px;text-align:right;">'
                 f'<span style="font-size:0.68rem;font-weight:700;color:{_c};background:{_bg};'
                 f'border-radius:4px;padding:2px 8px;">{r["판정"]}</span></td></tr>')
+        _PV = {"양호": ("#1E7A55", "#EAF7EF"), "약함": ("#B0801F", "#FDF6E7"),
+               "부적합": (RED, "#FDECEB"), "검증 불가": (MUTED, "#F2F4F7")}
+        _pc, _pbg = _PV.get(_pt["판정"], (MUTED, "#F2F4F7"))
         with st.expander(
-                f"평행추세 진단 — 후보 {len(_diag)}개 중 {len(controls)}개 채택"
-                + (f" · 부적합 {_n_bad}개 제외" if _n_bad else "")
-                + (f" · 검증 불가 {_n_untested}개" if _n_untested else ""),
-                expanded=bool(_n_bad or _n_untested)):
+                f"평행추세 진단 — {_pt['판정']} · 대조군 {len(controls)}종 합산",
+                expanded=_pt["판정"] in ("부적합", "검증 불가")):
             st.markdown(
-                f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:10px;">'
+                f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:12px;">'
                 f'DiD는 <b>"마케팅이 없었다면 처치군도 대조군과 같은 방향으로 움직였을 것"</b>을 가정합니다. '
-                f'개입 이전 구간에서 주간 강도 변화(Δ)가 실제로 동행했는지 확인한 결과입니다 — '
-                f'<b>상관이 음수(부적합)</b>면 반대로 움직였다는 뜻이라 넣으면 DiD 부호까지 왜곡됩니다. '
-                f'대조군 평균은 <b>순자산 가중</b>입니다 (소형 ETF의 노이즈 억제).</div>'
+                f'이 가정은 <b>개입 이전 DiD가 0 근처에서 안정적인가</b>로 직접 확인합니다 — '
+                f'개입 전부터 대조군보다 앞서 있었다면 그 차이는 마케팅 효과가 아니라 원래의 추세입니다.<br>'
+                f'DiD가 실제로 쓰는 <b>순자산 가중 합산 대조군</b>에 대해 재므로 검증 대상과 계산 대상이 같습니다.</div>'
+                + (f'<div style="display:flex;gap:10px;margin-bottom:14px;">'
+                   f'<div style="flex:1;border:1px solid {LINE};border-radius:8px;padding:10px 12px;">'
+                   f'<div style="font-size:0.66rem;color:{FAINT};font-weight:700;">개입 전 DiD 평균</div>'
+                   f'<div style="font-size:1.05rem;font-weight:800;color:{INK};">{_pt["평균"]:+.2f}%p</div></div>'
+                   f'<div style="flex:1;border:1px solid {LINE};border-radius:8px;padding:10px 12px;">'
+                   f'<div style="font-size:0.66rem;color:{FAINT};font-weight:700;">주간 변동폭</div>'
+                   f'<div style="font-size:1.05rem;font-weight:800;color:{INK};">±{_pt["표준편차"]:.2f}%p</div></div>'
+                   f'<div style="flex:1;border:1px solid {_pbg};background:{_pbg};border-radius:8px;padding:10px 12px;">'
+                   f'<div style="font-size:0.66rem;color:{FAINT};font-weight:700;">'
+                   f'비율 (기준 {D.PRETREND_MAX:.2f} 이하)</div>'
+                   f'<div style="font-size:1.05rem;font-weight:800;color:{_pc};">{_pt["비율"]:.2f} · {_pt["판정"]}</div>'
+                   f'</div></div>'
+                   if _pt["가능"] else
+                   f'<div style="font-size:0.78rem;color:{MUTED};margin-bottom:12px;">'
+                   f'{_pt["사유"]}</div>')
+                + (f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">{_pt["사유"]}</div>'
+                   if _pt.get("사유") and _pt["가능"] else "")
+                + f'<div style="font-size:0.7rem;color:{FAINT};margin-bottom:6px;">'
+                  f'아래 Δ상관은 후보별 참고 지표입니다 — 순유입은 종목 간 상관이 원래 낮아 '
+                  f'채택 기준으로는 쓰지 않습니다.</div>'
                 f'<table class="sig-table"><thead><tr>'
                 f'<th>후보</th><th class="num">Δ상관</th><th class="num">평행오차</th>'
                 f'<th class="num">순자산</th><th style="text-align:right;">판정</th>'
@@ -2379,7 +2405,7 @@ with tab_report:
         if not e["분석가능"]:
             continue
         _wk = e["주차"] if e["주차"] in weeks else weeks[-1]
-        _, _c, _sx = did_verified(netbuy_df, _uni_r, e["ETF"], _wk)
+        _, _c, _sx, _ = did_verified(netbuy_df, _uni_r, e["ETF"], _wk)
         if _sx.get("did") is not None and _sx.get("score") is not None:
             _z = _sx["z"]
             did_ctx = {

@@ -121,15 +121,17 @@ def main():
                     "NAV": round(nav, 2),
                 })
             prev_sh = sh
-        if not wk_rows:
-            continue
         last = series.get(weeks_sorted[-1]) or series[max(series)]
         aum = _num(last.get("INVSTASST_NETASST_TOTAMT"))
         result.append({
             "종목명": nm, "티커": tk, "운용사": brand,
             "테마": theme, "기초시장": market,
             "순자산억": round(aum / 1e8) if aum else None,
+            # 상장 직후엔 직전 주가 없어 Δ가 안 나온다. 그래도 목록에는 남긴다 —
+            # 빼면 라인업·공백 분석과 캠페인 이름 매칭에서 사라진다(실측 2026-08-08:
+            # 8/4 상장 KODEX 미국CPU반도체TOP10이 캠페인 매칭에서 누락).
             "주간": wk_rows[-N_WEEKS:],
+            "신규상장": not wk_rows,
         })
 
     # ── 투자자별 순매수 (한국투자증권 KIS API)

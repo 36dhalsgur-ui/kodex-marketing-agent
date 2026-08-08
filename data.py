@@ -439,6 +439,17 @@ def real_netbuy_frame(flows: dict) -> pd.DataFrame:
         # 테마·기초시장은 JSON에 저장된 값 대신 현재 규칙으로 다시 분류한다.
         # 배치를 다시 돌리지 않아도 분류 개선이 즉시 반영되고, 규칙이 한 곳에만 있다.
         theme, market = classify_etf(e["종목명"])
+        if not e.get("주간"):
+            # 상장 직후라 주간 이력이 없다. 유니버스(라인업·이름 매칭·순자산)에는
+            # 있어야 하므로 값 없는 한 줄을 남긴다 — 순매수액은 NaN이라 DiD·강도
+            # 계산에서 자동으로 빠진다.
+            rows.append({
+                "주차": None, "종목명": e["종목명"], "테마": theme,
+                "기초시장": market, "운용사": e["운용사"],
+                "순매수액": float("nan"), "순자산": aum,
+                "개인순매수": None, "외국인순매수": None, "기관순매수": None,
+            })
+            continue
         for w in e.get("주간", []):
             flow = w.get("순유입억")
             if flow is None:
@@ -1166,6 +1177,36 @@ def banner_focus(title: str) -> str:
 
 
 _ETF_MENTION = re.compile(r"KODEX\s+[가-힣A-Za-z0-9&\+\.]+(?:\s*[가-힣A-Za-z0-9&\+\.]+)?")
+_TICKER_PAT = re.compile(r"종목\s?코드\s*[:：]?\s*([0-9A-Z]{6})")
+
+
+def match_etfs(title: str, uni: dict[str, str]) -> tuple[list[str], str]:
+    """제목에서 실제 ETF를 찾는다. 반환: (상품명 목록, 판별근거)
+
+    정규식으로 'KODEX + 다음 한두 단어'를 잘라 쓰면 없는 상품을 만들어낸다.
+    실측: 'KODEX 한국, 미국 반도체 ETF 투자 이벤트' → 'KODEX 한국',
+         'KODEX 분배금 인증 이벤트' → 'KODEX 분배금 인증'.
+    그래서 순서를 뒤집는다 — 실제 상장 목록에 있는 이름이 제목에 있는지 본다.
+
+    1) 유니버스 이름이 제목에 등장하는지 (긴 이름 우선, 복수 매칭 허용)
+    2) 없으면 제목의 종목코드로 (신규 상장은 유니버스에 아직 없다)
+    3) 그래도 없으면 상품을 특정할 수 없는 브랜드 이벤트로 본다
+    """
+    nt = _norm_etf(title or "")
+    hits, taken = [], ""
+    for key in sorted(uni, key=len, reverse=True):
+        if len(key) < 8 or key not in nt:      # 'KODEX200' 같은 짧은 키는 오탐이 많다
+            continue
+        if key in taken:                        # 더 긴 이름에 이미 포함됨
+            continue
+        hits.append(uni[key])
+        taken += key
+    if hits:
+        return hits, "이름"
+    m = _TICKER_PAT.search(title or "")
+    if m:
+        return [], "코드"
+    return [], "미상"
 
 
 def _norm_etf(name: str) -> str:
@@ -1195,6 +1236,7 @@ _ROUTINE_PAT = re.compile(r"WEEKLY|주간|월간|분기|성과\s?리뷰|운용\s
 
 # DiD의 '개입'으로 볼 수 있는 유형 — 프로모션이 우선, 콘텐츠는 보조
 PROMO, CONTENT = "프로모션", "콘텐츠"
+BRAND = "브랜드이벤트"      # 상품을 특정할 수 없는 이벤트 — 상품 캠페인으로 세지 않는다
 CAMPAIGN_TYPES = (PROMO, CONTENT)
 
 
@@ -1233,6 +1275,11 @@ def classify_marketing_events(events: list[dict]) -> list[dict]:
 
     for e in events:
         title = e.get("제목", "")
+        # 상품을 특정하지 못한 건 상품 캠페인이 아니다. 예전에는 정규식이 'KODEX 한국'
+        # 같은 없는 이름을 만들어 프로모션 수를 부풀렸다(실측 2026-08-08).
+        if not e.get("상품특정", True):
+            e["유형"], e["근거"] = BRAND, "상품 미특정 — 브랜드 이벤트"
+            continue
         # 이벤트 보드 출처는 추정이 아니라 운용사가 직접 고지한 집행이다 — 최상위 근거
         if e.get("채널") == "이벤트":
             e["유형"] = PROMO
@@ -1276,23 +1323,31 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
 
     events = []
     for channel, title, link, date, meta in src:
-        m = _ETF_MENTION.search(title or "")
-        if not m:
+        if "KODEX" not in (title or "").upper():
             continue
-        raw = re.sub(r"\s*ETF\s*$", "", m.group(0).strip())
-        tail = raw[len("KODEX"):].strip()
-        if len(tail) < 2 or tail.startswith("ETF"):
-            continue  # 'KODEX ETF가 제안하는' 같은 브랜드 일반 언급은 제외
-        matched = uni.get(_norm_etf(raw))
-        row = {
-            "ETF": matched or raw, "표기명": raw, "채널": channel,
-            "제목": title, "링크": link, "date": (date or "")[:10],
-            "주차": week_label_of(date or ""), "분석가능": matched is not None,
-        }
-        if meta:
-            row.update({"시작": meta.get("시작", ""), "종료": meta.get("종료", ""),
-                        "상태": meta.get("상태", "")})
-        events.append(row)
+        names, how = match_etfs(title, uni)
+        if not names:
+            # 상품을 특정하지 못한 건 억지로 이름을 만들지 않는다. 신규 상장은
+            # 유니버스에 아직 없으므로 제목의 표기를 그대로 쓰되 미확인으로 남긴다.
+            m = _ETF_MENTION.search(title or "")
+            raw = re.sub(r"\s*ETF\s*$", "", m.group(0).strip()) if m else ""
+            tail = raw[len("KODEX"):].strip() if raw else ""
+            if how == "코드" and len(tail) >= 2:
+                names = [raw]                   # 종목코드가 있으면 실제 상품이다
+            else:
+                names = [""]                    # 상품 특정 불가
+        for nm in names:
+            row = {
+                "ETF": nm or "(브랜드 이벤트)", "표기명": nm or "(브랜드 이벤트)",
+                "채널": channel, "제목": title, "링크": link,
+                "date": (date or "")[:10], "주차": week_label_of(date or ""),
+                "분석가능": bool(nm) and _norm_etf(nm) in uni,
+                "상품특정": bool(nm),
+            }
+            if meta:
+                row.update({"시작": meta.get("시작", ""), "종료": meta.get("종료", ""),
+                            "상태": meta.get("상태", "")})
+            events.append(row)
     classify_marketing_events(events)
     events.sort(key=lambda e: e["date"], reverse=True)
     return events
@@ -1567,7 +1622,22 @@ def _smoothed_intensity(df: pd.DataFrame) -> pd.DataFrame:
 
 # 평행추세 판정 기준 — 개입 이전 구간에서 처치군과 얼마나 같이 움직였나
 PARALLEL_MIN_WEEKS = 4    # 이보다 짧으면 검증 자체가 불가
-PARALLEL_GOOD = 0.30      # Δ상관 이 이상이면 양호
+PARALLEL_GOOD = 0.30      # 개별 후보 Δ상관 — 이제는 참고 지표로만 표시한다
+
+# 평행추세 판정 — 개별 후보의 상관이 아니라 '합산 대조군 대비 사전 추세'로 본다.
+#
+# 왜 바꿨나: 순유입(설정·환매)은 종목 간 상관이 원래 낮다. 가격은 같이 움직여도
+# 자금 유입은 각 ETF의 LP·기관 사정에 따라 따로 일어나는 lumpy 이벤트라서다.
+# 실측(2026-08-08): 개별 후보 상관 평균 +0.048, 음수 46%. 관측을 12→40주로
+# 늘려도 개선되지 않고 오히려 0으로 수렴했다 — 짧은 구간의 높은 상관이 노이즈였다.
+# 상관 0.30 기준은 가격 시계열용이지 자금 흐름용이 아니다.
+#
+# 대신 DiD의 평행추세 가정을 직접 확인한다: 개입 이전 구간의 DiD가 0 근처에서
+# 안정적이면 두 집단은 같이 움직여온 것이다. DiD가 실제로 쓰는 합산(순자산 가중)
+# 대조군에 대해 재므로 검증과 계산의 대상이 일치한다.
+#   비율 = |개입 전 DiD 평균| ÷ 개입 전 DiD 표준편차
+PRETREND_MAX = 0.30       # 이 이하면 평행추세 성립으로 본다
+PRETREND_MIN_WEEKS = 5    # 개입 전 DiD가 이보다 적으면 판정 불가
 
 
 def control_diagnostics(df: pd.DataFrame, treat: str, candidates: list[str],
@@ -1636,17 +1706,19 @@ def control_diagnostics(df: pd.DataFrame, treat: str, candidates: list[str],
 
 
 def select_controls(diag: pd.DataFrame, max_n: int = 5) -> list[str]:
-    """평행추세가 확인된 후보만 대조군으로 채택.
+    """대조군 채택 — 같은 테마·기초시장 후보 중 순자산이 큰 순으로.
 
-    '부적합'(반대로 움직인 종목)은 제외한다 — 넣으면 DiD가 부호까지 뒤집힌다.
-    검증이 불가능한 구간(신규상장 등)에서는 걸러낼 근거가 없으므로 후보를 그대로
-    두되, 화면에 '검증 불가'로 표시해 검증된 것처럼 보이지 않게 한다."""
+    예전에는 개별 후보의 Δ상관으로 걸렀는데, 순유입은 종목 간 상관이 원래 낮아
+    그 기준으로는 대부분이 탈락했다(실측: 후보의 46%가 음의 상관). 이제 평행추세는
+    합산 대조군에 대해 pretrend_check로 검증하므로, 여기서는 '어떤 후보를 합칠지'만
+    정한다. 순자산이 큰 종목을 쓰는 이유는 소형 종목의 lumpy한 설정·환매가 합산
+    평균을 흔들기 때문이다(가중평균이 이를 한 번 더 눌러준다)."""
     if diag is None or not len(diag):
         return []
-    ok = diag[diag["판정"].isin(["양호", "약함"])]
-    if not len(ok):                       # 검증 가능한 게 없으면 미검증 후보 유지
-        ok = diag[diag["판정"] == "검증 불가"]
-    return ok["종목명"].head(max_n).tolist()
+    d = diag.copy()
+    if "순자산" in d.columns:
+        d = d.sort_values("순자산", ascending=False)
+    return d["종목명"].head(max_n).tolist()
 
 
 def did_series(df: pd.DataFrame, treat: str, controls: list[str],
@@ -1688,6 +1760,38 @@ def did_series(df: pd.DataFrame, treat: str, controls: list[str],
             {"주차": wk, "처치강도": treat_s.iloc[i], "Δ처치": delta_t, "Δ대조군": delta_c, "DiD": did}
         )
     return pd.DataFrame(rows)
+
+
+def pretrend_check(series: pd.DataFrame, week: str) -> dict:
+    """개입 이전 DiD가 0 근처에서 안정적인가 — 평행추세 직접 검증.
+
+    반환: {가능, 주수, 평균, 표준편차, 비율, 판정, 사유}
+    판정: 양호(≤기준) / 약함(≤2배) / 부적합(그 이상) / 검증 불가(관측 부족)
+    """
+    hit = series.index[series["주차"] == week]
+    pre = series[series.index < hit[0]] if len(hit) else series
+    vals = pre["DiD"].dropna()
+    out = {"가능": False, "주수": int(len(vals)), "평균": None,
+           "표준편차": None, "비율": None, "판정": "검증 불가", "사유": ""}
+    if len(vals) < PRETREND_MIN_WEEKS:
+        out["사유"] = f"개입 이전 DiD {len(vals)}주 (최소 {PRETREND_MIN_WEEKS}주 필요)"
+        return out
+    m, sd = float(vals.mean()), float(vals.std())
+    if sd <= 1e-9:
+        out["사유"] = "개입 이전 DiD가 전혀 움직이지 않음 — 판정 불가"
+        return out
+    ratio = abs(m) / sd
+    out.update(가능=True, 평균=round(m, 2), 표준편차=round(sd, 2), 비율=round(ratio, 2))
+    if ratio <= PRETREND_MAX:
+        out["판정"] = "양호"
+    elif ratio <= PRETREND_MAX * 2:
+        out["판정"] = "약함"
+        out["사유"] = f"개입 전에도 대조군과 평균 {m:+.2f}%p 벌어져 있었다"
+    else:
+        out["판정"] = "부적합"
+        out["사유"] = (f"개입 전부터 대조군보다 평균 {m:+.2f}%p 앞서 있어 "
+                      f"효과와 추세를 구분할 수 없다")
+    return out
 
 
 MIN_BASELINE_ACTIVE = 4   # 개입 이전에 실제 거래가 있었던 최소 주 수
