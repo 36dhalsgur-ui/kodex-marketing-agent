@@ -2299,7 +2299,9 @@ with tab_did:
                 f'<div class="did-step-name">{treat[:22]}</div>'
                 f'<div class="did-step-val">{dt_v:+.2f}%p</div>'
                 f'<div class="did-step-desc">집행 전 {D.BASELINE_WEEKS}주 평균보다 '
-                f'{_flow(dt_v)}</div></div>'
+                f'{_flow(dt_v)}'
+                + (f' (집행 {sc["n_run"]}주 평균)' if sc.get("n_run", 0) > 1 else "")
+                + '</div></div>'
                 if dt_v is not None else
                 # 사유 없이 값만 비는 경우(선택 주차에 데이터 없음) — 포맷이 터지지 않게 막는다
                 (f'<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
@@ -2418,6 +2420,38 @@ with tab_did:
                 unsafe_allow_html=True,
             )
 
+    # ── 집행 후 주차별 DiD — 평균이 어떻게 나온 값인지 보여준다.
+    # 예전에 뺐던 차트인데, 그때는 롤링 기준선이라 이벤트 전 막대가 0으로 모이지
+    # 않아 읽을 수가 없었다. 지금은 기준선이 고정이고 판정이 평균이라, 이 그림이
+    # '한 주만 보면 안 되는 이유'를 그대로 설명한다(실측 미국S&P500 10주:
+    # 0점에서 100점까지 오간다).
+    if sc.get("n_run", 0) > 1:
+        _es3 = D.event_study(netbuy_df, treat, controls, event_week, weights=_w)
+        _post3 = _es3[_es3["구간"] == "후"] if len(_es3) else []
+        if len(_post3) > 1:
+            fig_es = go.Figure(go.Bar(
+                x=[int(v) + 1 for v in _post3["상대주차"]], y=_post3["DiD"],
+                customdata=_post3["주차"],
+                marker_color=[NAVY if v > 0 else "#C7CFDF" for v in _post3["DiD"]],
+                hovertemplate="집행 %{x}주차 (%{customdata})<br>DiD %{y:+.2f}%p<extra></extra>"))
+            fig_es.add_hline(y=float(_post3["DiD"].mean()), line_width=1.5,
+                             line_dash="dot", line_color=NAVY,
+                             annotation_text=f"평균 {_post3['DiD'].mean():+.2f}%p",
+                             annotation_position="top left",
+                             annotation_font=dict(size=11, color=NAVY))
+            fig_es = base_layout(fig_es, height=200)
+            fig_es.update_layout(
+                title=dict(text="집행 후 주차별 DiD", font=dict(size=14)),
+                margin=dict(l=10, r=10, t=36, b=10))
+            fig_es.update_xaxes(title=dict(text="집행 주차", font=dict(size=11)), dtick=1)
+            fig_es.update_yaxes(ticksuffix="%p")
+            st.plotly_chart(fig_es, use_container_width=True)
+            st.caption(
+                f"주차별로 크게 흔들려 한 주 값만으로는 판정할 수 없습니다 — "
+                f"점선이 판정에 쓰는 {len(_post3)}주 평균입니다. "
+                f"플러스 {int((_post3['DiD'] > 0).sum())}/{len(_post3)}주.")
+        st.write("")
+
     # 계산 방식은 매번 읽을 것이 아니라 확인할 것 — 탭 맨 아래에 접어 둔다
     st.write("")
     with st.expander("DiD 계산 방식"):
@@ -2526,8 +2560,10 @@ with tab_report:
         if _sx.get("did") is not None and _sx.get("score") is not None:
             _row.update(dt=_sx["delta_treat"], dc=_sx["delta_ctrl"], did=_sx["did"],
                         score=_sx["score"], week=_sx.get("week", _wk),
-                        n_run=_sx.get("n_run", 0), base_mean=_sx.get("base_mean"),
-                        base_std=_sx.get("base_std"), n_hist=_sx.get("n_hist"),
+                        n_run=_sx.get("n_run", 0), n_pos=_sx.get("n_pos", 0),
+                        did_last=_sx.get("did_last", _sx["did"]),
+                        base_mean=_sx.get("base_mean"), base_std=_sx.get("base_std"),
+                        std_err=_sx.get("std_err"), n_hist=_sx.get("n_hist"),
                         n_ctrl=len(_ctrls), verdict=_verdict_of(_sx["z"]))
         else:
             _row["reason"] = _sx.get("fallback") or "측정 불가"
@@ -2920,7 +2956,7 @@ with tab_report:
     if did_all:
         _n_ok = sum(1 for r in did_all if r["did"] is not None)
         sub_header("D", "마케팅 효과 검증",
-                   f"집행 {len(did_all)}건 중 측정 {_n_ok}건 · 이번 주 기준")
+                   f"집행 {len(did_all)}건 중 측정 {_n_ok}건 · 집행 기간 평균 기준")
         _rows = ""
         for r in did_all:
             if r["did"] is None:
@@ -2942,21 +2978,26 @@ with tab_report:
                 f'text-overflow:ellipsis;white-space:nowrap;font-size:0.83rem;'
                 f'font-weight:700;color:{INK};">{r["name"]}</span>'
                 f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;'
-                f'margin:0 10px;">{r["week"]} · 집행 {r["n_run"]}주차</span>'
+                f'margin:0 10px;">집행 {r["n_run"]}주 평균</span>'
                 f'<span style="font-size:0.8rem;color:{NAVY};white-space:nowrap;'
                 f'min-width:74px;text-align:right;">DiD <b>{r["did"]:+.2f}%p</b></span>'
                 f'<span style="font-size:0.82rem;font-weight:800;color:{_vc};'
                 f'white-space:nowrap;min-width:44px;text-align:right;">{r["score"]:.0f}점</span>'
                 f'<span style="font-size:0.74rem;color:{_vc};white-space:nowrap;'
-                f'min-width:96px;text-align:right;">{r["verdict"]}</span></div>')
+                f'min-width:96px;text-align:right;">{r["verdict"]}</span></div>'
+                # 이번 주 값은 참고로만 — 판정은 평균이 한다
+                + (f'<div style="font-size:0.68rem;color:{FAINT};padding:0 2px 6px;">'
+                   f'이번 주 {r["did_last"]:+.2f}%p · 플러스 {r["n_pos"]}/{r["n_run"]}주</div>'
+                   if r.get("n_run", 0) > 1 else ""))
         st.markdown(f'<div class="card" style="padding:6px 18px 10px;">{_rows}</div>',
                     unsafe_allow_html=True)
         # 계산 방식은 ③에서 설명했다. 여기서는 '이 숫자를 어떻게 읽나'만 적는다.
         st.caption("DiD가 양수면 같은 기간 경쟁 ETF보다 자금을 더 받았다는 뜻입니다. "
                    "점수는 그 값이 이 ETF에서 이례적인지를 보여줍니다 — 38~62점은 평소 "
                    "범위라 효과로 보기 어렵고, 73점을 넘어야 효과가 있었다고 볼 만합니다.  \n"
-                   "집행 기간 안의 가장 최근 주를 잰 값이며, ③과 같은 기준입니다. "
-                   "대조군 구성과 평행추세 검증은 ③에서 봅니다.")
+                   "한 주 값은 크게 출렁여 판정에 쓰지 않습니다 — 집행 기간 전체 평균으로 "
+                   "재고, 매주 새 데이터가 더해져 갱신됩니다. 주차별 추이와 대조군 구성은 "
+                   "③에서 봅니다.")
         st.write("")
 
     # ══════════ PDF 내보내기 ══════════

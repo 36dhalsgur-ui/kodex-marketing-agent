@@ -1889,15 +1889,20 @@ def event_study(df: pd.DataFrame, treat: str, controls: list[str], event_week: s
 def did_latest(df: pd.DataFrame, treat: str, controls: list[str], event_week: str,
                end_week: str | None = None, weights: dict[str, float] | None = None,
                week_order: list[str] | None = None) -> dict:
-    """집행 기간 안 '가장 최근 주'의 DiD와 점수. 기준선은 집행 전 8주 고정.
+    """집행 기간 전체의 평균 DiD와 점수. 기준선은 집행 전 8주 고정.
 
-    화면이 매주 갱신되는데 집행 시작 주만 재면, 6월에 시작한 이벤트가 10주 뒤에도
-    6월 값을 보고한다(실측: 미국나스닥100 집행 첫 주 28점 / 최신 주 71점 —
-    결론이 뒤집힌다). 기준선이 고정이라 어느 주를 재든 같은 '평소'와 비교된다.
+    한 주 값으로는 판정할 수 없다. 같은 이벤트가 주차마다 0점에서 100점까지
+    오간다(실측 미국S&P500 10주: 61·25·93·0·2·100·60·89·68·29). 첫 주를 고르든
+    최신 주를 고르든 그 주의 우연이 결론이 된다.
 
+    집행 기간 평균은 노이즈가 √n으로 줄어든다. 그래서 점수는 평균을 표준오차
+    (평소 변동폭 ÷ √집행주수)로 나눠 매긴다. 집행 1주차면 평균 = 그 주 값이라
+    자연히 같아진다.
+
+    기준선이 고정이라 집행 주차가 늘어도 같은 '평소'와 비교된다.
     ③과 ④가 같은 값을 말하도록 계산은 여기 한 곳에만 둔다.
-    반환은 did_score와 같은 모양 — available·did·score·z·delta_*·base_std·n_hist에
-    측정 주차(week)와 집행 몇 주차인지(n_run)를 더한다.
+    반환: available·did(집행 평균)·score·z·delta_*(평균)·base_std·n_hist에
+    측정 마지막 주(week)·집행 주수(n_run)·최신 주 값(did_last)을 더한다.
     """
     es = event_study(df, treat, controls, event_week, weights=weights)
     if not len(es):
@@ -1914,17 +1919,23 @@ def did_latest(df: pd.DataFrame, treat: str, controls: list[str], event_week: st
             lambda w: w in order and order.index(w) <= order.index(end_week))]
         post = keep if len(keep) else post
     r = post.iloc[-1]
-    out = {"available": True, "week": r["주차"], "n_run": int(r["상대주차"]) + 1,
-           "delta_treat": float(r["Δ처치"]), "delta_ctrl": float(r["Δ대조군"]),
-           "did": float(r["DiD"]), "score": None, "z": None, "fallback": None}
+    n_run = len(post)
+    out = {"available": True, "week": r["주차"], "n_run": n_run,
+           "delta_treat": float(post["Δ처치"].mean()),
+           "delta_ctrl": float(post["Δ대조군"].mean()),
+           "did": float(post["DiD"].mean()), "did_last": float(r["DiD"]),
+           "week_last": r["주차"], "n_pos": int((post["DiD"] > 0).sum()),
+           "score": None, "z": None, "fallback": None}
     if len(pre) < ZSCORE_MIN_HIST or float(pre.std()) < 1e-9:
         out["fallback"] = (f"집행 전 DiD {len(pre)}주 — 점수 산출에 부족"
                            f"(최소 {ZSCORE_MIN_HIST}주), DiD 원값만 제공")
         return out
-    z = (out["did"] - float(pre.mean())) / float(pre.std())
+    sd = float(pre.std())
+    se = sd / math.sqrt(n_run)          # 평균의 표준오차 — 주수가 늘수록 잣대가 좁아진다
+    z = (out["did"] - float(pre.mean())) / se
     out.update(z=round(float(z), 2), score=round(100 / (1 + math.exp(-z)), 1),
                base_mean=round(float(pre.mean()), 2),
-               base_std=round(float(pre.std()), 2), n_hist=int(len(pre)))
+               base_std=round(sd, 2), std_err=round(se, 2), n_hist=int(len(pre)))
     return out
 
 
