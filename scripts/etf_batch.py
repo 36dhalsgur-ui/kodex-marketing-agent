@@ -149,7 +149,8 @@ def main():
                 try:
                     for d in investor_daily(r["티커"], a):
                         daily[d.get("stck_bsop_date", "")] = d
-                except KisApiError:
+                except Exception:
+                    # 종목 하나의 네트워크 오류로 전체가 죽지 않게 한다(실측 2026-08-07)
                     continue
             if not daily:
                 fail += 1

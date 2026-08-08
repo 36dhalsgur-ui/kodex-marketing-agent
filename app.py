@@ -1033,20 +1033,31 @@ with tab_home:
              else f'{_hn}개 섹터 모두 쇠퇴·관망이라 사정권에 든 섹터가 없습니다.')
     _lead_parts = [(", ".join(_seg) + ", " if _seg else "") + _tail]
 
-    # ── 뒷줄: 우리 마케팅. 프로모션(리워드 걸린 판촉)만 '집행 중'으로 센다
+    # ── 뒷줄: 우리 마케팅. 프로모션(리워드 걸린 판촉)만 '집행 중'으로 센다.
+    # 착수뿐 아니라 '선점 검토'도 말해야 한다 — 시장이 바뀌어 새 섹터가 잡혀도
+    # 착수 기준을 못 넘으면 문구가 '보류'로만 남아 변화가 드러나지 않았다.
     _go_now = [e for e in EMERGING_GO if e["판정"] == "착수"]
+    _prep = [e for e in EMERGING_GO if e["판정"] == "선점 검토"]
     _n1 = ", ".join(e["섹터"] for e in _go_now)
-    if PROMOS and _go_now:
-        _act = (f'프로모션 <b>{len(PROMOS)}종</b>을 집행 중이고, '
-                f'신규 착수 대상은 <b>{_n1}</b>입니다.')
-    elif PROMOS:
-        _act = f'프로모션 <b>{len(PROMOS)}종</b>은 그대로 두고, 신규 착수는 이번 주 보류합니다.'
-    elif _go_now:
-        # 진행 중인 판촉이 없는데 착수 대상이 있으면 그게 이번 주의 유일한 액션이다
-        _act = (f'진행 중인 프로모션은 없고, <b>{_n1}</b>{D._ga(_n1)[len(_n1):]} '
-                f'유일한 착수 대상입니다.')
+    _n2 = ", ".join(e["섹터"] for e in _prep)
+    _p = f'프로모션 <b>{len(PROMOS)}종</b>' if PROMOS else ""
+
+    if _go_now:
+        _next = f'신규 착수 대상은 <b>{_n1}</b>입니다'
+        if _prep:
+            _next += f' ({_n2}{D._eun(_n2)[len(_n2):]} 소재만 준비)'
+    elif _prep:
+        _next = (f'착수 기준을 넘긴 섹터는 없고, <b>{_n2}</b>{D._ga(_n2)[len(_n2):]} '
+                 f'소재 준비 대상입니다')
+    elif EMERGING_JUDGED:
+        _next = f'신규 착수 대상은 없습니다 ({EMERGING_DROPPED})'
     else:
-        _act = ('진행 중인 프로모션도, 신규 착수 대상도 없습니다'
+        _next = '태동 국면 섹터가 없어 신규 착수 대상도 없습니다'
+
+    if _p:
+        _act = f'{_p}을 집행 중이고, {_next}.'
+    else:
+        _act = ('진행 중인 프로모션은 없고, ' + _next
                 + (f' (콘텐츠 푸시 {len(CAMPAIGNS)}종).' if CAMPAIGNS else '.'))
 
     st.markdown(

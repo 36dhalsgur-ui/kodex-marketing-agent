@@ -58,10 +58,13 @@ def token(force: bool = False) -> str:
         except Exception:
             pass
     key, sec = _creds()
-    r = requests.post(f"{BASE}/oauth2/tokenP", timeout=TIMEOUT,
-                      json={"grant_type": "client_credentials",
-                            "appkey": key, "appsecret": sec})
-    d = r.json() if r.content else {}
+    try:
+        r = requests.post(f"{BASE}/oauth2/tokenP", timeout=TIMEOUT,
+                          json={"grant_type": "client_credentials",
+                                "appkey": key, "appsecret": sec})
+        d = r.json() if r.content else {}
+    except requests.RequestException as e:
+        raise KisApiError(f"토큰 발급 실패 — {type(e).__name__}")
     if "access_token" not in d:
         raise KisApiError(f"토큰 발급 실패 — {d.get('error_description') or d or r.status_code}")
     TOKEN_CACHE.parent.mkdir(parents=True, exist_ok=True)
@@ -81,14 +84,22 @@ def investor_daily(code: str, bas_dd: str) -> list[dict]:
     last = ""
     for attempt in range(RATE_RETRY):
         time.sleep(RATE_SLEEP * (attempt + 1))
-        r = requests.get(f"{BASE}{INVESTOR_URL}", timeout=TIMEOUT,
-                         headers={"authorization": f"Bearer {token()}",
-                                  "appkey": key, "appsecret": sec,
-                                  "tr_id": INVESTOR_TR, "custtype": "P"},
-                         params={"FID_COND_MRKT_DIV_CODE": "J",
-                                 "FID_INPUT_ISCD": code,
-                                 "FID_INPUT_DATE_1": bas_dd,
-                                 "FID_ORG_ADJ_PRC": "", "FID_ETC_CLS_CODE": ""})
+        try:
+            r = requests.get(f"{BASE}{INVESTOR_URL}", timeout=TIMEOUT,
+                             headers={"authorization": f"Bearer {token()}",
+                                      "appkey": key, "appsecret": sec,
+                                      "tr_id": INVESTOR_TR, "custtype": "P"},
+                             params={"FID_COND_MRKT_DIV_CODE": "J",
+                                     "FID_INPUT_ISCD": code,
+                                     "FID_INPUT_DATE_1": bas_dd,
+                                     "FID_ORG_ADJ_PRC": "", "FID_ETC_CLS_CODE": ""})
+        except requests.RequestException as e:
+            # 타임아웃·연결 끊김은 KisApiError가 아니라 그대로 튀어나가 배치 전체를
+            # 죽였다(실측 2026-08-07: 종목 하나의 ReadTimeout으로 26개 섹터가 통째로
+            # 날아감). 네트워크 오류도 재시도 대상으로 잡고, 끝내 안 되면 우리 예외로
+            # 바꿔 호출부가 종목 단위로 건너뛸 수 있게 한다.
+            last = f"{type(e).__name__}"
+            continue
         try:
             d = r.json()
         except Exception:

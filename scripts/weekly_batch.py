@@ -210,7 +210,9 @@ def main():
             try:
                 for d in investor_daily(tk, a):
                     daily[d.get("stck_bsop_date", "")] = d
-            except KisApiError:
+            except Exception:
+                # 종목 하나가 실패해도 나머지는 계속 간다 — 예외 종류를 가리지 않는다.
+                # KisApiError만 잡았다가 ReadTimeout이 튀어나와 배치 전체가 죽었다.
                 continue
         if not daily:
             _flow_cache[tk] = None

@@ -81,7 +81,7 @@ if ! git diff --quiet -- data/ || [ -n "$(git status --porcelain -- data/)" ]; t
     git add data/
     git -c user.name="kodex-batch" \
         -c user.email="batch@users.noreply.github.com" \
-        commit -q -m "데이터: 주간 배치 자동 갱신 ($(date '+%Y-%m-%d'))"
+        commit -q -m "데이터: 주간 배치 자동 갱신 ($(date '+%Y-%m-%d'))${failed:+ — 실패: ${failed[*]}}"
     log "✓ 커밋 완료"
     if [ -z "${NO_PUSH:-}" ]; then
         if git push -q; then

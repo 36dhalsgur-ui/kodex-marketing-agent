@@ -73,6 +73,9 @@ jobs:
         if: steps.fresh.outputs.run == 'yes'
         env:
           KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+          # 투자자별 순매수(섹터 수급·ETF 순매수) — 없으면 그 열이 통째로 빈다
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
           # KRX_ID/PW는 pykrx 시절 잔재 — channel_batch 등이 아직 참조할 수 있어 남긴다
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
