@@ -2208,31 +2208,27 @@ with tab_did:
         no_baseline = sc.get("did") is None and sc.get("delta_treat") is None and sc.get("fallback")
         if no_baseline:
             _pw, _pn = sc.get("pre_weeks", 0), sc.get("pre_need", D.MIN_BASELINE_ACTIVE)
-            # 사유는 둘이고, 뭉치면 앞뒤가 안 맞는 문장이 나온다.
-            #   ① 상장이 개입 시점 이후·동시 — '이전'이 아예 없다
-            #   ② 수집 구간이 개입 직전에 시작 — '이전'이 짧다
-            # 순유입은 Δ좌수라 상장 첫 주엔 값이 없다. 그래서 유입 행의 첫 주는
-            # 상장 주보다 한 주 늦는데, 이걸 '수집 시작'이라 부르면 '수집은 7월
-            # 4주부터인데 개입은 7월 3주'라는 말이 안 되는 설명이 된다(실측).
+            # 사유는 셋이고, 뭉치면 앞뒤가 안 맞는 문장이 나온다. 한 줄씩 짧게.
+            #   ① 상장이 이벤트와 같은 주 — '이전'이 아예 없다
+            #   ② 상장이 수집 구간 안이라 이력이 짧다
+            #   ③ 수집 구간이 이벤트 직전에 시작 — '이전'이 짧다
             _listed = netbuy_df.loc[netbuy_df["종목명"] == treat, "첫주차"].dropna()
             _listed = _listed.iloc[0] if len(_listed) else None
-            if _listed:
-                _why = (f'이 ETF는 <b>{_listed}</b>에 상장했고, 이벤트도 같은 주에 '
-                        f'시작했습니다. 상품이 없던 기간과는 비교할 수 없으니 '
-                        f'‘평소’가 존재하지 않습니다 — 이 경우 첫 주 유입은 마케팅 '
-                        f'효과가 아니라 신규 상장 그 자체입니다.')
+            if _listed == event_week:
+                _why = f'이 ETF는 이벤트와 같은 주(<b>{_listed}</b>)에 상장했습니다.'
+            elif _listed:
+                _why = f'이 ETF는 <b>{_listed}</b>에 상장해 이벤트 앞이 {_pw}주뿐입니다.'
             else:
                 _first = weeks_avail[0] if weeks_avail else "?"
-                _why = (f'수집 구간이 <b>{_first}</b>부터라 이벤트 집행'
-                        f'(<b>{event_week}</b>) 앞에 {_pw}주치만 있습니다.')
+                _why = f'수집이 <b>{_first}</b>부터라 이벤트 앞이 {_pw}주뿐입니다.'
             st.markdown(
                 f'<div class="did-result" style="background:#5B6478;">'
                 f'<div class="did-result-label">측정 불가</div>'
                 f'<div class="did-result-val" style="font-size:1.2rem;">'
                 f'이벤트 집행 전 이력 {_pw}주 '
                 f'<span style="font-size:0.85rem;opacity:0.75;">(필요 {_pn}주)</span></div>'
-                f'<div class="did-result-note">DiD는 <b>이벤트를 집행하기 전과 후</b>를 '
-                f'비교해 효과를 가려냅니다. {_why}</div>'
+                f'<div class="did-result-note">DiD는 이벤트 전후를 비교합니다. '
+                f'{_why} 비교할 이전 기간이 부족해 측정하지 않습니다.</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
