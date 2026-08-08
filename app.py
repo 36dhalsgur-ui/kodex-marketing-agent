@@ -2259,11 +2259,18 @@ with tab_did:
             # 제목 자리에는 기호(Δ처치) 대신 '무엇을 잰 값인지'를 둔다 — 처치군은
             # 해당 ETF명, 대조군은 몇 종을 합쳤는지. 설명 줄도 계산식 대신 뜻을 쓴다.
             # 수식은 아래 'DiD 계산 방식' 접이식에 그대로 있다.
-            # 대조군 문장에 '~도'를 쓰지 않는 이유: 두 값의 부호가 엇갈릴 수 있다
-            # (실측 미국S&P500 처치 +0.02 / 대조 -0.11).
             def _flow(v):
                 return ("자금이 더 들어왔습니다" if v > 0 else
                         "자금이 덜 들어왔습니다" if v < 0 else "평소와 같았습니다")
+
+            # 조사는 두 값의 부호가 같을 때만 '도'다. 처치군은 늘고 대조군은 준
+            # 경우가 실제로 있어(실측 미국S&P500 처치 +0.02 / 대조 -0.11),
+            # '도'로 고정하면 '경쟁 ETF도 덜 들어왔습니다'처럼 틀린 문장이 된다.
+            def _sgn(v):
+                return 0 if v == 0 else (1 if v > 0 else -1)
+
+            _josa = ("도" if dt_v is not None and dc_v is not None
+                     and _sgn(dt_v) == _sgn(dc_v) else "는")
 
             s1c.markdown(
                 f'<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
@@ -2283,8 +2290,8 @@ with tab_did:
                 f'<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
                 f'<div class="did-step-name">경쟁 ETF {len(controls)}종</div>'
                 f'<div class="did-step-val">{dc_v:+.2f}%p</div>'
-                f'<div class="did-step-desc">같은 기간 경쟁 ETF는 {_flow(dc_v)}.<br>'
-                f'마케팅과 무관한 시장 몫입니다</div></div>'
+                f'<div class="did-step-desc">같은 기간 경쟁 ETF{_josa} {_flow(dc_v)}.<br>'
+                f'이는 마케팅과 무관한 시장 몫입니다</div></div>'
                 if dc_v is not None else
                 ('<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
                  '<div class="did-step-name">대조군 없음</div>'
