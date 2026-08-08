@@ -1307,11 +1307,12 @@ with tab_trend:
                     # 섹터명 아래 상품명은 '그 ETF 가격으로 판정한 섹터'에만 붙인다.
                     # KRX섹터 17개는 지수로 판정하는데 상품명을 같이 적으면
                     # ETF 기준으로 판정한 것처럼 읽힌다(실제 오해 발생).
-                    + (f'<div style="font-size:0.68rem;color:{FAINT};">'
-                       f'{r["KODEX"]} · 종가 기준'
-                       if r.get("군") != "KRX섹터" and r.get("KODEX") else
-                       '<div style="font-size:0.68rem;color:%s;">' % FAINT)
-                    + (f' · {note}' if note else "") + '</div></td>'
+                    # '종가 기준'은 붙이지 않는다 — 헤더에 날짜와 함께 한 번,
+                    # 상단 설명에 한 번 나오므로 행마다 9번 더 적을 이유가 없다.
+                    + '<div style="font-size:0.68rem;color:%s;">' % FAINT
+                    + " · ".join(x for x in (
+                        r.get("KODEX") if r.get("군") != "KRX섹터" else "", note) if x)
+                    + '</div></td>'
                     + (
                         f'<td class="num"><b style="font-size:0.98rem;">{signed(r["RS수준"])}</b>'
                         f'<div style="font-size:0.66rem;color:{FAINT};">{"강세" if r["RS수준"] >= 0 else "약세"}</div></td>'
