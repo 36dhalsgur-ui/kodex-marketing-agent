@@ -2356,45 +2356,6 @@ with tab_did:
                 unsafe_allow_html=True,
             )
 
-        # ── 사건연구 차트 — 집행 전 8주를 고정 기준선으로 삼은 주차별 DiD.
-        # 전체 24주를 다 그리면 반도체처럼 집행 직후인 건은 막대 24개 중 23개가
-        # 이벤트 전이라 정작 볼 곳이 묻힌다. 표시 구간을 '집행 전 8주 + 집행 후 전부'로
-        # 자른다 — 앞의 8주는 곧 기준선으로 평균 낸 그 구간이라, 무엇을 기준 삼았는지
-        # 그림이 그대로 보여준다.
-        _es = D.event_study(netbuy_df, treat, controls, event_week,
-                            weights=(_uni.drop_duplicates("종목명")
-                                     .set_index("종목명")["순자산"].to_dict()
-                                     if _uni is not None and "순자산" in _uni.columns else None))
-        if len(_es):
-            _pre_mean = _es.loc[_es["구간"] == "전", "DiD"].mean()
-            _post = _es[_es["구간"] == "후"]
-            fig_did = go.Figure()
-            fig_did.add_trace(go.Bar(
-                x=_es["상대주차"], y=_es["DiD"],
-                customdata=_es["주차"],
-                marker_color=[NAVY if g == "후" else "#C7CFDF" for g in _es["구간"]],
-                hovertemplate="%{customdata} (집행 %{x:+d}주)<br>DiD %{y:+.2f}%p<extra></extra>",
-            ))
-            # 집행 시작 경계 — 막대 사이(-0.5)에 그어야 0주차가 '후'에 포함돼 보인다
-            fig_did.add_vline(x=-0.5, line_width=1.5, line_dash="dot", line_color=NAVY)
-            fig_did.add_hline(y=0, line_width=1, line_color="#D5DBE7")
-            fig_did = base_layout(fig_did, height=240)
-            fig_did.update_layout(
-                title=dict(text=f"집행 전후 DiD — 회색 = 이벤트 전(기준선 구간), "
-                                f"남색 = 집행 후 {len(_post)}주", font=dict(size=14)),
-                margin=dict(l=10, r=10, t=40, b=10))
-            fig_did.update_xaxes(title=dict(text="집행 시작 기준 주차", font=dict(size=11)),
-                                 dtick=1, zeroline=False)
-            fig_did.update_yaxes(ticksuffix="%p")
-            st.plotly_chart(fig_did, use_container_width=True)
-            st.caption(
-                f"이벤트 전 평균 **{_pre_mean:+.2f}%p** — 0에 가까울수록 두 군이 나란히 "
-                f"움직였다는 뜻이라 비교가 성립합니다."
-                + (f"  ·  집행 후 평균 **{_post['DiD'].mean():+.2f}%p** ({len(_post)}주)"
-                   if len(_post) else "")
-                + f"  ·  기준선은 집행 전 {D.BASELINE_WEEKS}주 평균으로 고정이라 모든 막대가 "
-                  f"같은 ‘평소’와 비교됩니다.")
-
     # 계산 방식은 매번 읽을 것이 아니라 확인할 것 — 탭 맨 아래에 접어 둔다
     st.write("")
     with st.expander("DiD 계산 방식"):
