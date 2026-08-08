@@ -1009,57 +1009,36 @@ with tab_home:
     _hmix = " · ".join(f'{s[:2]} {_hstage[s]}' for s in ("태동기", "확산기", "과열기")
                        if _hstage.get(s))
 
-    # ── 앞줄: 시장. 지수는 KRX300이 아니라 코스피·코스닥으로 말한다 — 바로 아래
-    # 지수 스트립과 같은 값이라야 읽는 사람이 두 숫자를 대조하지 않는다.
-    # (KRX300은 섹터 국면 판정의 벤치마크로 ① 시장 트렌드에 그대로 남는다.)
-    _seg = []
-    _idx = {m["name"]: m for m in load_weekly_market()}
-    _kp, _kq = _idx.get("코스피"), _idx.get("코스닥")
-    if _kp and _kq:
-        _both = (_kp["weekly"], _kq["weekly"])
-        _dir = ("오른" if min(_both) >= 0 else "밀린" if max(_both) < 0 else "엇갈린")
-        _seg.append(f'코스피 <b>{_kp["weekly"]:+.1f}%</b> · 코스닥 <b>{_kq["weekly"]:+.1f}%</b>로 '
-                    f'{_dir} 한 주')
-    if _hup is not None:
-        # 섹터 수익률은 배치 주간 구간, 지수는 최근 5거래일이라 구간이 다르다.
-        # 그래서 '지수보다 강했다'처럼 둘을 견주는 표현은 쓰지 않는다.
-        _r = _hup["주간수익률"]
-        _seg.append(f'{D._ga(_hup["섹터"])} <b>{_r:+.1f}%</b>로 '
-                    + ("가장 강했고" if _r >= 0 else "낙폭이 가장 작았고"))
-    _tail = (f'마케팅 사정권은 <b>{_hact_n}개 섹터</b>({_hmix})입니다.' if _hact_n
-             else f'{_hn}개 섹터 모두 쇠퇴·관망이라 사정권에 든 섹터가 없습니다.')
-    _lead_parts = [(", ".join(_seg) + ", " if _seg else "") + _tail]
-
-    # ── 뒷줄: 우리 마케팅. 프로모션(리워드 걸린 판촉)만 '집행 중'으로 센다.
-    # 착수뿐 아니라 '선점 검토'도 말해야 한다 — 시장이 바뀌어 새 섹터가 잡혀도
-    # 착수 기준을 못 넘으면 문구가 '보류'로만 남아 변화가 드러나지 않았다.
+    # ── 스냅샷은 아래 카드가 못 하는 일만 한다.
+    # 예전에는 코스피·코스닥·최고 섹터·사정권을 문장으로 늘어놨는데, 넷 다
+    # 바로 아래 시장 현황 스트립과 KPI 카드에 그대로 다시 나온다. 숫자 8개 중
+    # 6개가 두 번째 등장이라 정작 고유한 정보(이번 주 액션)가 묻혔다.
+    # 시장 숫자는 카드에 맡기고 여기서는 판단과 근거만 말한다.
     _go_now = [e for e in EMERGING_GO if e["판정"] == "착수"]
     _prep = [e for e in EMERGING_GO if e["판정"] == "선점 검토"]
     _n1 = ", ".join(e["섹터"] for e in _go_now)
     _n2 = ", ".join(e["섹터"] for e in _prep)
-    _p = f'프로모션 <b>{len(PROMOS)}종</b>' if PROMOS else ""
+    _p = f'프로모션 <b>{len(PROMOS)}종</b>을 집행 중이고, ' if PROMOS else "진행 중인 프로모션은 없고, "
 
     if _go_now:
-        _next = f'신규 착수 대상은 <b>{_n1}</b>입니다'
-        if _prep:
-            _next += f' ({_n2}{D._eun(_n2)[len(_n2):]} 소재만 준비)'
+        # 근거는 '핵심 — 부연' 꼴이라 앞머리만 쓴다. 왜 그 섹터인지가 한눈에 보여야 한다
+        _why = (f' — {_go_now[0]["근거"].split("—")[0].strip()}' if len(_go_now) == 1 else "")
+        _line1 = f'{_p}이번 주 새로 착수할 곳은 <b>{_n1}</b>입니다{_why}.'
+        _line2 = (f'{_n2}{D._eun(_n2)[len(_n2):]} 소재만 준비하고 집행은 보류합니다.'
+                  if _prep else "")
     elif _prep:
-        _next = (f'착수 기준을 넘긴 섹터는 없고, <b>{_n2}</b>{D._ga(_n2)[len(_n2):]} '
-                 f'소재 준비 대상입니다')
+        _line1 = f'{_p}착수 기준을 넘긴 섹터는 없습니다.'
+        _line2 = f'<b>{_n2}</b>{D._eun(_n2)[len(_n2):]} 소재만 준비하고 집행은 보류합니다.'
     elif EMERGING_JUDGED:
-        _next = f'신규 착수 대상은 없습니다 ({EMERGING_DROPPED})'
+        _line1 = f'{_p}이번 주 새로 착수할 곳은 없습니다.'
+        _line2 = f'태동 {len(EMERGING_JUDGED)}개는 모두 기준에 못 미칩니다 ({EMERGING_DROPPED}).'
     else:
-        _next = '태동 국면 섹터가 없어 신규 착수 대상도 없습니다'
-
-    if _p:
-        _act = f'{_p}을 집행 중이고, {_next}.'
-    else:
-        _act = ('진행 중인 프로모션은 없고, ' + _next
-                + (f' (콘텐츠 푸시 {len(CAMPAIGNS)}종).' if CAMPAIGNS else '.'))
+        _line1 = f'{_p}태동 국면 섹터가 없어 새로 착수할 곳도 없습니다.'
+        _line2 = ""
 
     st.markdown(
         f'<div class="home-lead"><div class="hl-k">WEEKLY SNAPSHOT · {sel_week}</div>'
-        f'<div class="hl-t">{" ".join(_lead_parts)}<br>{_act}</div></div>',
+        f'<div class="hl-t">{_line1}' + (f'<br>{_line2}' if _line2 else "") + '</div></div>',
         unsafe_allow_html=True)
     st.write("")
 
@@ -1121,13 +1100,22 @@ with tab_home:
     # ── 워크플로 — 카드로 두면 시장 현황과 같은 위계로 읽혀 이번 주 상황을 가린다.
     # 탭 구성 안내는 매주 바뀌지 않는 정보이므로 데이터 출처와 함께 각주로 내린다.
     st.write("")
-    st.caption(
-        "탭 구성 — ① 시장 트렌드: 섹터 국면·수익률·검색량으로 방향 진단 · "
-        "② 채널 모니터링: 8개 브랜드 배너·유튜브·블로그로 경쟁 마케팅 감지 · "
-        "③ 마케팅 효과 측정: 감지된 캠페인의 자금 유입 효과를 DiD로 검증 · "
-        "④ 주간 리포트: 종합 브리핑·다음 주 액션 도출 · "
-        "⑤ 규제 동향: 금융위 발표·법령 시행일 점검"
-    )
+    _tabs_info = [
+        ("①", "시장 트렌드", "섹터 국면·수익률·검색량으로 방향 진단"),
+        ("②", "채널 모니터링", "8개 브랜드 배너·유튜브·블로그로 경쟁 마케팅 감지"),
+        ("③", "마케팅 효과 측정", "감지된 캠페인의 자금 유입 효과를 DiD로 검증"),
+        ("④", "주간 리포트", "종합 브리핑·다음 주 액션 도출"),
+        ("⑤", "규제 동향", "금융위 발표·법령 시행일 점검"),
+    ]
+    st.markdown(
+        f'<div style="font-size:0.7rem;color:{FAINT};font-weight:700;letter-spacing:.06em;'
+        f'margin-bottom:7px;">탭 구성</div>'
+        + "".join(
+            f'<div style="font-size:0.8rem;color:{INK};line-height:1.9;">'
+            f'<b>{no} {nm}</b>'
+            f'<span style="color:{MUTED};"> — {ds}</span></div>'
+            for no, nm, ds in _tabs_info),
+        unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────
 # ① 시장 트렌드
