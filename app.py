@@ -2255,27 +2255,35 @@ with tab_did:
             s1c, s2c = st.columns(2)
             dt_v = sc.get("delta_treat")
             dc_v = sc.get("delta_ctrl")
+
+            # 카드 제목을 기호(Δ처치)에서 평서문으로 바꾼다. 기호가 제목 자리를
+            # 차지하고 뜻은 아래 작은 글씨에 있어, 숫자의 방향이 눈에 안 들어왔다.
+            # 부호에 따라 문장이 바뀌므로 숫자를 읽기 전에 방향이 먼저 잡힌다.
+            def _dir(v):
+                return "평소보다 더 들어옴" if v > 0 else "평소보다 덜 들어옴" if v < 0 else "평소와 같음"
+
             s1c.markdown(
-                f'<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
-                f'<div class="did-step-name">Δ처치 (베이스라인 대비)</div>'
+                f'<div class="did-step"><div class="did-step-no">STEP 1 · {treat[:22]}</div>'
+                f'<div class="did-step-name">{_dir(dt_v)}</div>'
                 f'<div class="did-step-val">{dt_v:+.2f}%p</div>'
-                f'<div class="did-step-desc">{treat[:20]}<br>금주 강도 − 직전 8주 평균</div></div>'
+                f'<div class="did-step-desc">집행 주 − 직전 {D.BASELINE_WEEKS}주 평균 '
+                f'(Δ처치)</div></div>'
                 if dt_v is not None else
                 # 사유 없이 값만 비는 경우(선택 주차에 데이터 없음) — 포맷이 터지지 않게 막는다
-                ('<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
+                (f'<div class="did-step"><div class="did-step-no">STEP 1 · {treat[:22]}</div>'
                  '<div class="did-step-name">산출 불가</div>'
-                 f'<div class="did-step-desc">{treat[:20]}<br>'
-                 f'{event_week} 유입 데이터가 없습니다</div></div>'),
+                 f'<div class="did-step-desc">{event_week} 유입 데이터가 없습니다</div></div>'),
                 unsafe_allow_html=True,
             )
             s2c.markdown(
-                f'<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
-                f'<div class="did-step-name">Δ대조군 평균</div>'
+                f'<div class="did-step"><div class="did-step-no">STEP 2 · 경쟁 ETF '
+                f'{len(controls)}종</div>'
+                f'<div class="did-step-name">{_dir(dc_v)}</div>'
                 f'<div class="did-step-val">{dc_v:+.2f}%p</div>'
-                f'<div class="did-step-desc">{len(controls)}개 경쟁 ETF 평균<br>'
+                f'<div class="did-step-desc">순자산 가중평균 (Δ대조군)<br>'
                 f'= 시장이 원래 움직인 만큼</div></div>'
                 if dc_v is not None else
-                ('<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
+                ('<div class="did-step"><div class="did-step-no">STEP 2 · 경쟁 ETF</div>'
                  '<div class="did-step-name">대조군 없음</div>'
                  '<div class="did-step-desc">경쟁 ETF를 지정하면 시장효과가 제거됩니다</div></div>'),
                 unsafe_allow_html=True,
