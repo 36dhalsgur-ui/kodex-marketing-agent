@@ -1532,33 +1532,45 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
         if not sizes:
             row.update(판정="확인 필요", 우선순위=3,
                        근거="경쟁사 순자산을 확인하지 못했다 — 시장 규모 미상")
-        elif n_rivals <= 2:
+        elif n_rivals <= 2 and (share is None or share < GAP_DOMINANCE):
             # 선발이 1~2곳 — 경쟁사 수가 적어 시장 규모만으로는 판단할 수 없다.
             # 아직 아무도 못 키운 것인지, 이제 열리는 시장인지가 갈린다.
+            # ※ 점유율 조건을 함께 본다. 예전에는 경쟁 2종 이하면 점유율을 아예
+            #   보지 않아, 1위가 92%를 쥔 판을 '경쟁이 굳기 전'이라고 말했다
+            #   (실측 2026-08-08 글로벌연금·자산배분: RISE 92% 독점).
             if total >= GAP_MARKET_VIABLE:
                 row.update(판정="선점 기회", 우선순위=0,
-                           # 규모·경쟁 종수는 위 지표 카드에 이미 있다. 판정의 뜻만 남긴다.
-                           근거="경쟁이 굳기 전에 들어갈 여지가 있습니다")
+                           근거=f"경쟁 {n_rivals}종뿐이고 1위도 {share:.0%}라 "
+                                f"아직 자리가 열려 있습니다"
+                                if share is not None else
+                                f"경쟁 {n_rivals}종뿐이라 아직 자리가 열려 있습니다")
             else:
                 row.update(판정="시장 미검증", 우선순위=3,
-                           근거="수요가 없는 것인지 아직 안 열린 것인지 확인이 필요합니다")
+                           근거=f"경쟁 {n_rivals}종이 {total:,.0f}억에 그칩니다. 수요가 없는 "
+                                f"것인지 아직 안 열린 것인지 확인이 필요합니다")
         elif total < GAP_MARKET_VIABLE:
             row.update(판정="보류", 우선순위=3,
-                       근거=f"경쟁 {len(sizes)}종이 모은 돈이 다 합쳐 {total:,.0f}억이라 "
+                       근거=f"경쟁 {len(sizes)}종이 다 합쳐 {total:,.0f}억에 그칩니다. "
                             f"만들어도 모일 시장이 아닙니다")
         elif share is not None and share >= GAP_DOMINANCE:
             row.update(판정="차별화 필요", 우선순위=2,
-                       근거=f"{top[0]}가 {share:.0%}를 독식해 같은 구성으로는 "
-                            f"후발 진입이 어렵습니다")
+                       근거=f"경쟁 {len(sizes)}종 중 {top[0]}가 {share:.0%}를 쥔 "
+                            f"{'사실상 독점이라' if share >= 0.8 else '독식 구도라'} "
+                            f"같은 구성으로는 후발 진입이 어렵습니다")
         elif stage in ("과열기", "쇠퇴기"):
+            # 같은 '시점 대기'라도 경쟁이 몇 종인지에 따라 준비 방향이 다르다.
+            # 10종이 붙은 판과 3종뿐인 판을 같은 문장으로 적으면 복붙이 된다.
+            _crowd = (f"이미 {len(sizes)}종이 붙어 있어 운용 방식으로 갈라서야 합니다"
+                      if len(sizes) >= 6 else
+                      f"경쟁 {len(sizes)}종으로 아직 자리가 있습니다")
             row.update(판정="시점 대기", 우선순위=1,
-                       근거=f"규모는 되나 국면이 {stage}라, 리드타임을 감안해 준비만 하고 "
-                            f"출시는 진정 후로 미룹니다")
+                       근거=f"규모는 되나 국면이 {stage}입니다. {_crowd}. "
+                            f"리드타임만 감안해 소재를 준비하고 출시는 진정 후로 미룹니다")
         else:
             _sz = "1조 이상 대형 시장" if total >= GAP_MARKET_LARGE else f"시장 {total:,.0f}억"
             row.update(판정="출시 검토", 우선순위=0,
-                       근거=f"{_sz}에 KODEX만 없고 1위 {top[0]}도 {share:.0%}라 "
-                            f"독점 구도가 아닙니다")
+                       근거=f"{_sz}에 KODEX만 없고, 경쟁 {len(sizes)}종이 나눠 가진 "
+                            f"1위도 {share:.0%}라 독점 구도가 아닙니다")
         out.append(row)
     out.sort(key=lambda x: (x["우선순위"], -(x["시장규모억"] or 0)))
     return out
