@@ -39,14 +39,20 @@ if any(not hasattr(D, a) for a in _REQUIRED_ATTRS):
 # 위 목록은 사람이 관리해서 새 함수를 추가할 때 빠뜨리기 쉽다(실제로 반복 발생).
 # 이름 존재 여부만 보면 '시그니처만 바뀐 기존 함수'를 놓친다(실측: detect_marketing_events에
 # 인자를 추가했는데 이름이 이미 있어 재로드가 안 걸렸다). 소스 해시를 직접 대조한다.
-try:
-    _src = (Path(__file__).parent / "data.py").read_text()
-    _sig = hashlib.md5(_src.encode()).hexdigest()
-    if getattr(D, "_SRC_SIG", None) != _sig:
-        D = importlib.reload(D)
-        D._SRC_SIG = _sig
-except Exception:
-    pass
+# report_template.py도 같이 본다 — data.py만 감시해서 리포트 문구를 고쳐도
+# 화면이 그대로였다(실측 2026-08-08: 리드 문단 축약이 반영되지 않음).
+for _mod, _name in ((D, "data.py"), (RT, "report_template.py")):
+    try:
+        _sig = hashlib.md5((Path(__file__).parent / _name).read_bytes()).hexdigest()
+        if getattr(_mod, "_SRC_SIG", None) != _sig:
+            _mod = importlib.reload(_mod)
+            _mod._SRC_SIG = _sig
+            if _name == "data.py":
+                D = _mod
+            else:
+                RT = _mod
+    except Exception:
+        pass
 
 
 def news_link(query: str) -> str:
@@ -2541,8 +2547,8 @@ with tab_report:
             _angle = (f'1위 {_top}가 {_share:.0%}를 쥐고 있어 같은 지수를 따라가면 승산이 낮습니다. '
                       f'세부 테마를 좁히거나 액티브·커버드콜 등 운용 방식으로 갈라야 합니다. ')
         elif _all_same:
-            _angle = (f'경쟁 {g["경쟁사수"]}종이 전부 {_dom}이므로 액티브·세부 테마 심화로 '
-                      f'차별화 여지가 있습니다. ')
+            # '경쟁 n종이 전부 X'는 위 '경쟁 구도' 카드가 이미 말한다
+            _angle = '액티브·세부 테마 심화로 차별화 여지가 있습니다. '
         else:
             _angle = f'경쟁이 {_dom} 중심이므로 다른 운용 방식으로 빈틈을 노릴 수 있습니다. '
         return {
@@ -2560,7 +2566,8 @@ with tab_report:
                                        "리드타임 감안 준비만 착수"
                                        if _stage in ("과열기", "쇠퇴기") else "국면 확인 후 출시 시점 판단"),
             "시장규모억": j.get("시장규모억"), "1위": _top, "점유율": _share,
-            "차별화": _angle + "추종 지수 존재 여부와 구성종목은 담당자 검증이 필요합니다.",
+            # 면책 문구는 후보마다 같은 말이라 문장에서 빼고 섹션 하단에 한 번만 둔다
+            "차별화": _angle.rstrip(),
         }
 
     gap_ctx = _gap_detail(gaps[0]) if gaps else None
@@ -2638,7 +2645,7 @@ with tab_report:
     st.write("")
 
     # ══════════ A. 현재 마케팅 점검 (핵심) ══════════
-    sub_header("A", "현재 마케팅 점검", "집행 중인 상품을 국면·자금 근거로 지속·확대·축소 판정")
+    sub_header("A", "현재 마케팅 점검", f"지속 {n_keep} · 축소 {n_cut}")
     if review:
         _vc = {"지속": ("#2E7D5B", "#EAF7EF"), "확대": ("#2E7D5B", "#EAF7EF"),
                "지속·관찰": ("#B0801F", "#FDF6E7"), "지속·신중": ("#B0801F", "#FDF6E7"),
@@ -2661,9 +2668,8 @@ with tab_report:
                 f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;">{r["국면"]}</span>'
                 f'<span style="font-size:0.78rem;font-weight:700;color:{fcol};white-space:nowrap;'
                 f'min-width:66px;text-align:right;">{flow}</span></div>')
-        st.markdown(f'<div class="card" style="padding:6px 18px 12px;">{rows}'
-                    f'<div style="margin-top:10px;padding:10px 13px;background:#EAF0FD;border-radius:7px;'
-                    f'font-size:0.8rem;line-height:1.6;">{review_read}</div></div>',
+        # 하단 요약 박스는 뺐다 — 판정은 위 행에, 건수는 부제와 KPI에 이미 있다.
+        st.markdown(f'<div class="card" style="padding:6px 18px 12px;">{rows}</div>',
                     unsafe_allow_html=True)
         with st.expander("판정 근거 자세히"):
             for r in review:
@@ -2795,9 +2801,10 @@ with tab_report:
                     f'<div style="font-size:0.86rem;font-weight:800;color:{INK};margin-top:2px;">'
                     f'{d["국면"] or "국면 미상"}</div>'
                     f'<div style="font-size:0.68rem;color:{MUTED};">{d["신호설명"]}</div></div></div>'
-                    # 판정 근거 + 차별화 각도
+                    # 판정 근거 + 차별화 각도.
+                    # 판정 라벨은 상단 배지에 이미 있어 문장 앞머리에서 뺀다.
                     f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.6;margin-top:10px;">'
-                    f'<b style="color:{_c};">{d["타이밍"]}</b> — {d["타이밍설명"]}</div>'
+                    f'{d["타이밍설명"]}</div>'
                     f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.6;margin-top:6px;">'
                     f'<b style="color:{INK};">차별화 각도</b> — {d["차별화"]}</div>'
                     + (f'<div style="font-size:0.68rem;color:{FAINT};margin-top:8px;">'
@@ -2812,11 +2819,12 @@ with tab_report:
                 with st.expander(f"더보기 {len(_rest)}건"):
                     for d in _rest:
                         st.markdown(_gap_card(d), unsafe_allow_html=True)
-            if _gap_dropped:
-                st.markdown(
-                    f'<div style="font-size:0.72rem;color:{FAINT};margin-top:4px;">'
-                    f'제외 {_n_gap - len(gap_details)}건 — {_gap_dropped}</div>',
-                    unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="font-size:0.72rem;color:{FAINT};margin-top:6px;">'
+                + (f'제외 {_n_gap - len(gap_details)}건 — {_gap_dropped} · '
+                   if _gap_dropped else "")
+                + f'추종 지수 존재 여부와 구성종목은 담당자 검증이 필요합니다</div>',
+                unsafe_allow_html=True)
             with st.expander("출시 판정 기준"):
                 st.markdown(
                     criteria_list(

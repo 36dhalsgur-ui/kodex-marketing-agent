@@ -35,6 +35,16 @@ def _reul(word: str) -> str:
     return "를"
 
 
+def _eun(word: str) -> str:
+    """은/는 조사만 반환. 테마명이 매주 바뀌어 고정하면 어긋난다."""
+    if not word:
+        return "는"
+    c = ord(word[-1])
+    if 0xAC00 <= c <= 0xD7A3:
+        return "은" if (c - 0xAC00) % 28 else "는"
+    return "는"
+
+
 def build_lead(ctx: dict, polite: bool = False) -> str:
     """리드 문단 — 국면·캠페인·검색을 엮은 한 단락 종합 (규칙 기반).
 
@@ -46,9 +56,10 @@ def build_lead(ctx: dict, polite: bool = False) -> str:
     n_dec = ctx["stage_counts"].get("쇠퇴기", 0)
     n_tot = ctx["n_sectors"]
     # 앞단 — 시장 상황
+    # '광범위한 조정'은 바로 아래 KPI의 KRX300 주간수익률과 같은 말이라 뺀다.
     market = [
-        f'이번 주 국내 증시는 {n_tot}개 섹터 중 <span class="hl">{n_dec}개가 쇠퇴 국면</span>에 '
-        f'진입하며 광범위한 조정을 {_e("겪었다", "겪었습니다")}.'
+        f'{n_tot}개 섹터 중 <span class="hl">{n_dec}개가 쇠퇴 국면</span>'
+        f'{_e("이다", "입니다")}.'
     ]
     worst = ctx["top_dn"][0] if ctx["top_dn"] else None
     if worst:
@@ -63,18 +74,20 @@ def build_lead(ctx: dict, polite: bool = False) -> str:
         nm = c0.get("표기명", "")
         # 신규상장 캠페인이면 그 사실을 문장에 드러낸다
         pre = "신규상장된 " if "신규" in (c0.get("제목") or "") else ""
+        # '이런 하락장에서'는 앞 문장의 되풀이. 집행 건수는 KPI에 있으므로 대표 상품만.
+        # 상품명이 이미 'KODEX ~'라 주어와 겹친다 — 표기명에서 브랜드를 떼고 쓴다.
+        _short = _esc(nm).replace("KODEX ", "")
         tail.append(
-            f'이런 하락장에서 삼성자산운용은 {pre}<b>{_esc(nm)}</b>{_reul(nm)} 중심으로 '
-            f'마케팅 집행하며 방어형 수요를 {_e("겨냥했다", "겨냥했습니다")}.')
-        tail.append(f'— <span class="hl">국면에 부합하는 선택</span>{_e("이다", "입니다")}.')
+            f'KODEX는 {pre}<b>{_short}</b> 등 방어형을 집행 중 '
+            f'— <span class="hl">국면에 부합</span>{_e("한다", "합니다")}.')
     ups = sorted([(k, v) for k, v in ctx.get("search", {}).items() if v > 15],
                  key=lambda x: -x[1])[:2]
     if ups:
         names = "·".join(k for k, _ in ups)
+        # 조사를 이름 끝소리에 맞춘다 — 예전 '미국주식로'처럼 어긋났다.
         tail.append(
-            f'반면 검색 수요는 {_esc(names)}로 쏠렸으나 해당 테마는 이미 과열·쇠퇴 국면이어서, '
-            f'지금은 신규 진입보다 재매집이 진행 중인 섹터를 다음 사이클 후보로 '
-            f'관찰할 {_e("시점이다", "시점입니다")}.')
+            f'검색이 몰린 {_esc(names)}{_eun(names)} 이미 과열이라, 재매집 중인 섹터를 '
+            f'다음 사이클 후보로 관찰할 {_e("시점이다", "시점입니다")}.')
 
     # 시장 상황(앞) / 우리 해석(뒤) 사이에서만 한 번 줄을 바꾼다
     out = " ".join(market)

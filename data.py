@@ -1464,31 +1464,29 @@ def emerging_launch_review(board: list[dict], is_marketed, aum_of=None) -> list[
             near = lvl >= EMERGING_NEAR_CROSS
             strong = mom >= EMERGING_MOM_STRONG
             quiet = big > 0 and indiv < 0          # 큰손 매수 · 개인 매도
-            _sz = ("" if aum is None else
-                   f" 순자산 {aum:,.0f}억으로 규모도 충분하다." if aum >= AUM_COMFORTABLE else
-                   f" 다만 순자산 {aum:,.0f}억으로 크지 않아 집행 규모는 조절이 필요하다.")
             if strong and near and big >= 0:
-                # 큰손 자금이 빠지는 중이면 가격만 오른 반등일 수 있다 — 착수로 올리지 않는다
+                # 큰손 자금이 빠지는 중이면 가격만 오른 반등일 수 있다 — 착수로 올리지 않는다.
+                # 순자산은 카드 헤더에, '지금 착수'는 판정 라벨에 이미 있어 문장에서 뺀다.
                 row.update(판정="착수", 우선순위=0,
                            근거=f"확산 전환 임박 — 모멘텀 {mom:+.1f}, 시장 대비 {lvl:+.1f}로 "
-                                f"평균선 회복 직전이고 외국인·연기금도 {big:+,}억으로 이탈이 없다. "
-                                f"리드타임 감안 지금 착수.{_sz}")
+                                f"평균선 회복 직전이고 외국인·연기금도 {big:+,}억으로 이탈이 없다")
             elif strong and near:
                 row.update(판정="선점 검토", 우선순위=1,
                            근거=f"모멘텀 {mom:+.1f}로 평균선 회복 직전이나 외국인·연기금이 "
                                 f"{big:+,}억 이탈 중 — 큰손 자금이 돌아설 때까지 소재만 준비")
             elif quiet and strong:
                 row.update(판정="착수", 우선순위=0,
-                           근거=f"조용한 매집 — 외국인·연기금 {big:+,}억 순매수, 개인 {indiv:+,}억 "
-                                f"순매도. 가격({mom:+.1f})보다 수급이 먼저 돌았다.{_sz}")
+                           # '가격보다 수급이 먼저 돌았다'는 앞머리 '조용한 매집'의 정의라
+                           # 되풀이고, 순자산은 카드 헤더에 이미 찍힌다.
+                           근거=f"조용한 매집 — 외국인·연기금 {big:+,}억 순매수, "
+                                f"개인 {indiv:+,}억 순매도")
             elif quiet:
                 row.update(판정="선점 검토", 우선순위=1,
-                           근거=f"외국인·연기금 {big:+,}억 매집 중이나 모멘텀 {mom:+.1f}로 아직 약함 "
-                                f"— 소재 선점만 준비")
+                           근거=f"외국인·연기금 {big:+,}억 매집 중이나 모멘텀 {mom:+.1f}로 아직 약함")
             elif strong:
                 row.update(판정="선점 검토", 우선순위=1,
                            근거=f"모멘텀 {mom:+.1f}로 강하나 큰손 자금은 {big:+,}억 유출 "
-                                f"— 가격만 오른 반등일 수 있어 확인 필요")
+                                f"— 가격만 오른 반등일 수 있음")
             else:
                 row.update(판정="관찰", 우선순위=2,
                            근거=f"모멘텀 {mom:+.1f}·시장 대비 {lvl:+.1f} — 돌아서는 초입이라 아직 이름")
@@ -1539,12 +1537,11 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
             # 아직 아무도 못 키운 것인지, 이제 열리는 시장인지가 갈린다.
             if total >= GAP_MARKET_VIABLE:
                 row.update(판정="선점 기회", 우선순위=0,
-                           근거=f"선발 {n_rivals}곳뿐인데 이미 {total:,.0f}억을 모았다 "
-                                f"— 경쟁이 굳기 전에 들어갈 여지가 있다")
+                           # 규모·경쟁 종수는 위 지표 카드에 이미 있다. 판정의 뜻만 남긴다.
+                           근거="경쟁이 굳기 전에 들어갈 여지가 있다")
             else:
                 row.update(판정="시장 미검증", 우선순위=3,
-                           근거=f"선발 {n_rivals}곳이 {total:,.0f}억에 그친다 "
-                                f"— 수요가 없는 것인지 아직 안 열린 것인지 확인 필요")
+                           근거="수요가 없는 것인지 아직 안 열린 것인지 확인 필요")
         elif total < GAP_MARKET_VIABLE:
             row.update(판정="보류", 우선순위=3,
                        근거=f"경쟁 {len(sizes)}종이 모은 돈이 다 합쳐 {total:,.0f}억 "
