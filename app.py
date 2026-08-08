@@ -755,7 +755,6 @@ with st.sidebar:
     # 상장 직후 종목은 주차 없이 유니버스에만 실린다 — 주차 선택지에서 뺀다
     weeks = [w for w in dict.fromkeys(netbuy_df["주차"]) if isinstance(w, str)]
     sel_week = st.selectbox("분석 주차", weeks[1:][::-1], index=0)
-    top_n = st.slider("자금 유입강도 TOP N", 5, 20, 15)
 
     st.markdown("---")
     up = st.file_uploader("순매수 엑셀 업로드", type=["xlsx"], help="컬럼: 주차·종목명·테마·운용사·순매수액·순자산")
@@ -2062,9 +2061,8 @@ with tab_did:
     # ── 분석할 캠페인 선택 (처치 ETF + 개입 주차가 함께 결정된다)
     manual_mode = False
     if usable:
-        labels = [f'{e["표기명"]} · 개입 {e["주차"]}'
-                  + (f' · {e["채널수"]}개 채널' if e.get("채널수", 1) > 1 else f' · {e["채널"]}')
-                  for e in usable]
+        # 라벨은 ETF 이름만 — 개입 주차·채널은 아래 캡션과 01 목록에 이미 있다
+        labels = [e["표기명"] for e in usable]
         pick = st.selectbox("분석할 마케팅 이벤트", labels,
                             help="선택한 이벤트의 ETF가 처치군, 집행 주차가 개입 시점이 됩니다")
         ev = usable[labels.index(pick)]
@@ -2166,30 +2164,43 @@ with tab_did:
     sc = D.did_score(series, event_week)
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    sub_header("03", "진단 결과", "좌: 금주 자금 유입 맥락 · 우: 처치−대조 이중차분")
+    sub_header("03", "진단 결과", "처치군이 대조군보다 얼마나 더 받았는가")
 
     d1, d2 = st.columns([7, 5], gap="large")
     with d1:
-        # 순매수강도 TOP N (참고 맥락)
-        top = wk.nlargest(top_n, "매수강도").sort_values("매수강도")
-        colors = [NAVY if "KODEX" in n else "#D5DBE7" for n in top["종목명"]]
-        fig_top = go.Figure(
-            go.Bar(x=top["매수강도"], y=top["종목명"], orientation="h", marker_color=colors,
-                   text=[f"{v:+.2f}%" for v in top["매수강도"]], textposition="outside",
-                   cliponaxis=False,
-                   customdata=top[["순매수액", "개인순매수", "기관순매수"]].fillna(0).values,
-                   hovertemplate="%{y}<br>유입강도 %{x:.2f}%"
-                                 "<br>순유입 %{customdata[0]:,.0f}억 (설정·환매)"
-                                 "<br>개인 순매수 %{customdata[1]:,.0f}억"
-                                 "<br>기관 순매수 %{customdata[2]:,.0f}억<extra></extra>")
-        )
-        _h_top = max(360, top_n * BAR_ROW_PX + CHART_CHROME_PX)
-        fig_top = base_layout(fig_top, height=_h_top)
-        fig_top.update_layout(title=dict(text=f"{sel_week} 자금 유입강도 TOP {top_n}", font=dict(size=15)))
-        xmax = float(top["매수강도"].max())
-        fig_top.update_xaxes(ticksuffix="%", range=[min(0, float(top["매수강도"].min()) * 1.2), xmax * 1.25])
-        st.plotly_chart(fig_top, use_container_width=True)
-        st.caption(f"진한 남색 = KODEX 상품 · 분석 대상 {len(wk)}개 ETF · 막대는 순유입(Δ상장좌수×NAV) 기준, 막대에 마우스를 올리면 투자자별 순매수도 보입니다")
+        # 처치군 + 대조군만 그린다. 예전에는 전 종목 유입강도 TOP N을 띄웠는데,
+        # 선택한 캠페인과 무관한 목록이라 '진단 결과'라는 자리에 겉돌았다.
+        # 같은 자리에 비교 대상만 두면 DiD 숫자가 왜 그 값인지 막대로 읽힌다.
+        _cmp = [treat] + list(controls)
+        _cw = wk[wk["종목명"].isin(_cmp)].set_index("종목명")
+        _rows_c = [(n, float(_cw.loc[n, "매수강도"]))
+                   for n in _cmp if n in _cw.index and pd.notna(_cw.loc[n, "매수강도"])]
+        if _rows_c:
+            _rows_c.sort(key=lambda x: x[1])
+            _names = [n for n, _ in _rows_c]
+            _vals = [v for _, v in _rows_c]
+            _colors = [NAVY if n == treat else "#D5DBE7" for n in _names]
+            _aum = [float(_cw.loc[n, "순자산"]) if pd.notna(_cw.loc[n, "순자산"]) else 0
+                    for n in _names]
+            _flow = [float(_cw.loc[n, "순매수액"]) if pd.notna(_cw.loc[n, "순매수액"]) else 0
+                     for n in _names]
+            fig_cmp = go.Figure(go.Bar(
+                x=_vals, y=_names, orientation="h", marker_color=_colors,
+                text=[f"{v:+.2f}%" for v in _vals], textposition="outside", cliponaxis=False,
+                customdata=list(zip(_flow, _aum)),
+                hovertemplate="%{y}<br>유입강도 %{x:.2f}%"
+                              "<br>순유입 %{customdata[0]:,.0f}억"
+                              "<br>순자산 %{customdata[1]:,.0f}억<extra></extra>"))
+            fig_cmp = base_layout(fig_cmp, height=max(300, len(_names) * BAR_ROW_PX + CHART_CHROME_PX))
+            fig_cmp.update_layout(title=dict(
+                text=f"{event_week} 처치군 vs 대조군 유입강도", font=dict(size=15)))
+            _lo, _hi = min(_vals + [0]), max(_vals + [0])
+            fig_cmp.update_xaxes(ticksuffix="%", range=[_lo * 1.3 - 1, _hi * 1.3 + 1])
+            st.plotly_chart(fig_cmp, use_container_width=True)
+            st.caption(f"진한 남색 = 처치군 · 회색 = 대조군 {len(controls)}종 · "
+                       f"DiD는 처치군의 Δ에서 대조군 Δ의 순자산 가중평균을 뺀 값입니다")
+        else:
+            st.info(f"{event_week}에 처치군·대조군의 유입 데이터가 없습니다.")
 
     with d2:
         st.markdown(
