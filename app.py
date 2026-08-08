@@ -2544,11 +2544,12 @@ with tab_report:
         _share, _top = j.get("점유율"), j.get("1위", "")
         # 차별화 각도는 '왜 뚫을 수 있는가'라 판정 사유에 따라 달라진다
         if j.get("판정") == "차별화 필요" and _share:
-            _angle = (f'1위 {_top}가 {_share:.0%}를 쥐고 있어 같은 지수를 따라가면 승산이 낮습니다. '
-                      f'세부 테마를 좁히거나 액티브·커버드콜 등 운용 방식으로 갈라야 합니다. ')
+            # 점유율은 판정 근거가 이미 말한다 — 여기서는 '어떻게 갈라설지'만
+            _angle = ('세부 테마를 좁히거나 액티브·커버드콜 등 운용 방식으로 '
+                      '갈라야 합니다. ')
         elif _all_same:
             # '경쟁 n종이 전부 X'는 위 '경쟁 구도' 카드가 이미 말한다
-            _angle = '액티브·세부 테마 심화로 차별화 여지가 있습니다. '
+            _angle = '액티브·세부 테마 심화로 차별화할 수 있습니다. '
         else:
             _angle = f'경쟁이 {_dom} 중심이므로 다른 운용 방식으로 빈틈을 노릴 수 있습니다. '
         return {
@@ -2562,9 +2563,9 @@ with tab_report:
             "기준": f"전체 ETF {_gap_basis[0]:,}종 · {_gap_basis[1]} 수집" if _gap_basis[0] else "",
             "공백수": len(gaps),
             "타이밍": j.get("판정") or ("대기" if _stage in ("과열기", "쇠퇴기") else "검토"),
-            "타이밍설명": j.get("근거") or ("국면이 고점/쇠퇴 구간 — 진정 후 겨냥, "
-                                       "리드타임 감안 준비만 착수"
-                                       if _stage in ("과열기", "쇠퇴기") else "국면 확인 후 출시 시점 판단"),
+            "타이밍설명": j.get("근거") or (
+                "국면이 고점·쇠퇴 구간이라 리드타임만 감안해 준비하고 출시는 진정 후로 미룹니다"
+                if _stage in ("과열기", "쇠퇴기") else "국면을 확인한 뒤 출시 시점을 판단합니다"),
             "시장규모억": j.get("시장규모억"), "1위": _top, "점유율": _share,
             # 면책 문구는 후보마다 같은 말이라 문장에서 빼고 섹션 하단에 한 번만 둔다
             "차별화": _angle.rstrip(),
@@ -2801,12 +2802,12 @@ with tab_report:
                     f'<div style="font-size:0.86rem;font-weight:800;color:{INK};margin-top:2px;">'
                     f'{d["국면"] or "국면 미상"}</div>'
                     f'<div style="font-size:0.68rem;color:{MUTED};">{d["신호설명"]}</div></div></div>'
-                    # 판정 근거 + 차별화 각도.
+                    # 판정 근거와 차별화 각도를 한 줄로 합친다 — 둘 다 '왜 이 후보인가'라
+                    # 나눠 두면 같은 자리를 두 번 읽게 된다.
                     # 판정 라벨은 상단 배지에 이미 있어 문장 앞머리에서 뺀다.
                     f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.6;margin-top:10px;">'
-                    f'{d["타이밍설명"]}</div>'
-                    f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.6;margin-top:6px;">'
-                    f'<b style="color:{INK};">차별화 각도</b> — {d["차별화"]}</div>'
+                    f'<b style="color:{INK};">차별화 각도</b> — '
+                    f'{d["타이밍설명"].rstrip(". ")}. {d["차별화"]}</div>'
                     + (f'<div style="font-size:0.68rem;color:{FAINT};margin-top:8px;">'
                        f'경쟁 상품 · {" / ".join(d["경쟁상품"][:4])}</div>'
                        if d.get("경쟁상품") else "")

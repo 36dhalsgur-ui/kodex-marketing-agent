@@ -1538,27 +1538,27 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
             if total >= GAP_MARKET_VIABLE:
                 row.update(판정="선점 기회", 우선순위=0,
                            # 규모·경쟁 종수는 위 지표 카드에 이미 있다. 판정의 뜻만 남긴다.
-                           근거="경쟁이 굳기 전에 들어갈 여지가 있다")
+                           근거="경쟁이 굳기 전에 들어갈 여지가 있습니다")
             else:
                 row.update(판정="시장 미검증", 우선순위=3,
-                           근거="수요가 없는 것인지 아직 안 열린 것인지 확인 필요")
+                           근거="수요가 없는 것인지 아직 안 열린 것인지 확인이 필요합니다")
         elif total < GAP_MARKET_VIABLE:
             row.update(판정="보류", 우선순위=3,
-                       근거=f"경쟁 {len(sizes)}종이 모은 돈이 다 합쳐 {total:,.0f}억 "
-                            f"— 만들어도 모일 시장이 아니다")
+                       근거=f"경쟁 {len(sizes)}종이 모은 돈이 다 합쳐 {total:,.0f}억이라 "
+                            f"만들어도 모일 시장이 아닙니다")
         elif share is not None and share >= GAP_DOMINANCE:
             row.update(판정="차별화 필요", 우선순위=2,
-                       근거=f"시장 {total:,.0f}억 중 {top[0]}가 {share:.0%} 독식 "
-                            f"— 같은 구성으로는 후발 진입이 어렵다")
+                       근거=f"{top[0]}가 {share:.0%}를 독식해 같은 구성으로는 "
+                            f"후발 진입이 어렵습니다")
         elif stage in ("과열기", "쇠퇴기"):
             row.update(판정="시점 대기", 우선순위=1,
-                       근거=f"시장 {total:,.0f}억으로 규모는 되나 국면이 {stage} "
-                            f"— 리드타임 감안 준비만, 출시는 진정 후")
+                       근거=f"규모는 되나 국면이 {stage}라, 리드타임을 감안해 준비만 하고 "
+                            f"출시는 진정 후로 미룹니다")
         else:
             _sz = "1조 이상 대형 시장" if total >= GAP_MARKET_LARGE else f"시장 {total:,.0f}억"
             row.update(판정="출시 검토", 우선순위=0,
-                       근거=f"{_sz}에 KODEX만 부재 · 1위 {top[0]} {share:.0%}로 "
-                            f"독점 구도도 아니다")
+                       근거=f"{_sz}에 KODEX만 없고 1위 {top[0]}도 {share:.0%}라 "
+                            f"독점 구도가 아닙니다")
         out.append(row)
     out.sort(key=lambda x: (x["우선순위"], -(x["시장규모억"] or 0)))
     return out
