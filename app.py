@@ -1308,7 +1308,7 @@ with tab_trend:
                     # KRX섹터 17개는 지수로 판정하는데 상품명을 같이 적으면
                     # ETF 기준으로 판정한 것처럼 읽힌다(실제 오해 발생).
                     + (f'<div style="font-size:0.68rem;color:{FAINT};">'
-                       f'{r["KODEX"]} · 가격 기준'
+                       f'{r["KODEX"]} · 종가 기준'
                        if r.get("군") != "KRX섹터" and r.get("KODEX") else
                        '<div style="font-size:0.68rem;color:%s;">' % FAINT)
                     + (f' · {note}' if note else "") + '</div></td>'
@@ -1340,9 +1340,15 @@ with tab_trend:
                 groups_html += stage_rows(rows, stage)
         groups_html += "</tbody></table>"
 
-        # KRX 섹터지수가 없어 KODEX ETF 종가로 판정하는 섹터 — 설명에서 이름을 밝힌다
+        # KRX 섹터지수가 없어 KODEX ETF 종가로 판정하는 섹터 — 개수만 밝힌다.
+        # 이름은 표에서 섹터명 아래에 이미 붙으므로 문장에 또 나열하지 않는다.
         _etf_priced = [r["섹터"] for r in rows_all if r.get("군") != "KRX섹터"]
-        _etf_priced_txt = " · ".join(_etf_priced)
+
+        # 가격 날짜는 배치 실행일(asof)이 아니라 '완결된 마지막 주의 금요일'을 쓴다.
+        # 배치를 언제 돌리든(금 21시 로컬 / 토 09시 Actions / 수동 재실행) 같은 값이
+        # 나와야 하는데, asof는 돌린 날이라 하루씩 앞서 표시됐다.
+        _price_asof = (sb.get("주간구간", "").split("~")[-1].strip()
+                       or sb.get("asof", ""))
 
         # 단계별 개수를 칩으로 — "태동기 3 · 확산기 2" 텍스트보다 한눈에 들어온다
         _chips = ""
@@ -1362,17 +1368,17 @@ with tab_trend:
             f'flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
             f'<div>{_chips}</div>'
             f'<div style="font-size:0.68rem;color:{FAINT};font-weight:600;">'
-            f'{sb.get("asof", "")} 기준 · 벤치마크 국내 {sb.get("benchmark", "KRX 300")}'
+            f'{_price_asof} 종가 기준 · 벤치마크 국내 {sb.get("benchmark", "KRX 300")}'
             f' · 해외 {sb.get("benchmark_해외", "—")}</div></div>'
             f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;'
             f'border-left:3px solid {BRAND};background:{BRAND_SOFT};'
             f'padding:8px 12px;border-radius:0 6px 6px 0;margin-bottom:14px;">'
-            f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다. '
-            f'수급(13주 순매수)은 판정과 별개로 <b>자금이 실제로 어디로 움직였는지</b> 보여주는 '
-            f'보조 지표입니다 — 구성종목의 투자자별 순매수 합(한국투자증권 KIS API)입니다.<br>'
-            f'가격은 <b style="color:{NAVY};">KRX 공식 섹터지수</b>로 잽니다. '
-            f'다만 아래 <b>{len(_etf_priced)}개는 KRX 섹터지수가 없어 해당 KODEX ETF 종가</b>로 판정하며, '
-            f'섹터명 아래에 <b>‘상품명 · 가격 기준’</b>으로 표시했습니다 — {_etf_priced_txt}.</div>'
+            f'단계는 <b style="color:{NAVY};">가격(시장 대비 상대강도)만으로</b> 판정합니다 — '
+            f'수급(13주 순매수)은 판정에 쓰지 않는 참고값으로, 구성종목의 투자자별 '
+            f'순매수 합(한국투자증권 KIS API)입니다.<br>'
+            f'가격은 <b style="color:{NAVY};">KRX 공식 섹터지수 종가</b>로 잽니다. '
+            f'섹터지수가 없는 <b>{len(_etf_priced)}개</b>는 KODEX ETF 종가를 쓰며, '
+            f'해당 섹터 아래 ETF명을 명시합니다.</div>'
             f"{groups_html}</div>",
             unsafe_allow_html=True,
         )
@@ -1624,7 +1630,17 @@ with tab_trend:
                 st.caption(cap)
             else:
                 st.info(s.get("비고", "구성종목을 수집하지 못했습니다."))
-        st.caption(f"수집 {_uni_data.get('asof','')} · 주간 배치 `python scripts/sector_universe.py`")
+        # 구성종목은 KRX Open API에 해당 서비스가 없어 주간 갱신되지 않는다.
+        # '주간 배치'라고 적으면 매주 새로 받는 것처럼 읽혀, 실제로는 고정된
+        # 스냅샷이라는 사실이 가려진다. 며칠 전 것인지까지 같이 밝힌다.
+        _uni_asof = _uni_data.get("asof", "")
+        try:
+            _age = f" ({(dt.date.today() - dt.date.fromisoformat(_uni_asof)).days}일 전)"
+        except ValueError:
+            _age = ""
+        st.caption(
+            f"구성종목 **{_uni_asof}** 수집{_age} · KRX Open API가 구성종목을 제공하지 않아 "
+            "주간 갱신 없이 마지막 수집분을 씁니다 — 지수·ETF 구성은 자주 바뀌지 않습니다")
     else:
         st.info("섹터 유니버스 데이터가 없습니다 — 로컬에서 `python scripts/sector_universe.py` 실행 후 커밋하면 표시됩니다.")
 
