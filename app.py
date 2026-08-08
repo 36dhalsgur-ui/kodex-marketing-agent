@@ -9,6 +9,7 @@ import datetime as dt
 import hashlib
 import importlib
 import json
+import math
 import re
 from pathlib import Path
 from urllib.parse import quote
@@ -2485,22 +2486,43 @@ with tab_report:
         return ("이례적으로 강함" if z >= 1.65 else "평소보다 강함" if z >= 1.0 else
                 "다소 강함" if z >= 0.5 else "평소와 차이 없음" if z > -0.5 else "평소보다 부진")
 
+    # 주간 리포트는 '이번 주 어떤가'를 답하는 자리다. 집행 시작 주가 아니라
+    # 이벤트 기간 안의 가장 최근 주를 잰다 — 6월에 시작한 이벤트를 6월 값으로
+    # 보고하면 10주 전 숫자를 이번 주 결과처럼 읽게 된다(실측: 미국나스닥100이
+    # 집행 첫 주 28점 / 최신 주 71점으로 결론이 뒤집힌다).
+    # 기준선은 집행 전 8주로 고정하므로 어느 주를 재든 같은 '평소'와 비교된다.
+    # 집행 시점 값과 시계열은 ③에서 본다.
+    # 대조군 가중치 — 위 flow_top 계산의 _w(DataFrame)와 이름이 겹치지 않게 한다
+    _wts = (_uni_r.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
+            if _uni_r is not None and "순자산" in _uni_r.columns else None)
     did_all = []
     for e in rep_campaigns:
         _wk = e["주차"] if e["주차"] in weeks else weeks[-1]
         _row = {"name": e["표기명"], "channel": e["채널"], "week": _wk,
-                "did": None, "score": None, "verdict": "", "reason": ""}
+                "did": None, "score": None, "verdict": "", "reason": "", "n_run": 0}
         if not e["분석가능"]:
             _row["reason"] = "순매수 데이터 미연동"
-        else:
-            _, _c, _sx, _ = did_verified(netbuy_df, _uni_r, e["ETF"], _wk)
-            if _sx.get("did") is not None and _sx.get("score") is not None:
-                _row.update(dt=_sx["delta_treat"], dc=_sx["delta_ctrl"], did=_sx["did"],
-                            score=_sx["score"], base_mean=_sx["base_mean"],
-                            base_std=_sx["base_std"], n_hist=_sx["n_hist"],
-                            n_ctrl=len(_c), verdict=_verdict_of(_sx["z"]))
-            else:
-                _row["reason"] = _sx.get("fallback") or "측정 불가"
+            did_all.append(_row)
+            continue
+        _ctrls = D.control_group(e["ETF"], _uni_r) if _uni_r is not None else []
+        _es = D.event_study(netbuy_df, e["ETF"], _ctrls, _wk, weights=_wts)
+        _pre = _es[_es["구간"] == "전"]["DiD"] if len(_es) else []
+        _post = _es[_es["구간"] == "후"] if len(_es) else []
+        if not len(_post) or len(_pre) < D.ZSCORE_MIN_HIST or float(_pre.std()) < 1e-9:
+            _sx = D.did_score(D.did_series(netbuy_df, e["ETF"], _ctrls, weights=_wts), _wk)
+            _row["reason"] = _sx.get("fallback") or "측정 불가"
+            did_all.append(_row)
+            continue
+        # 종료된 이벤트는 마지막 집행 주까지만 본다 — 끝난 뒤 주를 재면 효과가 아니다
+        _endw = D.week_label_of(e.get("종료") or "") or weeks[-1]
+        _cand = _post[_post["주차"].apply(
+            lambda w: weeks.index(w) <= weeks.index(_endw) if _endw in weeks else True)]
+        _use = (_cand if len(_cand) else _post).iloc[-1]
+        _z = (_use["DiD"] - float(_pre.mean())) / float(_pre.std())
+        _row.update(did=float(_use["DiD"]), score=round(100 / (1 + math.exp(-_z)), 1),
+                    week=_use["주차"], n_run=int(_use["상대주차"]) + 1,
+                    base_std=round(float(_pre.std()), 2), n_hist=len(_pre),
+                    n_ctrl=len(_ctrls), verdict=_verdict_of(_z))
         did_all.append(_row)
     # PDF는 대표 1건 형식을 그대로 쓰므로 첫 측정 가능 건을 남긴다
     did_ctx = next((r for r in did_all if r["did"] is not None), None)
@@ -2890,7 +2912,7 @@ with tab_report:
     if did_all:
         _n_ok = sum(1 for r in did_all if r["did"] is not None)
         sub_header("D", "마케팅 효과 검증",
-                   f"집행 {len(did_all)}건 중 측정 {_n_ok}건")
+                   f"집행 {len(did_all)}건 중 측정 {_n_ok}건 · 이번 주 기준")
         _rows = ""
         for r in did_all:
             if r["did"] is None:
@@ -2912,7 +2934,7 @@ with tab_report:
                 f'text-overflow:ellipsis;white-space:nowrap;font-size:0.83rem;'
                 f'font-weight:700;color:{INK};">{r["name"]}</span>'
                 f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;'
-                f'margin:0 10px;">{r["week"]}</span>'
+                f'margin:0 10px;">{r["week"]} · 집행 {r["n_run"]}주차</span>'
                 f'<span style="font-size:0.8rem;color:{NAVY};white-space:nowrap;'
                 f'min-width:74px;text-align:right;">DiD <b>{r["did"]:+.2f}%p</b></span>'
                 f'<span style="font-size:0.82rem;font-weight:800;color:{_vc};'
@@ -2924,7 +2946,9 @@ with tab_report:
         # 계산 방식은 ③에서 설명했다. 여기서는 '이 숫자를 어떻게 읽나'만 적는다.
         st.caption("DiD가 양수면 같은 기간 경쟁 ETF보다 자금을 더 받았다는 뜻입니다. "
                    "점수는 그 값이 이 ETF에서 이례적인지를 보여줍니다 — 38~62점은 평소 "
-                   "범위라 효과로 보기 어렵고, 73점을 넘어야 효과가 있었다고 볼 만합니다.")
+                   "범위라 효과로 보기 어렵고, 73점을 넘어야 효과가 있었다고 볼 만합니다.  \n"
+                   "집행 기간 안의 가장 최근 주를 잰 값입니다. 주차별 추이와 집행 시점 "
+                   "값은 ③에서 봅니다.")
         st.write("")
 
     # ══════════ PDF 내보내기 ══════════
