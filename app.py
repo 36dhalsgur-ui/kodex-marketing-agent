@@ -2208,8 +2208,8 @@ with tab_did:
             _lo, _hi = min(_vals + [0]), max(_vals + [0])
             fig_cmp.update_xaxes(ticksuffix="%", range=[_lo * 1.3 - 1, _hi * 1.3 + 1])
             st.plotly_chart(fig_cmp, use_container_width=True)
-            st.caption(f"진한 남색 = 처치군 · 회색 = 대조군 {len(controls)}종 · "
-                       f"DiD는 Δ처치군에서 Δ대조군의 순자산 가중평균을 뺀 값")
+            st.caption("진한 남색 = 처치군, 회색 = 대조군, "
+                       "DiD는 Δ처치군에서 Δ대조군의 순자산 가중평균을 뺀 값")
         else:
             st.info(f"{event_week}에 처치군·대조군의 유입 데이터가 없습니다.")
 
