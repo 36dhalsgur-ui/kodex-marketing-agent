@@ -556,11 +556,13 @@ def _did_method_html() -> str:
           f'합산 대조군에 대해 재므로 검증 대상과 계산 대상이 같습니다.</div>'
           f'<div style="margin-top:6px;">{verdicts}</div></div></div>'
         + f'<div style="margin-top:12px;padding-top:10px;border-top:1px solid {LINE};'
-          f'color:{MUTED};line-height:1.6;">대조군은 같은 테마·기초시장 후보 중 '
-          f'<b style="color:{INK};">순자산이 큰 순으로 최대 5종</b>을 합칩니다. 소형 종목의 '
-          f'설정·환매는 한 번에 크게 튀어 합산 평균을 흔들기 때문입니다. 예전에는 후보별 '
-          f'Δ상관으로 걸렀는데, 순유입은 종목 간 상관이 원래 낮아(실측: 후보의 46%가 음의 '
-          f'상관) 그 기준으로는 대부분이 탈락했습니다. 상관은 참고 지표로만 남겼습니다.</div>'
+          f'color:{MUTED};line-height:1.6;">대조군은 <b style="color:{INK};">같은 테마·'
+          f'기초시장</b>의 경쟁 ETF 중에서 고릅니다. 커버드콜·배당·채권처럼 이름이 전략을 '
+          f'말하는 상품은 여기에 더해 <b style="color:{INK};">공시 기초지수의 기초자산이 같고 '
+          f'채권혼합 여부가 같은 것만</b> 남깁니다 — 같은 커버드콜이라도 코스피 200과 '
+          f'팔란티어는 반대로 움직일 수 있어 대조군이 될 수 없습니다. 개수 제한은 없습니다. '
+          f'적합한 후보가 적으면 적은 대로 쓰고, 합산은 순자산 가중평균이라 소형 종목의 '
+          f'출렁임이 눌립니다.</div>'
         + f'<div style="margin-top:18px;">'
         + _crit_label("측정이 안 되는 경우 — 점수 대신 사유를 표시")
         + f'<div style="line-height:1.6;color:{MUTED};">'
@@ -796,10 +798,15 @@ def flow_state(prev: float, this: float) -> str:
 
 
 def universe_frame(df: pd.DataFrame) -> pd.DataFrame | None:
-    """실데이터 유니버스(종목명·테마·기초시장·운용사). 데모면 None."""
+    """실데이터 유니버스(종목명·테마·기초시장·운용사 + 순자산·기초지수). 데모면 None.
+
+    순자산은 did_verified의 대조군 가중평균에 쓰인다 — 예전엔 이 열이 빠져
+    weights가 항상 None이 됐고, 화면이 '순자산 가중평균'이라 말하면서 실제로는
+    단순평균을 내고 있었다(실측 2026-08-08). 기초지수는 대조군 정밀 매칭용."""
     cols = {"종목명", "테마", "기초시장", "운용사"}
     if cols.issubset(df.columns):
-        return df[list(cols)].drop_duplicates(subset=["종목명"])
+        extra = [c for c in ("순자산", "기초지수") if c in df.columns]
+        return df[list(cols) + extra].drop_duplicates(subset=["종목명"])
     return None
 
 
@@ -2067,7 +2074,7 @@ with tab_did:
     ctrl_options = (sorted(_uni[_uni["운용사"] != "KODEX"]["종목명"].unique()) if _uni is not None
                     else sorted(n for n, _, i in D.ETF_UNIVERSE if i != "KODEX"))
     controls = st.multiselect(
-        "대조군 — 평행추세가 확인된 경쟁 ETF (자동 선정, 수정 가능)",
+        "대조군 — 자동 선정된 경쟁 ETF (수정 가능)",
         options=ctrl_options,
         default=auto_controls,
     )

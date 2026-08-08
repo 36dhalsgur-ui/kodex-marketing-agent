@@ -102,7 +102,7 @@ def load_etf_flows() -> dict | None:
 # ── ETF 분류 (테마·기초시장·브랜드) — 배치와 리포트가 공유하는 단일 기준 ──────
 ETF_BRANDS = ["KODEX", "TIGER", "ACE", "SOL", "HANARO", "RISE", "PLUS", "TIMEFOLIO", "TIME"]
 ETF_MARKETS = [
-    ("미국", r"미국|나스닥|S&P|필라델피아|다우|러셀"),
+    ("미국", r"미국|나스닥|S&P|필라델피아|다우|러셀|테슬라|엔비디아|팔란티어|애플|마이크로소프트|아마존|알파벳|메타|넷플릭스|브로드컴|일라이릴리|버크셔|코인베이스|AMD"),
     ("중국", r"차이나|중국|항셍|홍콩"),
     ("일본", r"일본|닛케이"),
     ("인도", r"인도|니프티"),
@@ -446,6 +446,7 @@ def real_netbuy_frame(flows: dict) -> pd.DataFrame:
             rows.append({
                 "주차": None, "종목명": e["종목명"], "테마": theme,
                 "기초시장": market, "운용사": e["운용사"],
+                "기초지수": e.get("기초지수", ""),
                 "순매수액": float("nan"), "순자산": aum,
                 "개인순매수": None, "외국인순매수": None, "기관순매수": None,
             })
@@ -457,6 +458,7 @@ def real_netbuy_frame(flows: dict) -> pd.DataFrame:
             rows.append({
                 "주차": w["주차"], "종목명": e["종목명"], "테마": theme,
                 "기초시장": market, "운용사": e["운용사"],
+                "기초지수": e.get("기초지수", ""),
                 "순매수액": flow, "순자산": aum,
                 # 장내 매매 주체 — 순유입(설정·환매)과 다른 면을 본다.
                 # 순유입: '새 돈이 들어왔나' / 개인 순매수: '개인이 샀나'.
@@ -1605,13 +1607,56 @@ def kodex_etfs() -> list[str]:
 
 INVERSE_LEV_PAT = re.compile(r"인버스|레버리지|2X|3X|곱버스")
 
+# ── 기초자산 정밀 매칭 — 전략 상품은 '전략'이 아니라 '기초자산'이 평행추세를 좌우한다.
+# '커버드콜' 같은 전략 테마는 키워드가 같아도 기초자산이 제각각이다 — 코스피 200·
+# 고배당주·테슬라·팔란티어·금이 한 풀에 있었다(실측 2026-08-08: KODEX 200커버드콜
+# 액티브의 대조군에 SOL 팔란티어커버드콜OTM채권혼합이 채택). 코스피가 빠지고
+# 팔란티어가 오르는 주에 둘은 반대로 움직이므로 대조군이 될 수 없다.
+# 구성종목(PDF)은 API가 없어 못 보지만, 공시 기초지수명이 그 상품이 무엇을 담는지의
+# 공식 선언이다. 지수명에서 산출사·전략 수식어를 걷어내면 기초자산이 남는다:
+#   '코스피 200 타겟 15% 위클리 커버드콜 지수'  → 코스피200
+#   'KEDI 팔란티어커버드콜OTM 채권혼합지수(NTR)' → 팔란티어
+# 자산 테마(반도체·조선 등)에는 적용하지 않는다 — 테마 자체가 기초자산이고,
+# 산출사가 달라도 같은 업종 종목을 담으므로 지수명 일치를 요구하면 대조군이 전멸한다.
+WRAPPER_THEMES = {"커버드콜", "배당", "채권", "시장대표", "빅테크", "금·원자재",
+                  "환율·통화", "연금·자산배분", "팩터·스타일"}
+_IDX_PCT_PAT = re.compile(r"\d+(?:\.\d+)?\s*%")
+_IDX_NOISE_PAT = re.compile(
+    r"KEDI|KRX-?Akros|Akros|FnGuide|iSelect|MKF|WISE|KAP|KTB|블룸버그|Bloomberg|"
+    r"커버드콜|콜매도|위클리|데일리|먼슬리|타겟|고정|분배|인컴|프리미엄|밸런스드|"
+    r"채권혼합|혼합|액티브|시장가격지수|지수|OTM|ATM|\((?:N?TR|PR)\)|[()]", re.I)
+
+
+def underlying_core(idx_name: str) -> str:
+    """공시 기초지수명 → 기초자산 코어. 빈 문자열이면 판별 불가."""
+    if not idx_name:
+        return ""
+    s = _IDX_PCT_PAT.sub(" ", str(idx_name))
+    s = _IDX_NOISE_PAT.sub(" ", s)
+    return re.sub(r"\s+", "", s).upper()
+
+
+def _bond_mixed(name: str, idx_name: str = "") -> bool:
+    """채권혼합형 여부 — 주식 노출이 절반 수준이라 유입 반응의 진폭이 다르다."""
+    return "채권혼합" in name or "혼합" in (idx_name or "")
+
+
+def _fx_hedged(name: str) -> bool:
+    """환헤지형 여부 — 기초지수가 같아도 환율 국면에 따라 자금이 반대로 움직인다
+    (원화 약세면 환노출로, 강세면 (H)로 몰린다). 대조군은 같은 쪽만 쓴다."""
+    return "(H)" in name
+
 
 def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list[str]:
-    """처치군과 '테마 + 기초시장'이 모두 같은 비(非)KODEX 경쟁 ETF 자동 매핑.
+    """처치군과 '테마 + 기초시장'이 같은 비(非)KODEX 경쟁 ETF 자동 매핑.
 
     기초시장까지 일치시키는 이유: 테마만 맞추면 'KODEX 미국반도체'의 대조군에
     'HANARO Fn K-반도체'(한국)가 붙는다. 두 시장은 환율·현지 실적에 다르게 반응해
-    DiD의 평행추세 가정이 깨지고, 마케팅과 무관한 차이가 효과로 오독된다."""
+    DiD의 평행추세 가정이 깨지고, 마케팅과 무관한 차이가 효과로 오독된다.
+
+    전략 테마(WRAPPER_THEMES)는 여기에 더해 공시 기초지수의 기초자산이 같고
+    채권혼합 여부가 같은 상품만 남긴다. 적합한 후보가 적으면 적은 대로 쓴다 —
+    엉뚱한 대조군으로 머릿수를 채우는 것보다 낫다."""
     if universe is not None and len(universe):
         row = universe[universe["종목명"] == treat_name]
         if len(row):
@@ -1625,6 +1670,20 @@ def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list
             peers = universe[(universe["테마"] == theme)
                              & (universe["기초시장"] == market)
                              & (universe["운용사"] != "KODEX")]
+            if theme in WRAPPER_THEMES and "기초지수" in universe.columns:
+                t_idx = row.iloc[0].get("기초지수") or ""
+                t_core = underlying_core(t_idx)
+                t_bond = _bond_mixed(treat_name, t_idx)
+                if t_core:
+                    # 기초지수가 없는 후보는 유사성을 확인할 수 없으므로 제외한다
+                    keep = []
+                    for _, p in peers.iterrows():
+                        c_idx = p.get("기초지수") or ""
+                        if (underlying_core(c_idx) == t_core
+                                and _bond_mixed(p["종목명"], c_idx) == t_bond
+                                and _fx_hedged(p["종목명"]) == _fx_hedged(treat_name)):
+                            keep.append(p["종목명"])
+                    peers = peers[peers["종목명"].isin(keep)]
             names = sorted(peers["종목명"].unique())
             # 인버스·레버리지는 기초자산이 같아도 방향·배수가 달라 평행추세가 성립하지 않는다
             # (예: '2차전지TOP10인버스'는 테마가 오를 때 내린다)
@@ -1731,20 +1790,25 @@ def control_diagnostics(df: pd.DataFrame, treat: str, candidates: list[str],
     return out.reset_index(drop=True)
 
 
-def select_controls(diag: pd.DataFrame, max_n: int = 5) -> list[str]:
-    """대조군 채택 — 같은 테마·기초시장 후보 중 순자산이 큰 순으로.
+def select_controls(diag: pd.DataFrame, max_n: int | None = None) -> list[str]:
+    """대조군 채택 — control_group이 추린 적합 후보를 순자산 큰 순으로 전부 쓴다.
 
-    예전에는 개별 후보의 Δ상관으로 걸렀는데, 순유입은 종목 간 상관이 원래 낮아
-    그 기준으로는 대부분이 탈락했다(실측: 후보의 46%가 음의 상관). 이제 평행추세는
-    합산 대조군에 대해 pretrend_check로 검증하므로, 여기서는 '어떤 후보를 합칠지'만
-    정한다. 순자산이 큰 종목을 쓰는 이유는 소형 종목의 lumpy한 설정·환매가 합산
-    평균을 흔들기 때문이다(가중평균이 이를 한 번 더 눌러준다)."""
+    개수 상한을 두지 않는다. 적합성은 control_group(기초자산·채권혼합 일치)이
+    이미 걸렀으므로, 적합한 후보가 많으면 많을수록 합산 평균이 안정되고 적으면
+    적은 대로 쓴다 — 상한 5로 자르던 시절에는 순자산 순위에 밀려 기초자산이
+    같은 후보가 탈락하고 엉뚱한 대형 종목이 들어왔다(실측 2026-08-08).
+    소형 종목의 lumpy한 설정·환매는 순자산 가중평균이 눌러준다.
+
+    예전에 쓰던 개별 후보 Δ상관 필터는 폐기했다 — 순유입은 종목 간 상관이 원래
+    낮아 그 기준으로는 대부분이 탈락했다(실측: 후보의 46%가 음의 상관). 평행추세는
+    합산 대조군에 대해 pretrend_check로 검증한다."""
     if diag is None or not len(diag):
         return []
     d = diag.copy()
     if "순자산" in d.columns:
         d = d.sort_values("순자산", ascending=False)
-    return d["종목명"].head(max_n).tolist()
+    names = d["종목명"].tolist()
+    return names[:max_n] if max_n else names
 
 
 def did_series(df: pd.DataFrame, treat: str, controls: list[str],
