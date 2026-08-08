@@ -54,28 +54,55 @@ for s in weekly_batch etf_batch channel_batch sector_universe; do
     fi
 done
 
-# 산출물이 실제로 최신 주를 담았는지 확인 — 배치가 조용히 옛 주를 남기는 것을 잡는다
-"$PY" - <<'PYEOF'
+# 산출물이 실제로 최신 주를 담았는지 확인 — 배치가 조용히 옛 주를 남기는 것을 잡는다.
+# signal_board만 보면 부족하다. 화면의 '분석 주차'는 etf_flows가 결정하므로
+# weekly_batch만 성공하고 etf_batch가 실패하면 날짜가 어긋난 채 갱신된 것처럼 보인다
+# (실측 2026-08-07: KIS 타임아웃으로 etf_batch가 죽어 보드가 7월 5주에 멈춤).
+if ! "$PY" - <<'PYEOF'
 import json, sys
 from datetime import date, timedelta
 from pathlib import Path
-p = Path("data/signal_board.json")
-if not p.exists():
-    sys.exit("  ! signal_board.json 없음")
-sb = json.loads(p.read_text())
+
 today = date.today()
-# 오늘 기준 마지막 완결 금요일
 last_fri = today - timedelta(days=(today.weekday() - 4) % 7)
 if today.weekday() < 4:
     last_fri = today - timedelta(days=today.weekday() + 3)
-got = (sb.get("주간구간") or "").split("~")[-1].strip()
-mark = "✓" if got == last_fri.isoformat() else "!"
-print(f"  {mark} 주간구간 {sb.get('주간구간')} (기대 종료일 {last_fri})")
-miss = [r["섹터"] for r in sb.get("board", [])
-        if r.get("군") != "해외" and not r.get("구성종목수")]
-if miss:
-    print(f"  ! 수급 미수집 {len(miss)}개: {', '.join(miss)}")
+
+stale = []
+sb = Path("data/signal_board.json")
+if sb.exists():
+    board = json.loads(sb.read_text())
+    got = (board.get("주간구간") or "").split("~")[-1].strip()
+    print(f"  {'✓' if got == last_fri.isoformat() else '!'} signal_board 종료일 "
+          f"{got or '없음'} (기대 {last_fri})")
+    if got != last_fri.isoformat():
+        stale.append("signal_board")
+    miss = [r["섹터"] for r in board.get("board", [])
+            if r.get("군") != "해외" and not r.get("구성종목수")]
+    if miss:
+        print(f"  ! 수급 미수집 {len(miss)}개: {', '.join(miss)}")
+else:
+    stale.append("signal_board(없음)")
+
+ef = Path("data/etf_flows.json")
+if ef.exists():
+    weeks = json.loads(ef.read_text()).get("weeks") or []
+    got_w = weeks[-1] if weeks else ""
+    want_w = f"{last_fri.month}월 {(last_fri.day - 1) // 7 + 1}주"
+    print(f"  {'✓' if got_w == want_w else '!'} etf_flows 마지막 주차 "
+          f"{got_w or '없음'} (기대 {want_w})")
+    if got_w != want_w:
+        stale.append("etf_flows")
+else:
+    stale.append("etf_flows(없음)")
+
+if stale:
+    print(f"  ✗ 최신 주가 아닙니다: {', '.join(stale)}")
+    sys.exit(1)
 PYEOF
+then
+    failed+=("날짜검증")
+fi
 
 if ! git diff --quiet -- data/ || [ -n "$(git status --porcelain -- data/)" ]; then
     git add data/

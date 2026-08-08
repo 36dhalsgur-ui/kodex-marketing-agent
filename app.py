@@ -1042,6 +1042,17 @@ with tab_home:
         _line1 = f'{_p}태동 국면 섹터가 없어 새로 착수할 곳도 없습니다.'
         _line2 = ""
 
+    # 배치가 실패해도 화면은 옛 데이터로 멀쩡해 보인다 — 날짜가 뒤처지면 알린다.
+    # (실측 2026-08-07: etf_batch가 죽어 보드가 7월 5주에 멈춘 채 갱신된 것처럼 보였다)
+    _last_fri = dt.date.today() - dt.timedelta(days=(dt.date.today().weekday() - 4) % 7)
+    if dt.date.today().weekday() < 4:
+        _last_fri = dt.date.today() - dt.timedelta(days=dt.date.today().weekday() + 3)
+    _want_week = f"{_last_fri.month}월 {(_last_fri.day - 1) // 7 + 1}주"
+    if weeks and weeks[-1] != _want_week:
+        st.warning(
+            f"데이터가 최신 주가 아닙니다 — 마지막 수집 **{weeks[-1]}**, "
+            f"기대 **{_want_week}** (~{_last_fri}). 주간 배치가 실패했을 수 있습니다.")
+
     st.markdown(
         f'<div class="home-lead"><div class="hl-k">WEEKLY SNAPSHOT · {sel_week}</div>'
         f'<div class="hl-t">{_line1}' + (f'<br>{_line2}' if _line2 else "") + '</div></div>',
