@@ -1229,12 +1229,19 @@ def _norm_etf(name: str) -> str:
 
 
 def week_label_of(date_str: str) -> str:
-    """ISO 날짜 → 주차 라벨('7월 3주'). week_labels()와 동일 규칙."""
+    """ISO 날짜 → 주차 라벨('7월 3주'). etf_flows의 주차와 같은 규칙.
+
+    라벨은 '그 주의 금요일'로 매긴다. 날짜 자체로 매기면 월~목이 한 주 앞으로
+    밀린다 — 2026-07-14(화)는 '7월 2주'가 되지만, 같은 주 금요일(07-17)로 매기는
+    유입 데이터에서 그 주는 '7월 3주'다. 캠페인 개입 주차가 유입 시계열의 다른
+    주를 가리켜, 개입이 수집 시작보다 앞서는 문장이 나왔다(실측 2026-08-08).
+    """
     try:
         d = dt.date.fromisoformat(date_str[:10])
     except Exception:
         return ""
-    return f"{d.month}월 {(d.day - 1) // 7 + 1}주"
+    fri = d + dt.timedelta(days=4 - d.weekday()) if d.weekday() <= 4 else d
+    return f"{fri.month}월 {(fri.day - 1) // 7 + 1}주"
 
 
 # 이벤트 — 투자자에게 리워드를 걸고 행동(매수·응모·인증)을 요구하는, 돈이 드는 판촉.
