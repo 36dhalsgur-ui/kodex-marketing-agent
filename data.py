@@ -284,9 +284,9 @@ def review_current_marketing(events: list, board: list, netbuy_df, week: str) ->
 
     out, seen = [], set()
     for e in events:
-        # 집행 중인 '마케팅'은 리워드를 건 프로모션만 센다. 블로그 소개 글까지 넣으면
+        # 집행 중인 '이벤트'는 리워드를 건 것만 센다. 블로그 소개 글까지 넣으면
         # 실제로 예산이 나가지 않는 상품도 '집행 중'이 되어 착수 판정이 흐려진다.
-        if e.get("유형") != PROMO:
+        if e.get("유형") != EVENT:
             continue
         name = e.get("표기명", "")
         if name in seen:
@@ -1237,32 +1237,33 @@ def week_label_of(date_str: str) -> str:
     return f"{d.month}월 {(d.day - 1) // 7 + 1}주"
 
 
-# 프로모션 — 투자자에게 리워드를 걸고 행동(매수·응모·인증)을 요구하는 판촉.
+# 이벤트 — 투자자에게 리워드를 걸고 행동(매수·응모·인증)을 요구하는, 돈이 드는 판촉.
+# 마케팅은 이보다 넓다: 블로그 글·영상도 마케팅이지만 비용 규모가 달라 이벤트가 아니다.
 # 블로그 글 한 편과는 성격이 다르다: 비용이 들고, 기간이 정해지고, 순매수를 직접 겨냥한다.
-_PROMO_PAT = re.compile(
+_EVENT_PAT = re.compile(
     r"이벤트|응모|추첨|경품|증정|사은|캐시백|리워드|인증|퀴즈|룰렛|"
     r"적립식\s?매수|매수\s?챌린지|선착순")
 # 콘텐츠 푸시 — 리워드 없이 상품을 알리는 집행(신규상장 안내 배너, 상품 소개 글·영상).
-# 마케팅이 아닌 건 아니지만 프로모션과 같은 칸에 세면 판촉 규모를 부풀린다.
+# 마케팅이 아닌 건 아니지만 이벤트와 같은 칸에 세면 집행 규모를 부풀린다.
 _LAUNCH_PAT = re.compile(r"신규\s?상장|출시|런칭|특별\s?분배|오픈|사전\s?예약")
 # 정기물 — 특정 상품 푸시가 아니라 매주·매분기 반복되는 리포트류. DiD의 '개입'으로 볼 수 없다.
 # ※ '팩트체크' 같은 순회 시리즈는 회차마다 다른 상품을 다루므로(실측 확인) 정기물이 아니라 캠페인이다.
 _ROUTINE_PAT = re.compile(r"WEEKLY|주간|월간|분기|성과\s?리뷰|운용\s?계획|시황|랭킹|리포트", re.I)
 
-# DiD의 '개입'으로 볼 수 있는 유형 — 프로모션이 우선, 콘텐츠는 보조
-PROMO, CONTENT = "프로모션", "콘텐츠"
+# 마케팅 유형. DiD는 이 중 이벤트만 처치로 본다 — 콘텐츠는 ② 채널 모니터링에서 본다.
+EVENT, CONTENT = "이벤트", "콘텐츠"
 BRAND = "브랜드이벤트"      # 상품을 특정할 수 없는 이벤트 — 상품 캠페인으로 세지 않는다
-CAMPAIGN_TYPES = (PROMO, CONTENT)
+CAMPAIGN_TYPES = (EVENT, CONTENT)
 
 
 def classify_marketing_events(events: list[dict]) -> list[dict]:
-    """이벤트를 프로모션 / 콘텐츠 / 정기 / 단순언급으로 분류하고 '유형'·'근거'를 채운다.
+    """수집 건을 이벤트 / 콘텐츠 / 정기 / 단순언급으로 분류하고 '유형'·'근거'를 채운다.
 
-    프로모션과 콘텐츠를 나누는 이유: 매수·인증 이벤트는 리워드를 걸고 투자자에게
+    이벤트와 콘텐츠를 나누는 이유: 매수·인증 이벤트는 리워드를 걸고 투자자에게
     행동을 요구하는 판촉이고, 블로그 소개 글은 인지도 콘텐츠다. 같은 칸에 세면
     '캠페인 5종'처럼 판촉 규모가 부풀려진다. 둘 다 개입이지만 급이 다르다.
 
-    프로모션 = 운용사 이벤트 보드 등재(기간 고지) 또는 제목에 판촉 신호어
+    이벤트   = 운용사 이벤트 보드 등재(기간 고지) 또는 제목에 판촉 신호어
     콘텐츠   = ① 신규상장·출시 안내 등 상품 푸시 신호어
                ② 같은 ETF가 7일 이내에 2개 이상 채널에 등장(집중 집행)
     정기     = 주간·분기 리포트 등 평소 반복 포맷 → 개입이 아니므로 DiD 제외
@@ -1291,17 +1292,17 @@ def classify_marketing_events(events: list[dict]) -> list[dict]:
     for e in events:
         title = e.get("제목", "")
         # 상품을 특정하지 못한 건 상품 캠페인이 아니다. 예전에는 정규식이 'KODEX 한국'
-        # 같은 없는 이름을 만들어 프로모션 수를 부풀렸다(실측 2026-08-08).
+        # 같은 없는 이름을 만들어 이벤트 수를 부풀렸다(실측 2026-08-08).
         if not e.get("상품특정", True):
             e["유형"], e["근거"] = BRAND, "상품 미특정 — 브랜드 이벤트"
             continue
         # 이벤트 보드 출처는 추정이 아니라 운용사가 직접 고지한 집행이다 — 최상위 근거
-        if e.get("채널") == "이벤트":
-            e["유형"] = PROMO
+        if e.get("채널") == "이벤트 보드":
+            e["유형"] = EVENT
             e["근거"] = (f'이벤트 {e.get("시작","")}~{e.get("종료","")}'
                         if e.get("시작") else "이벤트 보드")
-        elif _PROMO_PAT.search(title):
-            e["유형"], e["근거"] = PROMO, "판촉 신호어"
+        elif _EVENT_PAT.search(title):
+            e["유형"], e["근거"] = EVENT, "판촉 신호어"
         elif _LAUNCH_PAT.search(title):
             e["유형"], e["근거"] = CONTENT, "상품 푸시 신호어"
         elif id(e) in multi:
@@ -1334,7 +1335,7 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
         src.append(("블로그", p.get("title", ""), p.get("link", ""), p.get("date", ""), None))
     for e in events_board or []:
         # 개입 시점 = 이벤트 시작일 (수집일이 아니다)
-        src.append(("이벤트", e.get("제목", ""), e.get("링크", ""), e.get("시작", ""), e))
+        src.append(("이벤트 보드", e.get("제목", ""), e.get("링크", ""), e.get("시작", ""), e))
 
     events = []
     for channel, title, link, date, meta in src:
@@ -1568,7 +1569,7 @@ def dedupe_campaigns(events: list[dict]) -> list[dict]:
     out = []
     for etf, evs in by_etf.items():
         dated = [e for e in evs if e.get("date")]
-        board = [e for e in dated if e.get("채널") == "이벤트"]
+        board = [e for e in dated if e.get("채널") == "이벤트 보드"]
         # 이벤트 보드가 있으면 그 시작일이 개입 시점 — 추정이 아니라 고지된 값이다
         rep = min(board or dated or evs, key=lambda e: e.get("date") or "9999")
         rep = dict(rep)
@@ -1578,14 +1579,14 @@ def dedupe_campaigns(events: list[dict]) -> list[dict]:
         rep["감지건수"] = len(evs)
         if len(chans) > 1:
             rep["근거"] = f'{rep.get("근거", "")} · {len(chans)}개 채널 동시'.strip(" ·")
-        # 상품 단위 유형 — 한 채널이라도 프로모션이면 그 상품은 판촉 대상이다
-        promo = [e for e in evs if e.get("유형") == PROMO]
-        rep["유형"] = PROMO if promo else CONTENT
-        rep["프로모션채널"] = sorted({e["채널"] for e in promo})
+        # 상품 단위 유형 — 한 채널이라도 이벤트면 그 상품은 판촉 대상이다
+        evs_paid = [e for e in evs if e.get("유형") == EVENT]
+        rep["유형"] = EVENT if evs_paid else CONTENT
+        rep["이벤트채널"] = sorted({e["채널"] for e in evs_paid})
         # 정렬 기준은 '언제 시작했나'가 아니라 '얼마나 밀고 있나'.
         # 날짜로 정렬하면 블로그 글 한 건이 기간 고지된 신규상장 이벤트를 앞선다.
         # (배너는 게시일이 없어 수집일이 붙으므로 날짜 정렬에 특히 취약하다.)
-        rep["집행강도"] = (30 if promo else 0) + len(chans) * 10 + min(len(evs), 4)
+        rep["집행강도"] = (30 if evs_paid else 0) + len(chans) * 10 + min(len(evs), 4)
         out.append(rep)
     out.sort(key=lambda e: (e["집행강도"], e.get("date") or ""), reverse=True)
     return out

@@ -895,7 +895,7 @@ except Exception:
 
 _ALL_EVENTS, CAMPAIGNS = kodex_campaigns(CHANNEL, youtube, blogs, netbuy_df)
 # 리워드를 건 판촉만 따로 — 블로그 소개 글과 매수 이벤트를 같은 칸에 세지 않는다
-PROMOS = [c for c in CAMPAIGNS if c["유형"] == D.PROMO]
+EVENTS_LIVE = [c for c in CAMPAIGNS if c["유형"] == D.EVENT]
 _UNI = universe_frame(netbuy_df)
 _AUM = (netbuy_df.drop_duplicates("종목명").set_index("종목명")["순자산"].to_dict()
         if "순자산" in netbuy_df.columns else {})
@@ -1018,7 +1018,8 @@ with tab_home:
     _prep = [e for e in EMERGING_GO if e["판정"] == "선점 검토"]
     _n1 = ", ".join(e["섹터"] for e in _go_now)
     _n2 = ", ".join(e["섹터"] for e in _prep)
-    _p = f'프로모션 <b>{len(PROMOS)}종</b>을 집행 중이고, ' if PROMOS else "진행 중인 프로모션은 없고, "
+    _p = (f'이벤트 <b>{len(EVENTS_LIVE)}종</b>을 집행 중이고, ' if EVENTS_LIVE
+          else "진행 중인 이벤트는 없고, ")
 
     if _go_now:
         # 근거는 '핵심 — 근거 문장들' 꼴이다. 앞머리(조용한 매집)만 쓰면 왜 그
@@ -2008,18 +2009,19 @@ with tab_did:
     )
     st.write("")
 
-    # ── 처치 = 프로모션만. 콘텐츠 푸시(블로그 소개 글·상품 안내 배너)는 여기서 빼고
-    # ② 채널 모니터링에 남긴다. 블로그 글·영상은 이 탭에서 마케팅으로 세지 않는다.
+    # ── 처치 = 이벤트만. 이벤트는 리워드를 걸어 비용이 드는 판촉이고, 콘텐츠 푸시
+    # (블로그 글·영상·상품 안내 배너)는 마케팅이지만 이벤트가 아니라 ②에 남긴다.
+    # 이 탭은 '큰 비용이 실제 효과를 냈는가'를 보는 곳이므로 이벤트만 다룬다.
     events, _campaigns_dedup = kodex_campaigns(ch_data, youtube, blogs, netbuy_df)
     # 같은 ETF를 여러 채널에 집행하면 채널 수만큼 잡히지만, 순매수 시계열은 하나뿐이라
     # DiD는 상품당 한 번이면 된다.
-    campaigns = [e for e in _campaigns_dedup if e["유형"] == D.PROMO]
-    _promo_names = {e["ETF"] for e in campaigns}
-    campaigns_raw = [e for e in events if e["ETF"] in _promo_names and e["유형"] == D.PROMO]
+    campaigns = [e for e in _campaigns_dedup if e["유형"] == D.EVENT]
+    _event_names = {e["ETF"] for e in campaigns}
+    campaigns_raw = [e for e in events if e["ETF"] in _event_names and e["유형"] == D.EVENT]
     usable = [e for e in campaigns if e["분석가능"]]
 
     CH_ICON = {"홈페이지": "#6B4FBB", "유튜브": "#C2333F", "블로그": "#1E7A55",
-               "이벤트": BRAND}
+               "이벤트 보드": BRAND}
 
     def ev_row(e: dict) -> str:
         dot = CH_ICON.get(e["채널"], "#98A2B3")
@@ -2040,7 +2042,7 @@ with tab_did:
             f'{right}</div></a>'
         )
 
-    sub_header("01", "측정 대상 프로모션", "리워드를 건 판촉만 = DiD의 처치")
+    sub_header("01", "측정 대상 이벤트", "리워드를 건 판촉만 = DiD의 처치")
     st.markdown(
         f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
         f'감지 {len(campaigns_raw)}건 → <b style="color:{INK};">상품 {len(campaigns)}종</b>'
@@ -2054,7 +2056,7 @@ with tab_did:
             f'<div class="card" style="padding:8px 16px;">{"".join(ev_row(e) for e in campaigns[:8])}</div>',
             unsafe_allow_html=True)
     else:
-        st.info("측정할 프로모션이 없습니다 — 리워드를 건 매수·인증 이벤트가 감지되지 않았습니다.")
+        st.info("측정할 이벤트가 없습니다 — 리워드를 건 매수·인증 이벤트가 감지되지 않았습니다.")
     st.write("")
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
@@ -2372,8 +2374,8 @@ with tab_report:
         _ch = {}
     # ③과 같은 파이프라인 — 탭마다 따로 계산해 숫자가 어긋나던 것을 없앤다
     rep_events, _rep_all = kodex_campaigns(_ch, youtube, rep_blogs, netbuy_df)
-    # 리포트가 말하는 '집행'도 ③과 같이 프로모션 기준 — 콘텐츠 푸시는 ②에서 본다
-    rep_campaigns = [c for c in _rep_all if c["유형"] == D.PROMO]
+    # 리포트가 말하는 '집행'도 ③과 같이 이벤트 기준 — 콘텐츠 푸시는 ②에서 본다
+    rep_campaigns = [c for c in _rep_all if c["유형"] == D.EVENT]
     _week_ago_r = (dt.date.today() - dt.timedelta(days=7)).isoformat()
     _uni_r = universe_frame(netbuy_df)
 
@@ -2568,7 +2570,7 @@ with tab_report:
     with k2:
         _b = ctx["bench_ret"]
         kpis = [("KRX300 주간", f"{_b:+.1f}%" if _b is not None else "—", COOL if (_b or 0) < 0 else RED),
-                ("집행 프로모션", f"{len(rep_campaigns)}건", INK),
+                ("집행 이벤트", f"{len(rep_campaigns)}건", INK),
                 ("축소 검토", f"{n_cut}건", COOL)]
         cells = "".join(
             f'<div style="flex:1;text-align:center;"><div style="font-size:0.66rem;color:{GRAY};">{k}</div>'
