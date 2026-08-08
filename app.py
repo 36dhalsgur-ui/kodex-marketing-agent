@@ -2257,14 +2257,20 @@ with tab_did:
             dc_v = sc.get("delta_ctrl")
 
             # 제목 자리에는 기호(Δ처치) 대신 '무엇을 잰 값인지'를 둔다 — 처치군은
-            # 해당 ETF명, 대조군은 몇 종을 합쳤는지. 기호는 계산식과 대조할 때만
-            # 필요하므로 아래 설명 줄 괄호로 내린다.
+            # 해당 ETF명, 대조군은 몇 종을 합쳤는지. 설명 줄도 계산식 대신 뜻을 쓴다.
+            # 수식은 아래 'DiD 계산 방식' 접이식에 그대로 있다.
+            # 대조군 문장에 '~도'를 쓰지 않는 이유: 두 값의 부호가 엇갈릴 수 있다
+            # (실측 미국S&P500 처치 +0.02 / 대조 -0.11).
+            def _flow(v):
+                return ("자금이 더 들어왔습니다" if v > 0 else
+                        "자금이 덜 들어왔습니다" if v < 0 else "평소와 같았습니다")
+
             s1c.markdown(
                 f'<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
                 f'<div class="did-step-name">{treat[:22]}</div>'
                 f'<div class="did-step-val">{dt_v:+.2f}%p</div>'
-                f'<div class="did-step-desc">집행 주 − 직전 {D.BASELINE_WEEKS}주 평균 '
-                f'(Δ처치)</div></div>'
+                f'<div class="did-step-desc">평소(직전 {D.BASELINE_WEEKS}주)보다 '
+                f'{_flow(dt_v)}</div></div>'
                 if dt_v is not None else
                 # 사유 없이 값만 비는 경우(선택 주차에 데이터 없음) — 포맷이 터지지 않게 막는다
                 (f'<div class="did-step"><div class="did-step-no">STEP 1 · 처치군</div>'
@@ -2277,8 +2283,8 @@ with tab_did:
                 f'<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
                 f'<div class="did-step-name">경쟁 ETF {len(controls)}종</div>'
                 f'<div class="did-step-val">{dc_v:+.2f}%p</div>'
-                f'<div class="did-step-desc">순자산 가중평균 (Δ대조군)<br>'
-                f'= 시장이 원래 움직인 만큼</div></div>'
+                f'<div class="did-step-desc">같은 기간 경쟁 ETF는 {_flow(dc_v)}.<br>'
+                f'마케팅과 무관한 시장 몫입니다</div></div>'
                 if dc_v is not None else
                 ('<div class="did-step"><div class="did-step-no">STEP 2 · 대조군</div>'
                  '<div class="did-step-name">대조군 없음</div>'
