@@ -1647,7 +1647,7 @@ with tab_trend:
 # ──────────────────────────────────────────────
 with tab_channel:
     st.write("")
-    section_header("STEP 2 · MONITOR", "채널 모니터링", "경쟁 운용사가 지금 무엇을 밀고 있는지 — 공식 홈페이지 배너·유튜브·블로그·뉴스를 수집합니다. 여기서 감지된 마케팅이 ③ 효과 측정의 입력이 됩니다.")
+    section_header("STEP 2 · MONITOR", "채널 모니터링", "경쟁 운용사가 지금 무엇을 밀고 있는지 — 공식 홈페이지 배너·유튜브·블로그·뉴스를 수집합니다.")
     st.write("")
 
     blogs = load_blogs()
@@ -1792,13 +1792,6 @@ with tab_channel:
                         f'<div style="margin-bottom:14px;"><div style="font-weight:800;font-size:0.88rem;margin-bottom:2px;">{brand}</div>{items}</div>',
                         unsafe_allow_html=True,
                     )
-            _ord = {b: ch_brands.get(b, {}).get("순서근거", "-") for b in D.ISSUERS}
-            _n_rank = sum(1 for v in _ord.values() if v == "운용사 지정 우선순위")
-            st.caption(
-                f'공식 홈페이지 배너 주간 배치 수집 ({ch_data.get("asof", "")}) · '
-                f'운용사가 매긴 실제 순위를 제공하는 곳은 {_n_rank}/{len(D.ISSUERS)}개사뿐이라 '
-                f'"첫 배너 = 최우선"이라고 단정할 수 없습니다 — 슬롯 점유 수·동시 집행 채널 수는 '
-                f'수집해두고 ③ 효과 측정의 캠페인 판정에만 사용합니다.')
         else:
             st.info("배너 데이터가 없습니다 — 로컬에서 `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
 
@@ -1844,7 +1837,6 @@ with tab_channel:
                     f'{_b} <span style="font-size:0.7rem;color:{FAINT};font-weight:600;">'
                     f'진행 중 {len(_live)}건 / 수집 {len(_evs)}건</span></div>'
                     f'{_rows}</div>', unsafe_allow_html=True)
-            st.caption("운용사 이벤트 보드 주간 배치 수집 · D-n은 종료까지 남은 일수 (14일 이내 강조)")
         else:
             st.info("이벤트 데이터가 없습니다 — `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
 
@@ -1898,8 +1890,6 @@ with tab_channel:
                 st.caption(
                     "⚠ 수집 실패 " + ", ".join(f"{b}({e.split(':')[0]})" for b, e in _yt_fail.items())
                     + " — 유튜브 RSS 일시 제한입니다. 직전 성공분을 표시 중이며 잠시 후 자동 복구됩니다.")
-            st.caption(f"유튜브 채널 RSS 실시간 수집 (30분 캐시) · {len(latest)}/{len(D.ISSUERS)}개 브랜드 · "
-                       "API 키 없이 동작, YOUTUBE_API_KEY 설정 시 좋아요·댓글 확장 가능")
         else:
             st.info("유튜브 수집에 실패했습니다 — RSS 일시 제한일 수 있습니다. "
                     "잠시 후 새로고침하면 복구됩니다.")
@@ -1907,23 +1897,48 @@ with tab_channel:
         # ── ③ 공식 블로그 — 최신 글 (브랜드별 묶음)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
         sub_header("04", "공식 블로그 — 최신 글", "브랜드별 최신 4건 · 네이버 블로그 RSS 실시간")
+        # 제목은 한 줄로 가둔다. 예전엔 title[:44]로 잘라 '미국CPU반도체T'처럼 단어
+        # 중간에서 끊겼고, 2줄로 흐른 카드끼리 높이가 어긋나 2열이 들쭉날쭉했다.
+        # 날짜도 '2026-08-05'가 32번 반복돼 최신 여부가 안 읽혔다 → 상대 표기.
+        def _days_ago(s) -> int | None:
+            try:
+                return (dt.date.today() - dt.date.fromisoformat(str(s)[:10])).days
+            except (ValueError, TypeError):
+                return None
+
         if any(blogs.values()):
             bcols = st.columns(2, gap="large")
             for i, brand in enumerate(D.ISSUERS):
                 posts = blogs.get(brand, [])[:4]
-                items = "".join(
-                    f'<a class="kw-link" href="{p["link"]}" target="_blank"><div class="kw-row" style="align-items:center;">'
-                    f'<span class="kw-name" style="flex:1;font-size:0.82rem;font-weight:600;">{p["title"][:44]}</span>'
-                    f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;margin-left:10px;">{p["date"]}</span>'
-                    f'</div></a>'
-                    for p in posts
-                ) or f'<div style="font-size:0.75rem;color:{GRAY};padding:4px 0;">수집 실패 또는 게시물 없음</div>'
+                # 7일 이내를 '이번 주'로 본다. 브랜드마다 게시 빈도가 달라 최신 4건만
+                # 봐서는 누가 지금 활발한지 구분이 안 된다 — 건수를 헤더에 박는다.
+                _ages = [(p, _days_ago(p["date"])) for p in posts]
+                _n_fresh = sum(1 for _, d in _ages if d is not None and d <= 7)
+                items = ""
+                for p, _d in _ages:
+                    _new = _d is not None and _d <= 7
+                    _ago = ("—" if _d is None else "오늘" if _d <= 0
+                            else "어제" if _d == 1 else f"{_d}일")
+                    items += (
+                        f'<a class="kw-link" href="{p["link"]}" target="_blank">'
+                        f'<div class="kw-row" style="align-items:center;">'
+                        f'<span style="flex:none;width:5px;height:5px;border-radius:50%;'
+                        f'margin-right:9px;background:{BRAND if _new else "transparent"};"></span>'
+                        f'<span class="kw-name" style="flex:1;min-width:0;overflow:hidden;'
+                        f'text-overflow:ellipsis;white-space:nowrap;font-size:0.82rem;'
+                        f'font-weight:{700 if _new else 500};color:{INK if _new else MUTED};">'
+                        f'{p["title"]}</span>'
+                        f'<span style="flex:none;font-size:0.72rem;color:{GRAY};'
+                        f'white-space:nowrap;margin-left:10px;">{_ago}</span></div></a>')
+                items = items or (f'<div style="font-size:0.75rem;color:{GRAY};'
+                                  f'padding:4px 0;">수집 실패 또는 게시물 없음</div>')
                 bcols[i % 2].markdown(
                     f'<div class="card" style="padding:10px 16px;margin-bottom:14px;">'
-                    f'<div class="card-title" style="margin-bottom:2px;">{brand}</div>{items}</div>',
+                    f'<div class="card-title" style="margin-bottom:2px;">{brand}'
+                    f'<span style="font-size:0.7rem;font-weight:600;color:{FAINT};margin-left:9px;">'
+                    f'{len(posts)}건 · 이번 주 {_n_fresh}건</span></div>{items}</div>',
                     unsafe_allow_html=True,
                 )
-            st.caption("네이버 블로그 RSS 실시간 수집 (30분 캐시) · 브랜드별 최신순 · KODEX는 자체 블로그(samsungfundblog.com)")
         else:
             st.info("블로그 수집에 실패했습니다. 네트워크 상태를 확인해주세요.")
 
@@ -1972,8 +1987,6 @@ with tab_channel:
         if _in_fail:
             st.caption("⚠ 수집 실패 " + ", ".join(_in_fail)
                        + " — 구글 뉴스 일시 제한입니다. 잠시 후 자동 복구됩니다.")
-        st.caption("구글 뉴스 RSS 실시간 수집 (30분 캐시) · 브랜드별 최신 3건 · "
-                   "동음이의어(SOL·PLUS 등)를 피하려고 운용사명을 함께 검색합니다.")
 
         # ── ⑤ 브랜드 검색량 (캠페인 → 관심 반응 확인)
         st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
