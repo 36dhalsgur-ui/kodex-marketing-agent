@@ -2484,7 +2484,8 @@ with tab_report:
             did_ctx = {
                 "name": e["표기명"], "channel": e["채널"], "week": _wk,
                 "dt": _sx["delta_treat"], "dc": _sx["delta_ctrl"], "did": _sx["did"],
-                "score": _sx["score"], "base_mean": _sx["base_mean"], "base_std": _sx["base_std"],
+                "score": _sx["score"], "base_mean": _sx["base_mean"],
+                "base_std": _sx["base_std"], "n_hist": _sx["n_hist"],
                 "verdict": ("이례적으로 강함" if _z >= 1.65 else "평소보다 강함" if _z >= 1.0 else
                             "다소 강함" if _z >= 0.5 else "평소와 차이 없음" if _z > -0.5 else "평소보다 부진"),
             }
@@ -2867,7 +2868,8 @@ with tab_report:
             f'<span style="margin-left:auto;font-size:0.86rem;font-weight:800;color:{NAVY};">'
             f'{did_ctx["score"]:.0f}점 · {did_ctx["verdict"]}</span></div>'
             f'<div style="font-size:0.72rem;color:{GRAY};margin-top:8px;">'
-            f'50점이 "평소와 같음" 기준선 · 이 ETF 평소 DiD {did_ctx["base_mean"]:+.2f}±{did_ctx["base_std"]:.2f}%p'
+            f'이 ETF의 평소 DiD 변동폭 ±{did_ctx["base_std"]:.2f}%p '
+            f'(이벤트 이전 {did_ctx["n_hist"]}주 기준) · 50점 = 평소 변동폭 안'
             f'</div></div>', unsafe_allow_html=True)
         st.write("")
 

@@ -231,7 +231,8 @@ def render_report(ctx: dict) -> str:
         did_html = (
             f'<p>캠페인이 순매수를 실제로 움직였는지는 <b>DiD(이중차분)</b>로 시장 공통 효과를 제거하고 본다. '
             f'이번 주 측정 가능한 사례는 <b>{_esc(did["name"])}</b>({_esc(did["channel"])}, {_esc(did["week"])})이다. '
-            f'신규상장 캠페인은 상장 이전 순매수가 없어 측정 대상에서 제외했다.</p>'
+            f'이벤트 이전 이력이 없거나(상장과 이벤트가 같은 주), 구성종목이 충분히 '
+            f'비슷한 경쟁 ETF가 없으면 측정하지 않는다.</p>'
             f'<div class="did">'
             f'<div class="did-step"><div class="k">Step 1 · 처치</div><div class="t">Δ처치</div>'
             f'<div class="v down">{did["dt"]:+.2f}%p</div></div>'
@@ -239,11 +240,12 @@ def render_report(ctx: dict) -> str:
             f'<div class="v down">{did["dc"]:+.2f}%p</div></div>'
             f'<div class="did-step" style="border-color:var(--brand)"><div class="k">Step 3 · 순효과</div>'
             f'<div class="t">DiD</div><div class="v down">{did["did"]:+.2f}%p</div></div></div>'
-            f'<p class="rz">이 ETF의 평소 DiD 분포({did["base_mean"]:+.2f} ± {did["base_std"]:.2f}%p)로 '
-            f'표준화하면 <b>{did["score"]:.0f}점 / 100 · {_esc(did["verdict"])}</b>. '
-            f'50점이 "평소와 같음"이며, 그보다 낮으면 평소만 못했다는 뜻이다.</p>')
+            f'<p class="rz">이 ETF의 평소 DiD 변동폭(±{did["base_std"]:.2f}%p)과 견주면 '
+            f'<b>{did["score"]:.0f}점 / 100 · {_esc(did["verdict"])}</b>. '
+            f'50점이 "평소 변동폭 안"이며, 그보다 낮으면 평소만 못했다는 뜻이다.</p>')
     else:
-        did_html = '<p>이번 주 측정 가능한 캠페인이 없다 — 감지된 캠페인이 모두 신규상장이라 베이스라인이 없다.</p>'
+        did_html = ('<p>이번 주 측정 가능한 캠페인이 없다 — 이벤트 이전 이력이 부족하거나, '
+                    '구성종목이 충분히 비슷한 경쟁 ETF가 없어 비교가 성립하지 않는다.</p>')
 
     # 05-A 현재 마케팅 점검
     vd_cls = {"지속": "vd-keep", "확대": "vd-keep", "지속·관찰": "vd-watch",
