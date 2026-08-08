@@ -2054,7 +2054,9 @@ with tab_did:
         treat = st.selectbox("처치군 — 마케팅한 KODEX ETF (수동)", kodex_list(netbuy_df))
         event_week = sel_week
 
-    weeks_avail = list(dict.fromkeys(netbuy_df["주차"]))
+    # 신규 상장 종목은 Δ를 낼 직전 주가 없어 주차=None 한 줄로 들어온다. 걸러내지
+    # 않으면 아래 대체 주차가 None이 되고, 사유 문구의 '수집 구간'도 어긋난다.
+    weeks_avail = [w for w in dict.fromkeys(netbuy_df["주차"]) if isinstance(w, str)]
     if event_week not in weeks_avail:   # 순매수 데이터에 없는 주차면 최신 주차로 대체
         event_week = weeks_avail[-1]
 
@@ -2190,13 +2192,21 @@ with tab_did:
         no_baseline = sc.get("did") is None and sc.get("delta_treat") is None and sc.get("fallback")
         if no_baseline:
             _pw, _pn = sc.get("pre_weeks", 0), sc.get("pre_need", D.MIN_BASELINE_ACTIVE)
-            # 원인을 데이터로 짚는다. 예전 문구는 무조건 '신규 상장 등으로'라고 적어,
-            # 12주 창 맨 앞에 걸린 기존 상품까지 신규 상장으로 설명했다.
-            _first = weeks_avail[0] if weeks_avail else "?"
-            _why = (f'수집 구간이 <b>{_first}</b>부터라 개입(<b>{event_week}</b>) 앞에 '
-                    f'{_pw}주치만 있습니다.' if _pw else
-                    f'수집 구간(<b>{_first}</b>~)에 개입(<b>{event_week}</b>) 이전 거래 기록이 '
-                    f'없습니다.')
+            # 사유는 둘이고, 갈라야 한다.
+            #   ① 이 ETF가 개입 이후에야 데이터에 나타난다 (상장이 늦음)
+            #   ② 수집 구간 자체가 개입 직전에 시작한다 (창이 짧음)
+            # 뭉뚱그리면 반드시 한쪽이 거짓이 된다 — 예전엔 ②까지 '신규 상장'이라
+            # 적었고, 그걸 고치며 ①까지 '구간이 늦게 시작'이라 적었다(둘 다 오답).
+            _win_first = weeks_avail[0] if weeks_avail else "?"
+            _own = [w for w in netbuy_df.loc[netbuy_df["종목명"] == treat, "주차"]
+                    if isinstance(w, str)]
+            _own_first = _own[0] if _own else ""
+            if _own_first and _own_first != _win_first:
+                _why = (f'이 ETF는 <b>{_own_first}</b>부터 데이터에 나타납니다 — '
+                        f'개입(<b>{event_week}</b>) 이전 기록이 {_pw}주뿐입니다.')
+            else:
+                _why = (f'수집 구간이 <b>{_win_first}</b>부터라 개입(<b>{event_week}</b>) '
+                        f'앞에 {_pw}주치만 있습니다.')
             st.markdown(
                 f'<div class="did-result" style="background:#5B6478;">'
                 f'<div class="did-result-label">측정 불가</div>'
