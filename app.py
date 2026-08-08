@@ -2084,6 +2084,12 @@ with tab_did:
     st.caption(f"처치군 **{treat}** · 개입 주차 **{event_week}**"
                + ("  (수동 지정 — 실제 마케팅 여부는 검증되지 않음)" if manual_mode
                   else "  (감지된 마케팅 집행 시점 기준)"))
+    if len(controls) == 1:
+        # 유사성 기준(겹침 70%)을 조이면 대조군이 1종만 남는 테마가 생긴다.
+        # 1종이면 그 경쟁사가 같은 주에 자기 이벤트를 걸 때 희석 없이 오염된다.
+        st.caption(f"⚠ 대조군이 **{controls[0]}** 1종입니다 — 이 경쟁사가 같은 주에 자체 "
+                   "이벤트를 집행하면 결과가 오염될 수 있습니다. ② 채널 모니터링에서 "
+                   "해당 운용사의 이벤트 유무를 확인하고 해석하세요.")
 
     # ── 평행추세 진단 — DiD의 가정이 성립하는지 보여준다
     if len(_diag):
@@ -2313,9 +2319,11 @@ with tab_did:
                 )
         elif sc.get("delta_treat") is not None:
             st.markdown(
-                f'<div class="did-result"><div class="did-result-label">단순 변화량 (대조군 없음)</div>'
+                f'<div class="did-result"><div class="did-result-label">DiD 수행 안 함 — 적합한 대조군 없음</div>'
                 f'<div class="did-result-val">Δ{sc["delta_treat"]:+.2f}%p</div>'
-                f'<div class="did-result-note">시장효과가 제거되지 않은 값입니다. 대조군을 지정하세요.</div></div>',
+                f'<div class="did-result-note">구성종목 겹침 {D.OVERLAP_MIN:.0f}% 기준을 넘는 경쟁 ETF가 '
+                f'없습니다. 비슷하지 않은 대조군으로 억지로 재는 대신 측정하지 않습니다 — '
+                f'위 Δ처치는 시장효과가 제거되지 않은 참고값일 뿐, 마케팅 효과가 아닙니다.</div></div>',
                 unsafe_allow_html=True,
             )
 
