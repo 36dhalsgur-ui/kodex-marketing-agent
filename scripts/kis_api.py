@@ -112,6 +112,51 @@ def investor_daily(code: str, bas_dd: str) -> list[dict]:
     raise KisApiError(f"{code} {bas_dd} — {last}")
 
 
+COMPONENT_URL = "/uapi/etfetn/v1/quotations/inquire-component-stock-price"
+COMPONENT_TR = "FHKST121600C0"
+
+
+def etf_components(code: str) -> list[tuple[str, str, float]]:
+    """ETF 구성종목 [(종목코드, 종목명, 비중%)] — 대조군 유사성 판정의 근거.
+
+    KRX Open API에는 구성종목(PDF) 서비스가 없지만(404 확인) KIS에는 있다.
+    해외 자산 ETF는 빈 목록이 온다 — 그 경우 일별 수익률 상관으로 대신한다.
+    """
+    key, sec = _creds()
+    last = ""
+    for attempt in range(RATE_RETRY):
+        time.sleep(RATE_SLEEP * (attempt + 1))
+        try:
+            r = requests.get(f"{BASE}{COMPONENT_URL}", timeout=TIMEOUT,
+                             headers={"authorization": f"Bearer {token()}",
+                                      "appkey": key, "appsecret": sec,
+                                      "tr_id": COMPONENT_TR, "custtype": "P"},
+                             params={"FID_COND_MRKT_DIV_CODE": "J",
+                                     "FID_INPUT_ISCD": code,
+                                     "FID_COND_SCR_DIV_CODE": "11216"})
+        except requests.RequestException as e:
+            last = f"{type(e).__name__}"
+            continue
+        try:
+            d = r.json()
+        except Exception:
+            raise KisApiError(f"{code} 구성종목 — JSON 아님: {r.text[:150]}")
+        if d.get("rt_cd") == "0":
+            out = []
+            for x in d.get("output2") or []:
+                try:
+                    w = float(x.get("etf_cnfg_issu_rlim") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if w > 0 and x.get("stck_shrn_iscd"):
+                    out.append((x["stck_shrn_iscd"], x.get("hts_kor_isnm", ""), w))
+            return out
+        last = f"{d.get('msg1', '')} ({d.get('msg_cd', '')})".strip()
+        if d.get("msg_cd") != "EGW00201":
+            break
+    raise KisApiError(f"{code} 구성종목 — {last}")
+
+
 # 투자자별 순매수 금액 필드(*_ntby_tr_pbmn)는 **백만원** 단위다(실측 검산:
 # 개인 순매수 -2,656,901주 × 108,820원 = -2,891억, 필드값 -269,679 × 100만 = -2,697억).
 # 원 단위로 잘못 읽으면 모든 값이 0에 수렴하므로 여기서 한 번만 변환한다.

@@ -1647,6 +1647,105 @@ def _fx_hedged(name: str) -> bool:
     return "(H)" in name
 
 
+def _covered_call(name: str) -> bool:
+    """커버드콜 래퍼 여부 — 기초자산이 같아도 인컴형은 투자자층·자금 동학이 다르다."""
+    return "커버드콜" in name
+
+
+# ── 일별 수익률 상관 — 구성종목 유사성의 관측 가능한 지문 ─────────────────────
+# 구성종목(PDF)은 KRX Open API가 제공하지 않아 직접 볼 수 없다. 대신 보유 종목이
+# 같으면 가격이 거의 완벽하게 같이 움직인다는 사실을 쓴다(같은 지수 추종끼리
+# 일별 수익률 상관 0.99+). 이름에 같은 '반도체'가 있어도 대형주 ETF와 장비
+# 소부장 ETF는 상관 0.7~0.8대로 갈라진다(실측 2026-08-08: KODEX 반도체 vs
+# SOL 반도체전공정 +0.778, TSMC파운드리밸류체인 +0.727 — 대형주 추종은 0.95+).
+CORR_MIN = 0.95        # 자산 테마에서 대조군으로 인정할 최소 일별 수익률 상관
+CORR_GUARD = 0.90      # 전략 테마: 지수 일치라도 이 밑이면 공시와 실체가 다른 것
+CORR_MIN_OBS = 20      # 상관을 신뢰할 최소 공통 거래일 수
+_PRICES_PATH = Path(__file__).parent / "data" / "etf_prices.json"
+_price_cache: dict = {}
+
+
+def _price_returns():
+    """{티커: 일별 수익률 ndarray} — etf_prices.json(주간 배치 산출)을 1회 로드."""
+    if "rets" not in _price_cache:
+        try:
+            raw = json.loads(_PRICES_PATH.read_text())
+            rets = {}
+            for tk, closes in raw.get("closes", {}).items():
+                a = np.array([np.nan if v is None else float(v) for v in closes])
+                with np.errstate(invalid="ignore", divide="ignore"):
+                    rets[tk] = a[1:] / a[:-1] - 1
+            _price_cache["rets"] = rets
+        except Exception:
+            _price_cache["rets"] = {}
+    return _price_cache["rets"]
+
+
+def _name_to_ticker():
+    if "tk" not in _price_cache:
+        _price_cache["tk"] = {e["종목명"]: e.get("티커", "")
+                              for e in load_etf_flows().get("etfs", [])}
+    return _price_cache["tk"]
+
+
+def return_corr(a_name: str, b_name: str) -> tuple[float | None, int]:
+    """두 ETF의 일별 수익률 상관과 공통 관측일 수. 데이터 없으면 (None, 0)."""
+    rets, tk = _price_returns(), _name_to_ticker()
+    ra, rb = rets.get(tk.get(a_name, "")), rets.get(tk.get(b_name, ""))
+    if ra is None or rb is None:
+        return None, 0
+    m = ~(np.isnan(ra) | np.isnan(rb))
+    n = int(m.sum())
+    if n < CORR_MIN_OBS:
+        return None, n
+    return float(np.corrcoef(ra[m], rb[m])[0, 1]), n
+
+
+# ── 구성종목 비중 겹침 — 유사성의 1차 기준 ────────────────────────────────────
+# KIS API의 ETF 구성종목시세(국내 자산만 제공)로 실제 보유 종목·비중을 받아
+# Σ min(비중A, 비중B)를 잰다. 같은 포트폴리오면 100%에 가깝다.
+# 실측 2026-08-08, KODEX 반도체(하이닉스+삼전 60.8%) 기준:
+#   TIGER 반도체 92.8% · 반도체TOP10 65.7% · Fn K-반도체 56.9%   ← 같은 자산
+#   AI반도체소부장 25.1% · 후공정 13.3% · 전공정 10.7%            ← 다른 자산
+# 40.4%와 25.1% 사이가 자연 단절이라 기준선을 40%로 둔다.
+# 해외 자산 ETF는 KIS가 구성종목을 주지 않으므로 일별 수익률 상관으로 대신한다.
+OVERLAP_MIN = 40.0
+_HOLDINGS_PATH = Path(__file__).parent / "data" / "etf_holdings.json"
+
+
+def _holdings():
+    if "hold" not in _price_cache:
+        try:
+            raw = json.loads(_HOLDINGS_PATH.read_text()).get("holdings", {})
+            _price_cache["hold"] = {tk: {c: w for c, _, w in rows}
+                                    for tk, rows in raw.items() if rows}
+        except Exception:
+            _price_cache["hold"] = {}
+    return _price_cache["hold"]
+
+
+def holdings_overlap(a_name: str, b_name: str) -> float | None:
+    """공시 구성종목 비중 겹침(%) = Σ min(비중A, 비중B). 한쪽이라도 없으면 None."""
+    hold, tk = _holdings(), _name_to_ticker()
+    ha, hb = hold.get(tk.get(a_name, "")), hold.get(tk.get(b_name, ""))
+    if not ha or not hb:
+        return None
+    return sum(min(w, ha[c]) for c, w in hb.items() if c in ha)
+
+
+def similar_enough(treat_name: str, cand_name: str) -> tuple[bool, str]:
+    """대조군 적합성 — 구성종목 겹침을 먼저 보고, 없으면 수익률 상관으로.
+    반환 (적합 여부, 근거 문자열). 어느 쪽으로도 확인 불가면 부적합 —
+    검증 못 한 후보로 머릿수를 채우는 것보다 비워 두는 게 낫다."""
+    ov = holdings_overlap(treat_name, cand_name)
+    if ov is not None:
+        return ov >= OVERLAP_MIN, f"겹침 {ov:.0f}%"
+    c, n = return_corr(treat_name, cand_name)
+    if c is not None:
+        return c >= CORR_MIN, f"상관 {c:+.2f} ({n}일)"
+    return False, "확인 불가"
+
+
 def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list[str]:
     """처치군과 '테마 + 기초시장'이 같은 비(非)KODEX 경쟁 ETF 자동 매핑.
 
@@ -1654,9 +1753,12 @@ def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list
     'HANARO Fn K-반도체'(한국)가 붙는다. 두 시장은 환율·현지 실적에 다르게 반응해
     DiD의 평행추세 가정이 깨지고, 마케팅과 무관한 차이가 효과로 오독된다.
 
-    전략 테마(WRAPPER_THEMES)는 여기에 더해 공시 기초지수의 기초자산이 같고
-    채권혼합 여부가 같은 상품만 남긴다. 적합한 후보가 적으면 적은 대로 쓴다 —
-    엉뚱한 대조군으로 머릿수를 채우는 것보다 낫다."""
+    그 위에 유사성 검증을 얹는다.
+      전략 테마 — 공시 기초지수의 기초자산이 같은 것만 (선언 기반)
+      자산 테마 — 실제 구성종목 비중 겹침 ≥ OVERLAP_MIN, 해외는 수익률 상관
+      전 테마 — 커버드콜·채권혼합·환헤지(H) 여부가 처치군과 같아야 한다
+    적합한 후보가 적으면 적은 대로 쓴다 — 엉뚱한 대조군으로 머릿수를
+    채우는 것보다 낫다."""
     if universe is not None and len(universe):
         row = universe[universe["종목명"] == treat_name]
         if len(row):
@@ -1670,20 +1772,40 @@ def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list
             peers = universe[(universe["테마"] == theme)
                              & (universe["기초시장"] == market)
                              & (universe["운용사"] != "KODEX")]
-            if theme in WRAPPER_THEMES and "기초지수" in universe.columns:
-                t_idx = row.iloc[0].get("기초지수") or ""
+            t_idx = row.iloc[0].get("기초지수") or "" if "기초지수" in universe.columns else ""
+            if theme in WRAPPER_THEMES:
+                # 전략 테마 — 공시 기초지수의 기초자산이 같은 것만 (선언 기반).
+                # 단, 선언과 실체가 다를 수 있다 — 액티브 펀드는 벤치마크만 같고
+                # 실제 운용은 딴판일 수 있다(실측: TIME 미국S&P500액티브의 수익률
+                # 상관 +0.84). 상관이 계산되면 CORR_GUARD 밑은 거른다.
                 t_core = underlying_core(t_idx)
-                t_bond = _bond_mixed(treat_name, t_idx)
                 if t_core:
-                    # 기초지수가 없는 후보는 유사성을 확인할 수 없으므로 제외한다
                     keep = []
-                    for _, p in peers.iterrows():
-                        c_idx = p.get("기초지수") or ""
-                        if (underlying_core(c_idx) == t_core
-                                and _bond_mixed(p["종목명"], c_idx) == t_bond
-                                and _fx_hedged(p["종목명"]) == _fx_hedged(treat_name)):
-                            keep.append(p["종목명"])
+                    for _, c in peers.iterrows():
+                        c_idx = c.get("기초지수") or ""
+                        if underlying_core(c_idx) != t_core:
+                            continue
+                        corr, _n = return_corr(treat_name, c["종목명"])
+                        if corr is not None and corr < CORR_GUARD:
+                            continue
+                        keep.append(c["종목명"])
                     peers = peers[peers["종목명"].isin(keep)]
+            else:
+                # 자산 테마 — 테마 키워드는 풀이 너무 넓다. 같은 '반도체'라도
+                # 대형주 ETF와 장비 소부장 ETF는 다른 자산이다(실측: KODEX 반도체
+                # 대비 구성종목 겹침 10.7%). 실제 구성종목 겹침(해외는 수익률
+                # 상관)으로 유사성이 확인된 후보만 남긴다.
+                keep = [c for c in peers["종목명"]
+                        if similar_enough(treat_name, c)[0]]
+                peers = peers[peers["종목명"].isin(keep)]
+            # 구조가 다르면 기초자산이 같아도 자금 동학이 다르다 — 전 테마 공통
+            _flags = (_covered_call(treat_name), _bond_mixed(treat_name, t_idx),
+                      _fx_hedged(treat_name))
+            keep = [c["종목명"] for _, c in peers.iterrows()
+                    if (_covered_call(c["종목명"]),
+                        _bond_mixed(c["종목명"], c.get("기초지수") or ""),
+                        _fx_hedged(c["종목명"])) == _flags]
+            peers = peers[peers["종목명"].isin(keep)]
             names = sorted(peers["종목명"].unique())
             # 인버스·레버리지는 기초자산이 같아도 방향·배수가 달라 평행추세가 성립하지 않는다
             # (예: '2차전지TOP10인버스'는 테마가 오를 때 내린다)

@@ -32,8 +32,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import data as D  # 분류 기준을 앱과 공유 (drift 방지)
-from kis_api import INVESTOR_FIELDS, KisApiError, investor_daily, to_eok
-from krx_api import KrxApiError, snapshots, trading_dates
+from kis_api import (INVESTOR_FIELDS, KisApiError, etf_components,
+                     investor_daily, to_eok)
+from krx_api import KrxApiError, fetch, snapshots, trading_dates
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "etf_flows.json"
@@ -179,6 +180,54 @@ def main():
         print(f"  투자자별 순매수 {got}종 수집 (실패 {fail}종)")
     else:
         print("  투자자별 순매수 건너뜀 — KIS_APP_KEY/SECRET 미설정")
+
+    # ── 일별 종가 → data/etf_prices.json — 수익률 상관(해외 대조군 유사성)용.
+    # 날짜 1건 응답에 전 종목이 있어 거래일 수만큼만 부른다. fetch가 날짜별로
+    # 디스크 캐시하므로 매주 새 거래일 ~5건만 실제 요청이 나간다.
+    days, d = [], date.today()
+    while len(days) < 65 and (date.today() - d).days < 100:
+        if d.weekday() < 5:
+            days.append(d.strftime("%Y%m%d"))
+        d -= timedelta(days=1)
+    days.reverse()
+    closes, valid_dates = {}, []
+    for dd in days:
+        try:
+            rows = fetch(ETF_SVC, dd)
+        except KrxApiError:
+            continue
+        got = 0
+        for r in rows:
+            px = _num(r.get("TDD_CLSPRC"))
+            if px:
+                closes.setdefault(r.get("ISU_CD", ""), {})[dd] = px
+                got += 1
+        if got > 100:                      # 휴장일은 행이 없거나 값이 비어 온다
+            valid_dates.append(dd)
+    (ROOT / "data" / "etf_prices.json").write_text(json.dumps({
+        "asof": date.today().isoformat(), "dates": valid_dates,
+        "closes": {tk: [v.get(dd) for dd in valid_dates]
+                   for tk, v in closes.items() if tk},
+    }, ensure_ascii=False))
+    print(f"  일별 종가 {len(valid_dates)}거래일 · {len(closes)}종")
+
+    # ── 구성종목 → data/etf_holdings.json — 대조군 유사성(비중 겹침)의 근거.
+    # KRX Open API에는 없고(404 확인) KIS ETF구성종목시세로 받는다.
+    # 해외 자산 ETF는 빈 목록이 온다 — 그 종목은 수익률 상관으로 대신한다.
+    if os.environ.get("KIS_APP_KEY") and os.environ.get("KIS_APP_SECRET"):
+        hold, h_fail = {}, 0
+        for i, r in enumerate(result, 1):
+            try:
+                hold[r["티커"]] = [[c, n, w] for c, n, w in etf_components(r["티커"])]
+            except Exception:
+                h_fail += 1
+            if i % 200 == 0:
+                print(f"    구성종목 {i}/{len(result)}")
+        (ROOT / "data" / "etf_holdings.json").write_text(json.dumps({
+            "asof": date.today().isoformat(), "holdings": hold,
+        }, ensure_ascii=False))
+        n_has = sum(1 for v in hold.values() if v)
+        print(f"  구성종목 {n_has}종 확보 (해외 등 미제공 {len(hold) - n_has} · 실패 {h_fail})")
 
     # 라인업 공백 테마의 경쟁사 순자산 — 신규 출시 판단에 쓴다.
     # 공백은 정의상 KODEX가 없는 테마라 위 목록(8개 브랜드)에 없을 수 있다.
