@@ -1824,6 +1824,53 @@ def control_group(treat_name: str, universe: pd.DataFrame | None = None) -> list
     )
 
 
+def event_study(df: pd.DataFrame, treat: str, controls: list[str], event_week: str,
+                pre: int = BASELINE_WEEKS, weights: dict[str, float] | None = None) -> pd.DataFrame:
+    """집행 전 pre주를 '고정' 기준선으로 삼은 주차별 DiD (사건연구).
+
+    did_series의 롤링 기준선과 다르다. 롤링은 각 주가 자기 직전 8주를 기준으로 삼아
+      ① 이벤트 전 구간이 0 근처로 모이지 않아 평행추세를 눈으로 확인할 수 없고
+      ② 집행 후로 갈수록 기준선에 집행 기간이 섞여 효과가 스스로 희석된다
+        (실측 2026-08-08 미국S&P500 7월 2주: 롤링 +2.12%p vs 고정 +1.71%p).
+    고정 기준선이면 모든 주가 같은 '평소'와 비교되므로, 이벤트 전 막대가 0 근처인지로
+    평행추세가 그림으로 검증되고 집행 후 막대는 효과의 시간 경로가 된다.
+    ※ 집행 주 값은 두 방식이 같다 — 그 주의 '직전 8주'가 곧 '집행 전 8주'다.
+
+    반환: 주차 · 상대주차(집행=0) · DiD · 구간('전'/'후'). 표시 구간은 -pre부터.
+    """
+    d = _smoothed_intensity(df)
+    weeks = [w for w in dict.fromkeys(d["주차"]) if isinstance(w, str)]
+    if event_week not in weeks:
+        return pd.DataFrame()
+    ei = weeks.index(event_week)
+    lo = max(0, ei - pre)
+    if lo == ei:                       # 집행 전 구간이 없으면 기준선을 못 만든다
+        return pd.DataFrame()
+
+    def strength(name):
+        return d[d["종목명"] == name].set_index("주차")["강도"].reindex(weeks)
+
+    t = strength(treat)
+    base_t = t.iloc[lo:ei].mean()
+    base_c = {c: strength(c).iloc[lo:ei].mean() for c in controls}
+    rows = []
+    for i in range(lo, len(weeks)):
+        dt = t.iloc[i] - base_t
+        vals, ws = [], []
+        for c in controls:
+            v = strength(c).iloc[i] - base_c[c]
+            if pd.notna(v) and pd.notna(base_c[c]):
+                vals.append(v)
+                ws.append(max(float((weights or {}).get(c, 1.0)), 0.0))
+        if pd.isna(dt) or not vals:
+            continue
+        dc = (float(np.average(vals, weights=ws)) if sum(ws) > 0
+              else float(np.mean(vals)))
+        rows.append({"주차": weeks[i], "상대주차": i - ei,
+                     "DiD": float(dt - dc), "구간": "전" if i < ei else "후"})
+    return pd.DataFrame(rows)
+
+
 def _smoothed_intensity(df: pd.DataFrame) -> pd.DataFrame:
     """매수강도(스무딩) = 순매수액 / (전주 순자산 + α) × 100."""
     d = df.copy()
