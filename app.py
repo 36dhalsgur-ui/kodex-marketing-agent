@@ -2017,20 +2017,18 @@ with tab_did:
     section_header(
         "STEP 3 · MEASURE",
         "마케팅 효과 측정 — DiD 인과분석",
-        "②에서 실제로 감지된 마케팅만 분석 대상입니다. 개입 시점(집행 주차)을 기준으로 "
-        "처치군 KODEX ETF와 동일 테마 경쟁 ETF 평균을 비교해 시장효과를 제거합니다.",
+        "개입 시점(집행 주차)을 기준으로 처치군 KODEX ETF와 동일 테마 경쟁 ETF "
+        "평균을 비교해 시장효과를 제거합니다.",
     )
     st.write("")
 
     # ── 처치 = 이벤트만. 이벤트는 리워드를 걸어 비용이 드는 판촉이고, 콘텐츠 푸시
     # (블로그 글·영상·상품 안내 배너)는 마케팅이지만 이벤트가 아니라 ②에 남긴다.
     # 이 탭은 '큰 비용이 실제 효과를 냈는가'를 보는 곳이므로 이벤트만 다룬다.
-    events, _campaigns_dedup = kodex_campaigns(ch_data, youtube, blogs, netbuy_df)
+    _, _campaigns_dedup = kodex_campaigns(ch_data, youtube, blogs, netbuy_df)
     # 같은 ETF를 여러 채널에 집행하면 채널 수만큼 잡히지만, 순매수 시계열은 하나뿐이라
     # DiD는 상품당 한 번이면 된다.
     campaigns = [e for e in _campaigns_dedup if e["유형"] == D.EVENT]
-    _event_names = {e["ETF"] for e in campaigns}
-    campaigns_raw = [e for e in events if e["ETF"] in _event_names and e["유형"] == D.EVENT]
     usable = [e for e in campaigns if e["분석가능"]]
 
     CH_ICON = {"홈페이지": "#6B4FBB", "유튜브": "#C2333F", "블로그": "#1E7A55",
@@ -2055,15 +2053,7 @@ with tab_did:
             f'{right}</div></a>'
         )
 
-    sub_header("01", "측정 대상 이벤트", "리워드를 건 판촉만 = DiD의 처치")
-    st.markdown(
-        f'<div style="font-size:0.76rem;color:{MUTED};margin-bottom:10px;">'
-        f'감지 {len(campaigns_raw)}건 → <b style="color:{INK};">상품 {len(campaigns)}종</b>'
-        f' (분석 가능 {len(usable)}종)<br>'
-        f'같은 상품을 여러 채널에 집행해도 순매수 시계열은 하나뿐이라 '
-        f'<b>DiD는 상품당 한 번</b>만 돌립니다 — 개입 시점은 <b>가장 먼저 시작한 채널</b> 기준입니다.</div>',
-        unsafe_allow_html=True,
-    )
+    sub_header("01", "측정 대상 이벤트")
     if campaigns:
         st.markdown(
             f'<div class="card" style="padding:8px 16px;">{"".join(ev_row(e) for e in campaigns[:8])}</div>',
@@ -2138,7 +2128,7 @@ with tab_did:
         _pc, _pbg = _PV.get(_pt["판정"], (MUTED, "#F2F4F7"))
         with st.expander(
                 f"평행추세 진단 — {_pt['판정']} · 대조군 {len(controls)}종 합산",
-                expanded=_pt["판정"] in ("부적합", "검증 불가")):
+                expanded=False):
             st.markdown(
                 f'<div style="font-size:0.76rem;color:{MUTED};line-height:1.65;margin-bottom:12px;">'
                 f'DiD는 <b>"마케팅이 없었다면 처치군도 대조군과 같은 방향으로 움직였을 것"</b>을 가정합니다. '
@@ -2181,7 +2171,7 @@ with tab_did:
     sc = D.did_score(series, event_week)
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    sub_header("03", "진단 결과", "처치군이 대조군보다 얼마나 더 받았는가")
+    sub_header("03", "진단 결과")
 
     d1, d2 = st.columns([7, 5], gap="large")
     with d1:
@@ -2215,7 +2205,7 @@ with tab_did:
             fig_cmp.update_xaxes(ticksuffix="%", range=[_lo * 1.3 - 1, _hi * 1.3 + 1])
             st.plotly_chart(fig_cmp, use_container_width=True)
             st.caption(f"진한 남색 = 처치군 · 회색 = 대조군 {len(controls)}종 · "
-                       f"DiD는 처치군의 Δ에서 대조군 Δ의 순자산 가중평균을 뺀 값입니다")
+                       f"DiD는 Δ처치군에서 Δ대조군의 순자산 가중평균을 뺀 값")
         else:
             st.info(f"{event_week}에 처치군·대조군의 유입 데이터가 없습니다.")
 
