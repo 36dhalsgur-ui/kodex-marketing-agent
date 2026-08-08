@@ -1179,6 +1179,16 @@ def banner_focus(title: str) -> str:
 _ETF_MENTION = re.compile(r"KODEX\s+[가-힣A-Za-z0-9&\+\.]+(?:\s*[가-힣A-Za-z0-9&\+\.]+)?")
 _TICKER_PAT = re.compile(r"종목\s?코드\s*[:：]?\s*([0-9A-Z]{6})")
 
+# 이벤트 제목이 상품명을 그대로 쓰지 않는 경우가 있다.
+#   'KODEX 한국, 미국 반도체 ETF 투자 이벤트'  → 한국 반도체 + 미국 반도체 두 상품
+#   'KODEX 미국대표지수 ETF 적립식 매수 이벤트'  → 미국 대표지수 상품군
+# 정규식으로 추측하면 'KODEX 한국' 같은 없는 상품이 만들어지므로(실측 2026-08-08),
+# 사람이 확인한 매핑만 여기에 명시한다. 유니버스에 없는 이름은 자동으로 버려진다.
+EVENT_ALIASES: list[tuple[re.Pattern, list[str]]] = [
+    (re.compile(r"한국.{0,6}미국\s*반도체"), ["KODEX 반도체", "KODEX 미국반도체"]),
+    (re.compile(r"미국\s*대표지수"), ["KODEX 미국S&P500", "KODEX 미국나스닥100"]),
+]
+
 
 def match_etfs(title: str, uni: dict[str, str]) -> tuple[list[str], str]:
     """제목에서 실제 ETF를 찾는다. 반환: (상품명 목록, 판별근거)
@@ -1203,6 +1213,11 @@ def match_etfs(title: str, uni: dict[str, str]) -> tuple[list[str], str]:
         taken += key
     if hits:
         return hits, "이름"
+    for pat, names in EVENT_ALIASES:
+        if pat.search(title or ""):
+            live = [n for n in names if _norm_etf(n) in uni]
+            if live:
+                return live, "매핑"
     m = _TICKER_PAT.search(title or "")
     if m:
         return [], "코드"
@@ -1337,8 +1352,11 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
             else:
                 names = [""]                    # 상품 특정 불가
         for nm in names:
+            # 상품을 특정하지 못한 건 제목을 그대로 보여준다 — '(브랜드 이벤트)'로
+            # 뭉치면 서로 다른 이벤트가 한 줄로 합쳐져 무엇인지 알 수 없다.
+            label = nm or re.sub(r"\s+", " ", (title or "").strip())[:40] or "브랜드 이벤트"
             row = {
-                "ETF": nm or "(브랜드 이벤트)", "표기명": nm or "(브랜드 이벤트)",
+                "ETF": label, "표기명": label,
                 "채널": channel, "제목": title, "링크": link,
                 "date": (date or "")[:10], "주차": week_label_of(date or ""),
                 "분석가능": bool(nm) and _norm_etf(nm) in uni,
