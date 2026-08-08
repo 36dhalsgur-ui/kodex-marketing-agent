@@ -2038,7 +2038,16 @@ def did_score(series: pd.DataFrame, week: str) -> dict:
                         f"측정 불가 (필요 {MIN_BASELINE_ACTIVE}주)",
         }
     r = row.iloc[0]
-    hist = series[series["주차"] != week]["DiD"].dropna().tail(ZSCORE_WINDOW)
+    # '평소'는 이벤트 집행 이전 구간만 쓴다. 예전에는 이벤트 주 하나만 빼고 전부
+    # 썼는데, 장기 이벤트에서는 집행 중인 주가 '평소'로 들어가 기준선을 효과 쪽으로
+    # 끌어올려 자기 효과를 지웠다(실측 2026-08-08: 미국S&P500은 평소 15주 중 9주가
+    # 집행 기간이었다 — 이벤트가 6월 1주~12월 31일로 213일짜리다).
+    # ※ 한계: 자금 흐름의 변동성은 시기마다 다르다(실측: 종목 간 산포가 주별로
+    #   최대 7.2배, DiD 자체의 σ도 전·후반 1.6~1.7배 차이). 과거 구간의 σ로 이벤트
+    #   주를 재므로 국면이 바뀌면 z가 부풀거나 묻힐 수 있다. 방향은 예측되지 않는다.
+    #   이벤트 후 주를 섞는 편향(효과를 지우는 쪽)보다는 낫다고 보고 이 방식을 쓴다.
+    _pre = series.iloc[:series.index.get_loc(row.index[0])]
+    hist = _pre["DiD"].dropna().tail(ZSCORE_WINDOW)
     result = {
         "available": True,
         "delta_treat": float(r["Δ처치"]) if pd.notna(r["Δ처치"]) else None,

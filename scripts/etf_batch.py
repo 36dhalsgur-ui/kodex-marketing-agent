@@ -40,7 +40,13 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "etf_flows.json"
 ETF_SVC = "etp/etf_bydd_trd"
 
-N_WEEKS = 12          # DiD 베이스라인 8주 + 여유
+# DiD 베이스라인 8주 + 이벤트 이전 구간. 12주로는 6월 초 시작한 장기 이벤트의
+# '이벤트 전'이 1주밖에 안 남아 측정 자체가 불가능했다(실측 2026-08-08:
+# 미국S&P500·나스닥100). 24주면 그 두 건이 측정되고, 나머지 건의 평행추세도
+# '검증 불가'에서 '양호'로 바뀐다 — 사전 DiD가 5주 이상 확보되기 때문.
+# 비용은 거의 없다: 주간 스냅샷은 날짜당 1회 호출로 전 종목이 오고 디스크
+# 캐시라, 매주 새로 받는 건 1건뿐이다.
+N_WEEKS = 24
 
 # 분류·브랜드 판별은 data.py의 단일 기준을 재사용한다 (앱과 drift 방지).
 # 기초시장을 분리하는 이유: '반도체' 하나로 묶으면 미국반도체 처치군에
@@ -151,9 +157,13 @@ def main():
     # 겨냥하므로 둘은 같은 질문의 다른 면이고 함께 봐야 판단이 선다.
     # 한 번 호출에 30영업일(약 6주)이 오므로 12주를 채우려면 두 번 부른다.
     if os.environ.get("KIS_APP_KEY") and os.environ.get("KIS_APP_SECRET"):
+        # 투자자별 순매수는 최근 12주만 채운다. DiD는 KRX 좌수 기반 순유입만 쓰고
+        # 이 열은 화면 표시용이다. KIS는 종목마다 호출해야 해서(961종 × 앵커)
+        # 24주로 늘리면 배치 시간만 배로 든다.
         anchors = [weeks_sorted[-1]]
-        if len(weeks_sorted) > 6:
-            anchors.append(weeks_sorted[-7])      # 30영업일 앞
+        for back in (7, 13):                      # 30영업일씩 앞으로
+            if len(weeks_sorted) > back:
+                anchors.append(weeks_sorted[-back - 1])
         wk_of = {}                                 # 영업일 → 주차 라벨
         got = fail = 0
         for i, r in enumerate(result, 1):

@@ -508,11 +508,13 @@ def _did_method_html() -> str:
         _step(4, "DiD — 둘의 차이가 캠페인 몫", "DiD = Δ처치 − Δ대조군   (단위 %p)",
               "시장·테마 전체에 일어난 변화가 상쇄되고 처치군에만 있었던 차이가 남습니다."),
         _step(5, "0~100점 — 이 DiD가 평소보다 큰가",
-              f"z = (DiD − 과거 {D.ZSCORE_WINDOW}주 평균) ÷ 표준편차<br>"
+              f"z = (DiD − 평소 평균) ÷ 평소 표준편차<br>"
               f"점수 = 100 ÷ (1 + e^−z)",
-              "%p 값만으로는 큰지 작은지 알 수 없어 그 상품의 과거 변동폭과 견줍니다. "
+              "%p 값만으로는 큰지 작은지 알 수 없어 그 상품의 변동폭과 견줍니다. "
               f'<b style="color:{INK};">50점 = 평소와 같음</b>, 위로 갈수록 이례적으로 '
-              "강한 반응입니다."),
+              "강한 반응입니다.<br>"
+              f'‘평소’는 <b style="color:{INK};">이벤트 이전</b> 최대 {D.ZSCORE_WINDOW}주로 '
+              "잽니다. 집행 중인 주를 섞으면 효과가 기준선에 들어가 스스로 지워집니다."),
     ])
 
     verdicts = "".join(
@@ -576,7 +578,20 @@ def _did_method_html() -> str:
           f'<b style="color:{INK};">대조군 없음</b> — Δ처치만 제공하고 시장 효과가 제거되지 '
           f'않았음을 함께 표시합니다.<br>'
           f'<b style="color:{INK};">이력 부족</b> — 과거 DiD가 4주 미만이면 Z-score를 낼 수 없어 '
-          f'점수 없이 DiD 원값만 보여줍니다.</div></div></div>')
+          f'점수 없이 DiD 원값만 보여줍니다.</div></div>'
+        + f'<div style="margin-top:18px;">'
+        + _crit_label("알고 쓰는 한계")
+        + f'<div style="line-height:1.6;color:{MUTED};">'
+          f'<b style="color:{INK};">점수는 시장 국면을 탑니다.</b> 자금 흐름의 출렁임은 '
+          f'주마다 다릅니다 — 전 종목 유입강도의 산포가 잔잔한 주 4.0%에서 요동치는 주 '
+          f'28.9%까지 벌어지고(실측 24주), DiD 자체의 표준편차도 시기에 따라 1.6~1.7배 '
+          f'차이 납니다. 점수는 <b>이벤트 이전</b> 구간의 변동폭을 분모로 쓰므로, '
+          f'조용하던 시기가 기준이면 같은 크기의 유입도 높게, 요동치던 시기가 기준이면 '
+          f'낮게 나옵니다. 어느 쪽으로 틀릴지는 미리 알 수 없습니다.<br>'
+          f'<b style="color:{INK};">장기 이벤트는 첫 주만 잽니다.</b> 반년짜리 상시 '
+          f'이벤트도 집행 시작 주 한 번으로 판정하므로 지속 효과는 담기지 않습니다.<br>'
+          f'그래서 이 점수는 <b>판정이 아니라 우선순위 신호</b>로 쓰는 것이 맞습니다 — '
+          f'평행추세 판정과 함께 읽어야 합니다.</div></div></div>')
 
 def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
     """차트도 타이포와 같은 수준으로 다듬는다 — 옅은 그리드, 축 라벨 축소, 제목 정렬."""
@@ -2281,7 +2296,8 @@ with tab_did:
                     verdict, vcolor, vsay = "평소와 차이 없음", "#C7CFDF", "평소 변동 범위 안입니다 — 효과가 있었는지 판별되지 않습니다."
                 else:
                     verdict, vcolor, vsay = "평소보다 부진", "#9DB2D9", "평소보다 오히려 낮습니다 — 이번 캠페인 주간의 순유입은 평소만 못했습니다."
-                base_txt = (f'이 ETF 평소 DiD {sc["base_mean"]:+.2f}%p ± {sc["base_std"]:.2f}%p ({sc["n_hist"]}주)'
+                base_txt = (f'평소 DiD {sc["base_mean"]:+.2f}%p ± {sc["base_std"]:.2f}%p '
+                            f'(이벤트 이전 {sc["n_hist"]}주)'
                             if sc.get("base_mean") is not None else "")
                 st.markdown(
                     f'<div class="did-result">'
@@ -2294,7 +2310,11 @@ with tab_did:
                     f'background:rgba(255,255,255,0.85);"></div></div>'
                     f'<div style="display:flex;justify-content:space-between;font-size:0.6rem;opacity:0.6;margin-top:3px;">'
                     f'<span>0 · 평소보다 낮음</span><span>50 · 평소와 같음</span><span>100 · 평소보다 높음</span></div>'
-                    f'<div class="did-result-note">{vsay}</div></div>',
+                    f'<div class="did-result-note">{vsay}<br>'
+                    f'<span style="opacity:0.7;">‘평소’는 이벤트 이전 {sc["n_hist"]}주로 잽니다. '
+                    f'자금 흐름의 출렁임은 시기마다 달라(실측 1.6~1.7배) 조용하던 시기가 '
+                    f'기준이면 점수가 높게, 요동치던 시기가 기준이면 낮게 나올 수 있습니다.'
+                    f'</span></div></div>',
                     unsafe_allow_html=True,
                 )
                 with st.expander("점수 해석 기준"):
