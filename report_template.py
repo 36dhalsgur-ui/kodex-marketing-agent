@@ -425,7 +425,7 @@ def render_report(ctx: dict) -> str:
       <tbody>{rows_flow}</tbody></table>
   </div>
 
-  <div class="sec"><div class="sec-h"><span class="sec-no">03</span><span class="sec-t">마케팅 집행 · 경쟁 발행량</span>
+  <div class="sec"><div class="sec-h"><span class="sec-no">03</span><span class="sec-t">마케팅 경쟁 추이</span>
     <span class="sec-tag">Channels · Live</span></div>
     <p>이번 주 KODEX가 집행한 이벤트와 8개 브랜드의 콘텐츠 발행량이다.
       발행량 1위는 <b>{_esc(ctx['top_brand'][0])}</b>({ctx['top_brand'][1]}건)였다.</p>
@@ -435,7 +435,7 @@ def render_report(ctx: dict) -> str:
       <th class="num">건</th></tr></thead><tbody>{rows_brand}</tbody></table>
   </div>
 
-  <div class="sec"><div class="sec-h"><span class="sec-no">04</span><span class="sec-t">마케팅 효과 — DiD</span>
+  <div class="sec"><div class="sec-h"><span class="sec-no">04</span><span class="sec-t">이벤트 효과 — DiD</span>
     <span class="sec-tag">이중차분 · 인과추정</span></div>{did_html}
   </div>
 
