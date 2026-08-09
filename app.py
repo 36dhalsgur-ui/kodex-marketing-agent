@@ -2987,7 +2987,7 @@ with tab_report:
     # ══════════ DiD 요약 — ③이 잰 이벤트 전 건 ══════════
     if did_all:
         _n_ok = sum(1 for r in did_all if r["did"] is not None)
-        sub_header("D", "마케팅 효과 검증",
+        sub_header("D", "이벤트 효과 검증",
                    f"집행 {len(did_all)}건 중 측정 {_n_ok}건 · 집행 기간 평균 기준")
         _rows = ""
         for r in did_all:
