@@ -1207,7 +1207,14 @@ with tab_trend:
     st.write("")
 
     st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
-    sub_header("02", "섹터 시그널 보드", "22개 섹터의 현재 단계 판정 — 주 1회 갱신")
+    # 보드를 먼저 읽는다 — 섹터 수를 소제목에 쓰려면 개수가 먼저 있어야 한다.
+    # 하드코딩하면 유니버스가 늘 때 소제목과 배지 합계가 어긋난다(22 vs 26).
+    board_file = Path(__file__).parent / "data" / "signal_board.json"
+    sb = json.loads(board_file.read_text()) if board_file.exists() else {}
+    rows_all = sb.get("board", [])
+    sub_header("02", "섹터 시그널 보드",
+               f"{len(rows_all)}개 섹터의 현재 단계 판정 — 주 1회 갱신"
+               if rows_all else "섹터별 현재 단계 판정 — 주 1회 갱신")
 
     # 단계별 색·행동 — 시그널 보드와 섹터 유니버스가 같은 팔레트를 쓰도록 탭 상단에 둔다
     STAGE_META = {
@@ -1219,12 +1226,9 @@ with tab_trend:
     }
 
     # ── 섹터 시그널 보드 — 주간 배치 실데이터 (data/signal_board.json)
-    board_file = Path(__file__).parent / "data" / "signal_board.json"
-    if not board_file.exists():
+    if not rows_all:
         st.info("시그널 보드 데이터가 없습니다 — 로컬에서 `python scripts/weekly_batch.py` 실행 후 커밋하면 표시됩니다.")
     else:
-        sb = json.loads(board_file.read_text())
-        rows_all = sb.get("board", [])
         by_stage: dict = {}
         for r in rows_all:
             by_stage.setdefault(r.get("단계", "관망"), []).append(r)
@@ -1432,9 +1436,10 @@ with tab_trend:
 |------|------|------|
 | 가격 (1군 17개 섹터) | KRX 공식 섹터지수 | 코스피+코스닥 통합 |
 | 가격 (2군 5개 테마) | KODEX 테마 ETF 종가 | 방산·2차전지·조선·AI전력·원자력 |
-| 수급 구성종목 명부 | 1군 = KRX 섹터지수 구성종목 / 2군 = ETF PDF | 공식 공시 명부 — 자의적 선별 없음 |
+| 가격 (3군 4개 해외) | KODEX 해외 ETF 종가 | 미국반도체·미국AI전력·미국AI테크·미국우주항공 |
+| 수급 구성종목 명부 | 1군 = KRX 섹터지수 구성종목 / 2·3군 = ETF PDF | 공식 공시 명부 — 자의적 선별 없음 |
 | 투자자별 순매수 | KRX 정보데이터시스템 (투자자별 거래실적) | 주 1회 로컬 배치 수집 |
-| 벤치마크 | KRX 300 | 코스닥 쏠림 왜곡 방지 |
+| 벤치마크 | 국내 KRX 300 / 해외 KODEX 미국S&P500 | 코스닥 쏠림 왜곡 방지 · 해외는 달러 기준 시장과 비교 |
 
 ##### 알아둘 점
 
