@@ -35,6 +35,16 @@ def _reul(word: str) -> str:
     return "를"
 
 
+def _ida(word: str) -> str:
+    """(이)다 — 받침 있으면 '이다'. regime 값이 바뀌어도 어미가 어긋나지 않게."""
+    if not word:
+        return "다"
+    c = ord(word[-1])
+    if 0xAC00 <= c <= 0xD7A3:
+        return "이다" if (c - 0xAC00) % 28 else "다"
+    return "다"
+
+
 def _eun(word: str) -> str:
     """은/는 조사만 반환. 테마명이 매주 바뀌어 고정하면 어긋난다."""
     if not word:
@@ -231,50 +241,71 @@ def render_report(ctx: dict) -> str:
     # 02 경쟁
     rows_camp = "".join(
         f'<tr><td>{_esc(c["표기명"])}</td><td>{_esc(c["채널"])}</td><td class="num">{_esc(c["주차"])}</td></tr>'
-        for c in ctx["campaigns"][:4]) or '<tr><td colspan="3">감지된 캠페인 없음</td></tr>'
+        # 상한을 두지 않는다 — 집행 건수가 04 DiD 표와 맞아야 한다
+        for c in ctx["campaigns"]) or '<tr><td colspan="3">감지된 이벤트 없음</td></tr>'
 
-    # 03 자금
+    # 03 브랜드 발행량 — '경쟁 환경'이라 이름 붙여놓고 KODEX 표만 있었다
+    rows_brand = "".join(
+        f'<tr><td>{_esc(b)}</td><td class="num">{n}</td></tr>'
+        for b, n in (ctx.get("brand_act") or [])[:8]
+    ) or '<tr><td colspan="2">데이터 없음</td></tr>'
+
+    # 02 자금
     rows_flow = "".join(
         f'<tr><td>{_esc(nm)}</td><td class="num up">{v:+.2f}%</td></tr>'
-        for nm, v in ctx["flow_top"][:4]) or '<tr><td colspan="2">데이터 없음</td></tr>'
+        for nm, v in ctx["flow_top"][:6]) or '<tr><td colspan="2">데이터 없음</td></tr>'
 
-    # 04 DiD
+    # 전체 상위만 실으면 KODEX 리포트에 경쟁사 상품만 뜬다. 'KODEX 것 중
+    # 어디로 갔나'를 먼저, '시장 전체에서 어디로 갔나'를 참고로 붙인다.
+    rows_flow_kodex = "".join(
+        f'<tr><td>{_esc(nm)}</td><td class="num up">{v:+.2f}%</td></tr>'
+        for nm, v in (ctx.get("flow_kodex") or [])[:5]
+    ) or '<tr><td colspan="2">데이터 없음</td></tr>'
+
+    # 04 DiD — 집행 중인 이벤트를 전부 싣는다. 대표 1건만 보여주면 '어떤 건
+    # 통하고 어떤 건 아닌지'가 빠져, 이 섹션이 답해야 할 질문에 답이 안 된다.
     did = ctx.get("did")
-    if did:
+    _all = ctx.get("did_all") or []
+    if _all:
+        _n_ok = sum(1 for r in _all if r.get("did") is not None)
+        _tr = "".join(
+            f'<tr><td>{_esc(r["name"])}</td>'
+            + (f'<td class="num">{r.get("n_run", 0)}주</td>'
+               f'<td class="num">{r["did"]:+.2f}%p</td>'
+               f'<td class="num">{r["score"]:.0f}점</td>'
+               f'<td>{_esc(r["verdict"])}</td>'
+               if r.get("did") is not None else
+               f'<td class="num">—</td><td class="num">—</td><td class="num">—</td>'
+               f'<td>{_esc(r.get("reason") or "측정 불가")}</td>')
+            + '</tr>' for r in _all)
         did_html = (
-            f'<p>캠페인이 순매수를 실제로 움직였는지는 <b>DiD(이중차분)</b>로 시장 공통 효과를 제거하고 본다. '
-            f'이번 주 측정 가능한 사례는 <b>{_esc(did["name"])}</b>({_esc(did["channel"])}, {_esc(did["week"])})이다. '
-            f'이벤트 이전 이력이 없거나(상장과 이벤트가 같은 주), 구성종목이 충분히 '
-            f'비슷한 경쟁 ETF가 없으면 측정하지 않는다.</p>'
-            f'<div class="did">'
-            f'<div class="did-step"><div class="k">Step 1 · 처치</div><div class="t">Δ처치</div>'
-            f'<div class="v down">{did["dt"]:+.2f}%p</div></div>'
-            f'<div class="did-step"><div class="k">Step 2 · 대조군</div><div class="t">Δ대조군 평균</div>'
-            f'<div class="v down">{did["dc"]:+.2f}%p</div></div>'
-            f'<div class="did-step" style="border-color:var(--brand)"><div class="k">Step 3 · 순효과</div>'
-            f'<div class="t">DiD</div><div class="v down">{did["did"]:+.2f}%p</div></div></div>'
-            f'<p class="rz">이 ETF의 평소 DiD 변동폭(±{did["base_std"]:.2f}%p)과 견주면 '
-            f'<b>{did["score"]:.0f}점 / 100 · {_esc(did["verdict"])}</b>. '
-            f'DiD가 양수면 같은 기간 경쟁 ETF보다 자금을 더 받았다는 뜻이고, '
-            f'점수 38~62는 평소 범위라 효과로 보기 어렵다.</p>')
-        # 대표 1건만 실으면 '어떤 건 통하고 어떤 건 아닌지'가 빠진다 — 전 건을 표로 잇는다
-        _rest = [r for r in (ctx.get("did_all") or []) if r is not did]
-        if _rest:
-            _tr = "".join(
-                f'<tr><td>{_esc(r["name"])}</td><td>{_esc(r["week"])}</td>'
-                + (f'<td class="num">{r["did"]:+.2f}%p</td>'
-                   f'<td class="num">{r["score"]:.0f}점</td>'
-                   f'<td>{_esc(r["verdict"])}</td>'
-                   if r["did"] is not None else
-                   f'<td class="num">—</td><td class="num">—</td>'
-                   f'<td>{_esc(r["reason"])}</td>')
-                + '</tr>' for r in _rest)
+            f'<p>이벤트가 자금을 실제로 움직였는지는 <b>DiD(이중차분)</b>로 시장 공통 효과를 '
+            f'제거하고 본다. 집행 <b>{len(_all)}건</b> 중 <b>{_n_ok}건</b>을 측정했다. '
+            f'한 주 값은 크게 출렁여 <b>집행 기간 평균</b>으로 판정하며, 이벤트 이전 이력이 '
+            f'없거나(상장과 이벤트가 같은 주) 구성종목이 충분히 비슷한 경쟁 ETF가 없으면 '
+            f'측정하지 않는다.</p>'
+            '<table class="mini"><thead><tr><th>ETF</th><th class="num">집행</th>'
+            '<th class="num">평균 DiD</th><th class="num">점수</th><th>판정</th>'
+            '</tr></thead><tbody>' + _tr + '</tbody></table>')
+        if did:
             did_html += (
-                '<table class="mini"><thead><tr><th>ETF</th><th>집행</th>'
-                '<th class="num">DiD</th><th class="num">점수</th><th>판정</th>'
-                '</tr></thead><tbody>' + _tr + '</tbody></table>')
+                f'<p class="rz" style="margin-top:10px;">계산 과정 — <b>{_esc(did["name"])}</b> '
+                f'({_esc(did.get("week", ""))} 기준)</p>'
+                f'<div class="did">'
+                f'<div class="did-step"><div class="k">Step 1 · 처치군</div>'
+                f'<div class="t">{_esc(did["name"])}</div>'
+                f'<div class="v down">{did["dt"]:+.2f}%p</div></div>'
+                f'<div class="did-step"><div class="k">Step 2 · 대조군</div>'
+                f'<div class="t">경쟁 ETF {did.get("n_ctrl", 0)}종</div>'
+                f'<div class="v down">{did["dc"]:+.2f}%p</div></div>'
+                f'<div class="did-step" style="border-color:var(--brand)">'
+                f'<div class="k">Step 3 · 순효과</div>'
+                f'<div class="t">DiD</div><div class="v down">{did["did"]:+.2f}%p</div></div></div>'
+                f'<p class="rz">DiD가 양수면 같은 기간 경쟁 ETF보다 자금이 더 들어왔다는 뜻이다. '
+                f'점수는 그 값이 이 ETF의 평소보다 높은지 낮은지를 0~100으로 옮긴 값으로, '
+                f'50점이 보통이고 73점보다 높아야 이벤트 효과가 있었다고 볼 만하다.</p>')
     else:
-        did_html = ('<p>이번 주 측정 가능한 캠페인이 없다 — 이벤트 이전 이력이 부족하거나, '
+        did_html = ('<p>이번 주 측정 가능한 이벤트가 없다 — 이벤트 이전 이력이 부족하거나, '
                     '구성종목이 충분히 비슷한 경쟁 ETF가 없어 비교가 성립하지 않는다.</p>')
 
     # 05-A 현재 마케팅 점검
@@ -388,26 +419,33 @@ def render_report(ctx: dict) -> str:
 
   <div class="sec"><div class="sec-h"><span class="sec-no">01</span><span class="sec-t">시장 국면</span>
     <span class="sec-tag">Signal Board · KRX</span></div>
-    <p>상대강도 기준 시장의 무게중심은 {_esc(ctx['regime'])}다. 태동 국면은
-      <b>{_esc(ctx['emerging_names'] or '없음')}</b>, 확산 국면은 <b>{_esc(ctx['expanding_names'] or '없음')}</b>이다.</p>
+    <p>섹터별 상대강도로 보면 이번 주는 <b>{_esc(ctx['regime'])}</b>{_ida(ctx['regime'])}.
+      태동 국면은 <b>{_esc(ctx['emerging_names'] or '없음')}</b>, 확산 국면은
+      <b>{_esc(ctx['expanding_names'] or '없음')}</b>이다.</p>
     <table><thead><tr><th>상위</th><th class="num">주간</th><th>하위</th><th class="num">주간</th></tr></thead>
       <tbody>{rows_mkt}</tbody></table>
   </div>
 
-  <div class="sec"><div class="sec-h"><span class="sec-no">02</span><span class="sec-t">경쟁 환경</span>
-    <span class="sec-tag">Channels · Live</span></div>
-    <p>이번 주 KODEX가 집행한 캠페인과 경쟁 브랜드의 콘텐츠 발행량이다.
-      발행량 1위는 <b>{_esc(ctx['top_brand'][0])}</b>({ctx['top_brand'][1]}건)였다.</p>
-    <table><thead><tr><th>KODEX 감지 캠페인</th><th>채널</th><th class="num">주차</th></tr></thead>
-      <tbody>{rows_camp}</tbody></table>
+  <div class="sec"><div class="sec-h"><span class="sec-no">02</span><span class="sec-t">자금 흐름</span>
+    <span class="sec-tag">순유입 · KRX</span></div>
+    <p>마케팅 반응은 <b>순유입</b>으로 읽는다 — 상장좌수 증감 × NAV, 즉 설정·환매로
+      실제 들어오고 나간 돈이다. 장내 순매수는 손바뀜이라 ETF 규모가 늘었다는 뜻이
+      아니므로 쓰지 않는다. 유입강도 = 주간 순유입 ÷ 전주 순자산 × 100.</p>
+    <table><thead><tr><th>KODEX 유입강도 상위</th><th class="num">강도</th></tr></thead>
+      <tbody>{rows_flow_kodex}</tbody></table>
+    <table style="margin-top:10px;"><thead><tr><th>전체 ETF 유입강도 상위</th>
+      <th class="num">강도</th></tr></thead>
+      <tbody>{rows_flow}</tbody></table>
   </div>
 
-  <div class="sec"><div class="sec-h"><span class="sec-no">03</span><span class="sec-t">자금 흐름</span>
-    <span class="sec-tag">개인 순매수 · KRX</span></div>
-    <p>마케팅 반응은 <b>개인 순매수</b>로 읽는다(기관·LP의 설정·환매는 제외).
-      매수강도 = 개인 주간 순매수 ÷ 순자산 × 100.</p>
-    <table><thead><tr><th>순매수 강도 상위</th><th class="num">강도</th></tr></thead>
-      <tbody>{rows_flow}</tbody></table>
+  <div class="sec"><div class="sec-h"><span class="sec-no">03</span><span class="sec-t">마케팅 집행 · 경쟁 발행량</span>
+    <span class="sec-tag">Channels · Live</span></div>
+    <p>이번 주 KODEX가 집행한 이벤트와 8개 브랜드의 콘텐츠 발행량이다.
+      발행량 1위는 <b>{_esc(ctx['top_brand'][0])}</b>({ctx['top_brand'][1]}건)였다.</p>
+    <table><thead><tr><th>KODEX 집행 이벤트</th><th>채널</th><th class="num">집행 주차</th></tr></thead>
+      <tbody>{rows_camp}</tbody></table>
+    <table class="mini" style="margin-top:12px;"><thead><tr><th>브랜드 발행량 (최근 7일)</th>
+      <th class="num">건</th></tr></thead><tbody>{rows_brand}</tbody></table>
   </div>
 
   <div class="sec"><div class="sec-h"><span class="sec-no">04</span><span class="sec-t">마케팅 효과 — DiD</span>

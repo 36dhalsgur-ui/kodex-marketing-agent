@@ -2525,11 +2525,16 @@ with tab_report:
          for b in D.ISSUERS), key=lambda x: -x[1])
 
     # 자금 상위
-    flow_top = []
+    flow_top, flow_kodex = [], []
     if netbuy_live:
         _w = netbuy_df[netbuy_df["주차"] == report_week].dropna(subset=["매수강도"])
         _w = _w[_w["매수강도"] < 40]                      # 신규상장 왜곡 제외
-        flow_top = [(r["종목명"], r["매수강도"]) for _, r in _w.nlargest(4, "매수강도").iterrows()]
+        flow_top = [(r["종목명"], r["매수강도"]) for _, r in _w.nlargest(6, "매수강도").iterrows()]
+        # 전체 상위만 실으면 KODEX 리포트에 경쟁사 상품만 뜬다(실측: 상위 4종이 전부
+        # TIGER·RISE·ACE). '시장에서 어디로 갔나'와 '우리 것 중 어디로 갔나'를 함께 본다.
+        _wk_kodex = _w[_w["운용사"] == "KODEX"] if "운용사" in _w.columns else _w.iloc[0:0]
+        flow_kodex = [(r["종목명"], r["매수강도"])
+                      for _, r in _wk_kodex.nlargest(5, "매수강도").iterrows()]
 
     # ③이 잰 이벤트를 전부 싣는다. 대표 1건만 보여주면 '이번 주 마케팅이 통했나'에
     # 답이 안 된다 — 어떤 건 통하고 어떤 건 아닌 게 이 섹션의 핵심 정보다.
@@ -2696,7 +2701,9 @@ with tab_report:
         "bench_ret": _sb_all.get("벤치주간수익률"),
         "top_up": top_up, "top_dn": top_dn,
         "campaigns": rep_campaigns, "top_brand": brand_act[0] if brand_act else ("—", 0),
-        "flow_top": flow_top, "did": did_ctx, "did_all": did_all,
+        "brand_act": brand_act,
+        "flow_top": flow_top, "flow_kodex": flow_kodex,
+        "did": did_ctx, "did_all": did_all,
         "review": review, "review_read": review_read,
         "emerging": emerging, "emerging_names": emerging_names, "expanding_names": expanding_names,
         "gap": gap_ctx, "gaps_all": gaps_all, "gap_details": gap_details,
