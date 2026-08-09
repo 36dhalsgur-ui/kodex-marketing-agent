@@ -149,11 +149,6 @@ td{padding:6px 8px; border-bottom:1px solid var(--line);}
 td.num{text-align:right;} .up{color:var(--up); font-weight:700;} .down{color:var(--down); font-weight:700;}
 .co-tag{display:inline-block; font-size:10px; font-weight:700; color:var(--navy);
   background:var(--brand-soft); border-radius:3px; padding:1px 6px; margin-right:6px;}
-.did{display:flex; gap:8px; margin:8px 0 10px; flex-wrap:wrap;}
-.did-step{flex:1; min-width:150px; border:1px solid var(--line); border-radius:7px; padding:11px 13px;}
-.did-step .k{font-size:10px; color:var(--faint); font-weight:700; text-transform:uppercase;}
-.did-step .t{font-size:12px; font-weight:700; margin:2px 0 4px;}
-.did-step .v{font-size:20px; font-weight:800;}
 .blk-label{display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; margin:4px 0 9px;}
 .blk-label i{font-style:normal; display:inline-flex; align-items:center; justify-content:center;
   width:19px; height:19px; border-radius:4px; font-size:10.5px; font-weight:800; color:#fff;}
@@ -210,7 +205,7 @@ p.note{font-size:8.5pt;color:#8A93A6;margin:6px 0 0;line-height:1.5}
   body{background:#fff;}
   .rpt{box-shadow:none; margin:0; max-width:none; padding:0 12mm 12mm;}
   .brandbar{margin:0 -12mm 8mm;}
-  .sec{break-inside:avoid;} .proposal,.emerge,.did{break-inside:avoid;}
+  .sec{break-inside:avoid;} .proposal,.emerge{break-inside:avoid;}
   @page{size:A4; margin:12mm;}
 }
 """
@@ -264,19 +259,22 @@ def render_report(ctx: dict) -> str:
 
     # 04 DiD — 집행 중인 이벤트를 전부 싣는다. 대표 1건만 보여주면 '어떤 건
     # 통하고 어떤 건 아닌지'가 빠져, 이 섹션이 답해야 할 질문에 답이 안 된다.
-    did = ctx.get("did")
     _all = ctx.get("did_all") or []
     if _all:
         _n_ok = sum(1 for r in _all if r.get("did") is not None)
+        # 대표 1건의 계산 과정을 따로 빼면 그 한 건만 부각된다. Δ처치·Δ대조군을
+        # 표의 열로 올려, 5건 모두 같은 층위에서 계산 과정까지 보이게 한다.
         _tr = "".join(
             f'<tr><td>{_esc(r["name"])}</td>'
             + (f'<td class="num">{r.get("n_run", 0)}주</td>'
-               f'<td class="num">{r["did"]:+.2f}%p</td>'
+               f'<td class="num">{r["dt"]:+.2f}</td>'
+               f'<td class="num">{r["dc"]:+.2f}</td>'
+               f'<td class="num"><b>{r["did"]:+.2f}</b></td>'
                f'<td class="num">{r["score"]:.0f}점</td>'
                f'<td>{_esc(r["verdict"])}</td>'
                if r.get("did") is not None else
-               f'<td class="num">—</td><td class="num">—</td><td class="num">—</td>'
-               f'<td>{_esc(r.get("reason") or "측정 불가")}</td>')
+               f'<td class="num">—</td>'
+               f'<td colspan="5">{_esc(r.get("reason") or "측정 불가")}</td>')
             + '</tr>' for r in _all)
         did_html = (
             f'<p>이벤트가 자금을 실제로 움직였는지는 <b>DiD(이중차분)</b>로 시장 공통 효과를 '
@@ -285,25 +283,14 @@ def render_report(ctx: dict) -> str:
             f'없거나(상장과 이벤트가 같은 주) 구성종목이 충분히 비슷한 경쟁 ETF가 없으면 '
             f'측정하지 않는다.</p>'
             '<table class="mini"><thead><tr><th>ETF</th><th class="num">집행</th>'
-            '<th class="num">평균 DiD</th><th class="num">점수</th><th>판정</th>'
-            '</tr></thead><tbody>' + _tr + '</tbody></table>')
-        if did:
-            did_html += (
-                f'<p class="rz" style="margin-top:10px;">계산 과정 — <b>{_esc(did["name"])}</b> '
-                f'({_esc(did.get("week", ""))} 기준)</p>'
-                f'<div class="did">'
-                f'<div class="did-step"><div class="k">Step 1 · 처치군</div>'
-                f'<div class="t">{_esc(did["name"])}</div>'
-                f'<div class="v down">{did["dt"]:+.2f}%p</div></div>'
-                f'<div class="did-step"><div class="k">Step 2 · 대조군</div>'
-                f'<div class="t">경쟁 ETF {did.get("n_ctrl", 0)}종</div>'
-                f'<div class="v down">{did["dc"]:+.2f}%p</div></div>'
-                f'<div class="did-step" style="border-color:var(--brand)">'
-                f'<div class="k">Step 3 · 순효과</div>'
-                f'<div class="t">DiD</div><div class="v down">{did["did"]:+.2f}%p</div></div></div>'
-                f'<p class="rz">DiD가 양수면 같은 기간 경쟁 ETF보다 자금이 더 들어왔다는 뜻이다. '
-                f'점수는 그 값이 이 ETF의 평소보다 높은지 낮은지를 0~100으로 옮긴 값으로, '
-                f'50점이 보통이고 73점보다 높아야 이벤트 효과가 있었다고 볼 만하다.</p>')
+            '<th class="num">Δ처치</th><th class="num">Δ대조군</th>'
+            '<th class="num">DiD</th><th class="num">점수</th><th>판정</th>'
+            '</tr></thead><tbody>' + _tr + '</tbody></table>'
+            '<p class="rz" style="margin-top:8px;">Δ는 집행 전 8주 평균 대비 유입강도 '
+            '변화(%p)다. <b>DiD = Δ처치 − Δ대조군</b>이며, 양수면 같은 기간 경쟁 ETF보다 '
+            '자금이 더 들어왔다는 뜻이다. 점수는 그 값이 해당 ETF의 평소보다 높은지 낮은지를 '
+            '0~100으로 옮긴 값으로, 50점이 보통이고 73점보다 높아야 이벤트 효과가 있었다고 '
+            '볼 만하다.</p>')
     else:
         did_html = ('<p>이번 주 측정 가능한 이벤트가 없다 — 이벤트 이전 이력이 부족하거나, '
                     '구성종목이 충분히 비슷한 경쟁 ETF가 없어 비교가 성립하지 않는다.</p>')

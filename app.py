@@ -2578,9 +2578,6 @@ with tab_report:
         else:
             _row["reason"] = _sx.get("fallback") or "측정 불가"
         did_all.append(_row)
-    # PDF는 대표 1건 형식을 그대로 쓰므로 첫 측정 가능 건을 남긴다
-    did_ctx = next((r for r in did_all if r["did"] is not None), None)
-
     # 홈과 같은 판정을 쓴다 (탭 상단에서 한 번 계산)
     _n_em = len(EMERGING_JUDGED)
     emerging_all, _em_dropped = EMERGING_GO, EMERGING_DROPPED
@@ -2703,7 +2700,7 @@ with tab_report:
         "campaigns": rep_campaigns, "top_brand": brand_act[0] if brand_act else ("—", 0),
         "brand_act": brand_act,
         "flow_top": flow_top, "flow_kodex": flow_kodex,
-        "did": did_ctx, "did_all": did_all,
+        "did_all": did_all,
         "review": review, "review_read": review_read,
         "emerging": emerging, "emerging_names": emerging_names, "expanding_names": expanding_names,
         "gap": gap_ctx, "gaps_all": gaps_all, "gap_details": gap_details,
