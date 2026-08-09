@@ -1499,10 +1499,11 @@ def emerging_launch_review(board: list[dict], is_marketed, aum_of=None) -> list[
 
 # 신규 출시 판정 기준 — 공백이라고 다 채울 일이 아니다. 출시 후 모을 수 있어야 한다.
 GAP_MARKET_VIABLE = 3000.0   # 테마 시장 규모(경쟁사 순자산 합, 억). 이 미만이면 수요 자체가 작다
-# 태동기는 시장이 작은 게 당연하다 — 이제 열리는 중이니까. 같은 문턱을 대면
-# '아직 안 큰 시장'이 전부 보류로 떨어져, 정작 선점할 자리가 화면에서 사라진다
-# (실측 2026-08-09: 글로벌 방산 2,914억·글로벌 원자력 2,682억이 태동기인데 보류).
-GAP_MARKET_EMERGING = 1500.0
+# ※ 국면별로 문턱을 달리 두지 않는다. 태동기는 RS 사이클의 위치(관심이 빠졌다가
+#   다시 붙기 시작한 구간)이지 시장이 작다는 뜻이 아니다 — 실측 2026-08-09에도
+#   태동기에 방산 31,797억이 있고 쇠퇴기에 반도체 454,086억이 있다.
+#   '시장에 돈이 모였는가'와 '지금 관심이 오르는가'는 서로 다른 질문이라
+#   각각의 기준으로 따로 본다.
 GAP_MARKET_LARGE = 10000.0   # 1조 이상이면 후발이어도 파이가 크다
 GAP_DOMINANCE = 0.60         # 1위가 시장의 이 비율을 넘으면 이미 굳어진 판
 
@@ -1536,8 +1537,7 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
 
         n_rivals = g["경쟁사수"]
         emerging = stage == "태동기"
-        # 태동기는 시장 문턱을 낮춘다 — 이제 열리는 시장이라 작은 게 정상이다
-        viable = GAP_MARKET_EMERGING if emerging else GAP_MARKET_VIABLE
+        viable = GAP_MARKET_VIABLE
         if not sizes:
             row.update(판정="확인 필요", 우선순위=3,
                        근거="경쟁사 순자산을 확인하지 못했다 — 시장 규모 미상")
@@ -1584,9 +1584,9 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
                             + f"경쟁 {len(sizes)}종이 나눠 가진 1위도 {share:.0%}라 "
                               f"독점 구도가 아닙니다")
         out.append(row)
-    # 같은 판정 안에서는 태동기를 앞세운다. 규모만으로 줄 세우면 태동기가 늘
-    # 뒤로 밀린다 — 이제 열리는 시장이라 작은 게 당연한데, 그 작다는 사실이
-    # 곧 페널티가 된다(실측: 글로벌 방산·원자력이 태동기인데도 4·5위).
+    # 같은 판정 안에서는 태동기를 앞세운다. 관심이 다시 붙기 시작한 구간이라
+    # 지수 산출·상장 승인에 걸리는 몇 달 뒤가 수요가 오르는 시점과 겹친다.
+    # 규모는 앞선 판정에서 이미 걸렀으므로 여기서는 시점만 본다.
     out.sort(key=lambda x: (x["우선순위"], 0 if x["국면"] == "태동기" else 1,
                             -(x["시장규모억"] or 0)))
     return out

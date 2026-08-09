@@ -305,7 +305,7 @@ def render_report(ctx: dict) -> str:
     em_html = ""
     if em:
         em_html = (
-            f'<div class="blk-label"><i class="blk-b">B</i> 마케팅 태동기 착수 — 아직 안 밀고 있는 상승 초입 섹터</div>'
+            f'<div class="blk-label"><i class="blk-b">B</i> 태동기 섹터 마케팅 착수 — 아직 안 밀고 있는 상승 초입 섹터</div>'
             f'<div class="emerge"><div class="em-main">'
             f'<div class="em-sec">{_esc(em["섹터"])}<span class="em-badge">{_esc(em.get("배지", "태동기"))}</span></div>'
             f'<div class="em-body">태동 국면 진입. <b>{_esc(em["kodex"])}</b> 보유 상품이 있으나 현재 마케팅 미집행 — '
