@@ -1389,7 +1389,9 @@ def detect_marketing_events(banners: list[dict], videos: list[dict], posts: list
 # 실행 대상으로 올릴 판정 — 나머지는 화면에서 뺀다.
 # 판정 결과를 전부 늘어놓으면 선별한 의미가 없고 읽는 사람이 다시 골라야 한다.
 EMERGING_ACTIONABLE = ("착수", "선점 검토")
-GAP_ACTIONABLE = ("출시 검토", "선점 기회", "시점 대기", "차별화 필요")
+# '시점 대기'는 뺐다 — 과열·쇠퇴 국면에 출시 준비를 시작하면 리드타임을 거쳐
+# 상장할 즈음엔 국면이 더 내려가 있다. 후보로 올리지 않고 제외 목록에 남긴다.
+GAP_ACTIONABLE = ("출시 검토", "선점 기회", "차별화 필요")
 
 
 def split_actionable(rows: list[dict], actionable: tuple[str, ...]) -> tuple[list[dict], str]:
@@ -1497,6 +1499,10 @@ def emerging_launch_review(board: list[dict], is_marketed, aum_of=None) -> list[
 
 # 신규 출시 판정 기준 — 공백이라고 다 채울 일이 아니다. 출시 후 모을 수 있어야 한다.
 GAP_MARKET_VIABLE = 3000.0   # 테마 시장 규모(경쟁사 순자산 합, 억). 이 미만이면 수요 자체가 작다
+# 태동기는 시장이 작은 게 당연하다 — 이제 열리는 중이니까. 같은 문턱을 대면
+# '아직 안 큰 시장'이 전부 보류로 떨어져, 정작 선점할 자리가 화면에서 사라진다
+# (실측 2026-08-09: 글로벌 방산 2,914억·글로벌 원자력 2,682억이 태동기인데 보류).
+GAP_MARKET_EMERGING = 1500.0
 GAP_MARKET_LARGE = 10000.0   # 1조 이상이면 후발이어도 파이가 크다
 GAP_DOMINANCE = 0.60         # 1위가 시장의 이 비율을 넘으면 이미 굳어진 판
 
@@ -1529,26 +1535,37 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
                "점유율": share, "확인종수": len(sizes)}
 
         n_rivals = g["경쟁사수"]
+        emerging = stage == "태동기"
+        # 태동기는 시장 문턱을 낮춘다 — 이제 열리는 시장이라 작은 게 정상이다
+        viable = GAP_MARKET_EMERGING if emerging else GAP_MARKET_VIABLE
         if not sizes:
             row.update(판정="확인 필요", 우선순위=3,
                        근거="경쟁사 순자산을 확인하지 못했다 — 시장 규모 미상")
+        elif stage in ("과열기", "쇠퇴기"):
+            # 국면을 규모·점유율보다 먼저 본다. 출시는 리드타임이 길어, 지금
+            # 준비를 시작하면 상장 즈음엔 국면이 더 내려가 있다. 규모가 크다는
+            # 이유로 후보에 올리면 '늦은 시장에 더 늦게 들어가라'는 제안이 된다.
+            row.update(판정="국면 부적합", 우선순위=4,
+                       근거=f"시장은 {total:,.0f}억이나 국면이 {stage}입니다. "
+                            f"출시 리드타임을 감안하면 지금 준비를 시작해도 늦습니다")
         elif n_rivals <= 2 and (share is None or share < GAP_DOMINANCE):
             # 선발이 1~2곳 — 경쟁사 수가 적어 시장 규모만으로는 판단할 수 없다.
             # 아직 아무도 못 키운 것인지, 이제 열리는 시장인지가 갈린다.
             # ※ 점유율 조건을 함께 본다. 예전에는 경쟁 2종 이하면 점유율을 아예
             #   보지 않아, 1위가 92%를 쥔 판을 '경쟁이 굳기 전'이라고 말했다
             #   (실측 2026-08-08 글로벌연금·자산배분: RISE 92% 독점).
-            if total >= GAP_MARKET_VIABLE:
+            if total >= viable:
                 row.update(판정="선점 기회", 우선순위=0,
-                           근거=f"경쟁 {n_rivals}종뿐이고 1위도 {share:.0%}라 "
-                                f"아직 자리가 열려 있습니다"
-                                if share is not None else
-                                f"경쟁 {n_rivals}종뿐이라 아직 자리가 열려 있습니다")
+                           근거=(f"국면이 태동기이고 " if emerging else "")
+                                + (f"경쟁 {n_rivals}종뿐이고 1위도 {share:.0%}라 "
+                                   f"아직 자리가 열려 있습니다"
+                                   if share is not None else
+                                   f"경쟁 {n_rivals}종뿐이라 아직 자리가 열려 있습니다"))
             else:
                 row.update(판정="시장 미검증", 우선순위=3,
                            근거=f"경쟁 {n_rivals}종이 {total:,.0f}억에 그칩니다. 수요가 없는 "
                                 f"것인지 아직 안 열린 것인지 확인이 필요합니다")
-        elif total < GAP_MARKET_VIABLE:
+        elif total < viable:
             row.update(판정="보류", 우선순위=3,
                        근거=f"경쟁 {len(sizes)}종이 다 합쳐 {total:,.0f}억에 그칩니다. "
                             f"만들어도 모일 시장이 아닙니다")
@@ -1557,22 +1574,21 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
                        근거=f"경쟁 {len(sizes)}종 중 {top[0]}가 {share:.0%}를 쥔 "
                             f"{'사실상 독점이라' if share >= 0.8 else '독식 구도라'} "
                             f"같은 구성으로는 후발 진입이 어렵습니다")
-        elif stage in ("과열기", "쇠퇴기"):
-            # 같은 '시점 대기'라도 경쟁이 몇 종인지에 따라 준비 방향이 다르다.
-            # 10종이 붙은 판과 3종뿐인 판을 같은 문장으로 적으면 복붙이 된다.
-            _crowd = (f"이미 {len(sizes)}종이 붙어 있어 운용 방식으로 갈라서야 합니다"
-                      if len(sizes) >= 6 else
-                      f"경쟁 {len(sizes)}종으로 아직 자리가 있습니다")
-            row.update(판정="시점 대기", 우선순위=1,
-                       근거=f"규모는 되나 국면이 {stage}입니다. {_crowd}. "
-                            f"리드타임만 감안해 소재를 준비하고 출시는 진정 후로 미룹니다")
         else:
             _sz = "1조 이상 대형 시장" if total >= GAP_MARKET_LARGE else f"시장 {total:,.0f}억"
-            row.update(판정="출시 검토", 우선순위=0,
-                       근거=f"{_sz}에 KODEX만 없고, 경쟁 {len(sizes)}종이 나눠 가진 "
-                            f"1위도 {share:.0%}라 독점 구도가 아닙니다")
+            _crowd = (f"이미 {len(sizes)}종이 붙어 있어 운용 방식으로 갈라서야 합니다. "
+                      if len(sizes) >= 6 else "")
+            row.update(판정="출시 검토", 우선순위=0 if emerging else 1,
+                       근거=(f"국면이 태동기이고 " if emerging else "")
+                            + f"{_sz}에 KODEX만 없습니다. {_crowd}"
+                            + f"경쟁 {len(sizes)}종이 나눠 가진 1위도 {share:.0%}라 "
+                              f"독점 구도가 아닙니다")
         out.append(row)
-    out.sort(key=lambda x: (x["우선순위"], -(x["시장규모억"] or 0)))
+    # 같은 판정 안에서는 태동기를 앞세운다. 규모만으로 줄 세우면 태동기가 늘
+    # 뒤로 밀린다 — 이제 열리는 시장이라 작은 게 당연한데, 그 작다는 사실이
+    # 곧 페널티가 된다(실측: 글로벌 방산·원자력이 태동기인데도 4·5위).
+    out.sort(key=lambda x: (x["우선순위"], 0 if x["국면"] == "태동기" else 1,
+                            -(x["시장규모억"] or 0)))
     return out
 
 

@@ -305,7 +305,7 @@ def render_report(ctx: dict) -> str:
     em_html = ""
     if em:
         em_html = (
-            f'<div class="blk-label"><i class="blk-b">B</i> 태동기 착수 — 아직 안 밀고 있는 상승 초입 섹터</div>'
+            f'<div class="blk-label"><i class="blk-b">B</i> 마케팅 태동기 착수 — 아직 안 밀고 있는 상승 초입 섹터</div>'
             f'<div class="emerge"><div class="em-main">'
             f'<div class="em-sec">{_esc(em["섹터"])}<span class="em-badge">{_esc(em.get("배지", "태동기"))}</span></div>'
             f'<div class="em-body">태동 국면 진입. <b>{_esc(em["kodex"])}</b> 보유 상품이 있으나 현재 마케팅 미집행 — '
@@ -336,7 +336,7 @@ def render_report(ctx: dict) -> str:
         chips = "".join(f"<span>{_esc(c)}</span>" for c in
                         ["추종 지수 존재 확인", "구성종목 선정", "분산요건 · 단일종목 상한", "환헤지 · 보수 구조"])
         gap_html = (f'<div class="blk-label" style="margin-top:20px;"><i class="blk-c">C</i> '
-                    f'신규 출시 후보 — 검토 대상 {len(_details)}건 상세</div>')
+                    f'신규 ETF 출시 후보 — 검토 대상 {len(_details)}건 상세</div>')
         for gp in _details:
             _mk = f'{gp["시장규모억"]:,.0f}억' if gp.get("시장규모억") else "—"
             _lead = (f'{gp["1위"]} {gp["점유율"]:.0%}'
