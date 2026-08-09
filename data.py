@@ -1504,6 +1504,11 @@ GAP_MARKET_VIABLE = 3000.0   # 테마 시장 규모(경쟁사 순자산 합, 억
 #   태동기에 방산 31,797억이 있고 쇠퇴기에 반도체 454,086억이 있다.
 #   '시장에 돈이 모였는가'와 '지금 관심이 오르는가'는 서로 다른 질문이라
 #   각각의 기준으로 따로 본다.
+# 문턱의 80~100% 구간은 '규모 경계'로 따로 남긴다. 후발이 가져가는 몫은 시장의
+# 약 20%로 규모와 무관하게 일정한데(실측 경쟁 3종 이상 49개 테마: 2위 평균 16~27%),
+# 3,000억이면 후발 몫 600억 — 전체 ETF 순자산 중앙값 598억과 거의 같다. 그래서
+# 2,914억(후발 몫 583억)이 86억 차이로 화면에서 통째로 사라지는 건 과하다.
+GAP_MARKET_NEAR = 0.80
 GAP_MARKET_LARGE = 10000.0   # 1조 이상이면 후발이어도 파이가 크다
 GAP_DOMINANCE = 0.60         # 1위가 시장의 이 비율을 넘으면 이미 굳어진 판
 
@@ -1566,9 +1571,13 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
                            근거=f"경쟁 {n_rivals}종이 {total:,.0f}억에 그칩니다. 수요가 없는 "
                                 f"것인지 아직 안 열린 것인지 확인이 필요합니다")
         elif total < viable:
-            row.update(판정="보류", 우선순위=3,
-                       근거=f"경쟁 {len(sizes)}종이 다 합쳐 {total:,.0f}억에 그칩니다. "
-                            f"만들어도 모일 시장이 아닙니다")
+            _near = total >= viable * GAP_MARKET_NEAR
+            row.update(판정="규모 경계" if _near else "보류", 우선순위=3 if _near else 4,
+                       근거=(f"시장 {total:,.0f}억으로 문턱 {viable:,.0f}억에 조금 못 "
+                             f"미칩니다. 후발 몫은 대략 {total * 0.2:,.0f}억 수준입니다"
+                             if _near else
+                             f"경쟁 {len(sizes)}종이 다 합쳐 {total:,.0f}억에 그칩니다. "
+                             f"만들어도 모일 시장이 아닙니다"))
         elif share is not None and share >= GAP_DOMINANCE:
             row.update(판정="차별화 필요", 우선순위=2,
                        근거=f"경쟁 {len(sizes)}종 중 {top[0]}가 {share:.0%}를 쥔 "

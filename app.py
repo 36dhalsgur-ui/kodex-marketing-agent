@@ -2912,10 +2912,19 @@ with tab_report:
                 with st.expander(f"더보기 {len(_rest)}건"):
                     for d in _rest:
                         st.markdown(_gap_card(d), unsafe_allow_html=True)
+            # 문턱에 조금 못 미친 건은 이름과 규모까지 한 줄로 남긴다 — 86억 차이로
+            # 통째로 사라지면 담당자가 다시 볼 기회 자체가 없어진다.
+            _near = sorted((j for j in _gap_judged if j.get("판정") == "규모 경계"),
+                           key=lambda j: -(j.get("시장규모억") or 0))
             st.markdown(
                 f'<div style="font-size:0.72rem;color:{FAINT};margin-top:6px;">'
-                + (f'제외 {_n_gap - len(gap_details)}건 — {_gap_dropped} · '
+                + (f'제외 {_n_gap - len(gap_details)}건 — {_gap_dropped}<br>'
                    if _gap_dropped else "")
+                + (f'규모 경계 {len(_near)}건 — '
+                   + " · ".join(f'{j["시장"]} {j["테마"]} {(j["시장규모억"] or 0):,.0f}억'
+                                for j in _near[:4])
+                   + f' (문턱 {D.GAP_MARKET_VIABLE:,.0f}억)<br>'
+                   if _near else "")
                 + f'추종 지수 존재 여부와 구성종목은 담당자 검증이 필요합니다</div>',
                 unsafe_allow_html=True)
             with st.expander("출시 판정 기준"):
@@ -2927,8 +2936,13 @@ with tab_report:
                              "그 테마의 경쟁사 ETF 순자산을 모두 더한 값으로, 시장에 실제로 모인 "
                              f"돈입니다. 경쟁사 전체가 {D.GAP_MARKET_VIABLE:,.0f}억을 못 모았다면 "
                              "후발로 진입해 확보할 몫은 그보다 작아 상장·운용 고정비를 "
-                             "감당하기 어렵습니다. 국면과 무관하게 같은 기준을 씁니다 — "
-                             "규모와 국면은 서로 다른 질문입니다."),
+                             "감당하기 어렵습니다. 후발이 실제로 가져간 몫은 시장의 약 20%로 "
+                             "규모와 무관하게 일정했고(경쟁 3종 이상 49개 테마 실측), 그러면 "
+                             f"{D.GAP_MARKET_VIABLE:,.0f}억은 후발 몫 600억 — 전체 ETF 순자산 "
+                             "중앙값(598억) 수준입니다. 국면과 무관하게 같은 기준을 씁니다.<br>"
+                             f"문턱의 {D.GAP_MARKET_NEAR:.0%}~100% 구간은 <b>규모 경계</b>로 "
+                             "따로 남깁니다 — 몇십억 차이로 화면에서 통째로 사라지면 다시 볼 "
+                             "기회가 없어집니다."),
                             (f"1위 점유율 {D.GAP_DOMINANCE:.0%} 미만",
                              "ETF는 거래량이 많을수록 호가 스프레드가 좁아지고, 그것이 다시 "
                              "거래량을 부릅니다. 선발이 과반을 넘긴 시장에서는 같은 지수를 "
