@@ -64,6 +64,42 @@ def _num(v) -> float | None:
     return f if f > 0 else None
 
 
+AUM_FIELD = "INVSTASST_NETASST_TOTAMT"
+
+
+def repair_aum(snaps: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    """순자산총액이 전 종목 0으로 내려온 주를 직전 거래일 값으로 메운다.
+
+    KRX가 특정 일자에 이 필드만 전 종목 0으로 내보내는 일이 있다
+    (실측 2026-08-07·08-14 금요일 각 1,163종 전부 0, 같은 주 목요일은 정상).
+    주간 배치는 금요일 종가를 쓰므로 그대로 맞아 순자산이 통째로 비었고,
+    유입강도(순유입 ÷ 전주 순자산)와 출시 판정이 함께 무너졌다.
+    """
+    for wk in sorted(snaps):
+        rows = snaps[wk]
+        if any(_num(r.get(AUM_FIELD)) for r in rows):
+            continue
+        base = date.fromisoformat(f"{wk[:4]}-{wk[4:6]}-{wk[6:]}")
+        for back in range(1, 6):
+            dd = (base - timedelta(days=back)).strftime("%Y%m%d")
+            try:
+                prev = fetch(ETF_SVC, dd)
+            except KrxApiError:
+                continue
+            aum = {r.get("ISU_CD"): r.get(AUM_FIELD) for r in prev
+                   if _num(r.get(AUM_FIELD))}
+            if not aum:
+                continue
+            for r in rows:
+                if r.get("ISU_CD") in aum:
+                    r[AUM_FIELD] = aum[r["ISU_CD"]]
+            print(f"  순자산 보정 {wk} ← {dd} ({len(aum)}종)")
+            break
+        else:
+            print(f"  순자산 보정 실패 {wk} — 직전 5거래일 모두 값 없음")
+    return snaps
+
+
 def week_label(dd: str) -> str:
     """YYYYMMDD → '7월 4주' (앱의 주차 라벨 규칙과 동일).
 
@@ -90,6 +126,7 @@ def main():
     if len(snaps) < 3:
         sys.exit(f"주간 스냅샷 {len(snaps)}주 — 분석 불가")
 
+    snaps = repair_aum(snaps)
     weeks_sorted = sorted(snaps)
     print(f"  스냅샷 {len(weeks_sorted)}주 · {weeks_sorted[0]} ~ {weeks_sorted[-1]}")
 
@@ -131,7 +168,13 @@ def main():
                 })
             prev_sh = sh
         last = series.get(weeks_sorted[-1]) or series[max(series)]
-        aum = _num(last.get("INVSTASST_NETASST_TOTAMT"))
+        # 보정 후에도 최신 주가 비어 있을 수 있다(신규 상장 등). 값이 있는
+        # 가장 최근 주까지 거슬러 올라간다 — None이면 판정이 통째로 막힌다.
+        aum = None
+        for wk in reversed(weeks_sorted):
+            r = series.get(wk)
+            if r is not None and (aum := _num(r.get(AUM_FIELD))):
+                break
         result.append({
             "종목명": nm, "티커": tk, "운용사": brand,
             "테마": theme, "기초시장": market,
