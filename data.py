@@ -1528,7 +1528,12 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
         theme, market = g["테마"], g["시장"]
         peers = gap_competitors(theme, market, limit=8)
         sizes = [(p, aum_of(p)) for p in peers]
-        sizes = [(p, v) for p, v in sizes if v is not None]
+        # NaN도 걸러야 한다. 순자산은 판다스에서 오므로 상장 전 구간 등에서 NaN이
+        # 섞이는데, NaN은 None이 아니라 필터를 통과한 뒤 total을 NaN으로 만든다.
+        # 그러면 total>0 도 total<viable 도 모두 False가 되어 아래 분기가 전부
+        # 뚫리고 share=None인 채 마지막 else로 떨어진다(실측: 배포본 TypeError).
+        sizes = [(p, float(v)) for p, v in sizes
+                 if v is not None and math.isfinite(float(v))]
         total = sum(v for _, v in sizes)
         top = max(sizes, key=lambda x: x[1]) if sizes else None
         share = (top[1] / total) if (top and total > 0) else None
@@ -1587,11 +1592,14 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
             _sz = "1조 이상 대형 시장" if total >= GAP_MARKET_LARGE else f"시장 {total:,.0f}억"
             _crowd = (f"이미 {len(sizes)}종이 붙어 있어 운용 방식으로 갈라서야 합니다. "
                       if len(sizes) >= 6 else "")
+            # 점유율은 위 분기를 모두 통과했다면 값이 있어야 하지만, 근거 문장이
+            # None 하나로 화면 전체를 죽이지는 않게 한다.
+            _lead = (f"경쟁 {len(sizes)}종이 나눠 가진 1위도 {share:.0%}라 독점 구도가 "
+                     f"아닙니다" if share is not None else
+                     f"경쟁 {len(sizes)}종이 나눠 갖고 있어 독점 구도가 아닙니다")
             row.update(판정="출시 검토", 우선순위=0 if emerging else 1,
                        근거=(f"국면이 태동기이고 " if emerging else "")
-                            + f"{_sz}에 KODEX만 없습니다. {_crowd}"
-                            + f"경쟁 {len(sizes)}종이 나눠 가진 1위도 {share:.0%}라 "
-                              f"독점 구도가 아닙니다")
+                            + f"{_sz}에 KODEX만 없습니다. {_crowd}" + _lead)
         out.append(row)
     # 같은 판정 안에서는 태동기를 앞세운다. 관심이 다시 붙기 시작한 구간이라
     # 지수 산출·상장 승인에 걸리는 몇 달 뒤가 수요가 오르는 시점과 겹친다.
