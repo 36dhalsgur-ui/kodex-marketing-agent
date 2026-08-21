@@ -1,5 +1,5 @@
 {
-  "asof": "2026-08-15",
+  "asof": "2026-08-21",
   "brands": [
     {
       "브랜드": "KODEX",
@@ -11,13 +11,6 @@
           "상태": "진행중",
           "시작": "2026-08-05",
           "종료": "2026-09-30"
-        },
-        {
-          "제목": "KODEX 분배금 인증 이벤트📅💙",
-          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=98",
-          "상태": "진행중",
-          "시작": "2026-07-29",
-          "종료": "2026-08-15"
         },
         {
           "제목": "KODEX 200커버드콜액티브 ETF 신규 상장 이벤트🍀",
@@ -50,25 +43,17 @@
       ],
       "배너": [
         {
-          "제목": "상품안내 KODEX AI반도체TOP2플러스 ETF (종목코드 : 395160) AI반도체 TOP2(삼성전자, SK하이닉스)에 집중투자 상품안내",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE9",
+          "제목": "신규상장(8/25) KODEX 코리아TDF2065액티브 적격 ETF (종목코드 : 0231Z0) 연금계좌의 국장투자 필수템 상품안내 KODEX",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW2",
           "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
         },
         {
-          "제목": "신규상장(8/4) KODEX 미국CPU반도체TOP10 ETF (종목코드 : 0225V0) AI 에이전트 전성시대, CPU가 판을 바꾼다! 신규상",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFV9",
+          "제목": "신규상장(7/14) KODEX 200커버드콜액티브 ETF (종목코드 : 0219E0) 월말배당 추구에 옵션 프리미엄 비과세까지 투자자가 기다린",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFV8",
           "NEW": true,
-          "링크유형": "상품",
-          "노출": "메인 배너",
-          "슬롯수": 1
-        },
-        {
-          "제목": "미국대표지수 월배당 KODEX 미국배당커버드콜액티브 ETF KODEX 미국성장커버드콜액티브 ETF 미국 대표지수 월배당 ETF 보러가기 → HO",
-          "링크": "https://www.kodex.com/etf/theme-view.do?seq=60114&themeCd=usa%20monthly&bgColor=%23004d8a",
-          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -79,7 +64,78 @@
     {
       "브랜드": "TIGER",
       "홈": "https://www.tigeretf.com",
-      "이벤트비고": "이벤트 수집 실패: HTTPError",
+      "이벤트목록": [
+        {
+          "제목": "AI로 찾는 나만의 TIGER PICK! 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=184",
+          "상태": "진행중",
+          "시작": "2026-08-10",
+          "종료": "2026-09-09"
+        },
+        {
+          "제목": "TIGER ETF 미국대표지수 적립식 매수인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=183",
+          "상태": "진행중",
+          "시작": "2026-08-03",
+          "종료": "2026-12-31"
+        },
+        {
+          "제목": "상반기 개인순매수 TOP5 TIGER ETF 연금계좌 매수 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=182",
+          "상태": "진행중",
+          "시작": "2026-08-03",
+          "종료": "2026-08-31"
+        },
+        {
+          "제목": "TIGER ETF 증권사 거래 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=100",
+          "상태": "진행중",
+          "시작": "",
+          "종료": ""
+        },
+        {
+          "제목": "TIGER ETF 증권사 적립식 및 순매수 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=99",
+          "상태": "진행중",
+          "시작": "",
+          "종료": ""
+        },
+        {
+          "제목": "TIGER ETF 증권사 연금 및 ISA 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=97",
+          "상태": "진행중",
+          "시작": "",
+          "종료": ""
+        },
+        {
+          "제목": "TIGER 패밀리클럽 친구 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=181",
+          "상태": "종료",
+          "시작": "2026-07-15",
+          "종료": "2026-08-14"
+        },
+        {
+          "제목": "TIGER 글로벌반도체 ETF 매수 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=180",
+          "상태": "종료",
+          "시작": "2026-07-06",
+          "종료": "2026-07-31"
+        },
+        {
+          "제목": "TIGER 미국우주테크 매수 인증 이벤트!",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=178",
+          "상태": "종료",
+          "시작": "2026-06-10",
+          "종료": "2026-07-10"
+        },
+        {
+          "제목": "Run Your Pace, TIGER ETF 20주년 X 큰별하프마라톤 이벤트(※당첨자 발표※)",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=177",
+          "상태": "종료",
+          "시작": "2026-05-27",
+          "종료": "2026-06-19"
+        }
+      ],
       "배너": [
         {
           "제목": "[ETF 포트폴리오] 2026년 3분기 ETF 포트폴리오",
@@ -90,15 +146,7 @@
           "슬롯수": 1
         },
         {
-          "제목": "[하반기 전망] TIGER 미국 S&P500 TIGER 미국 나스닥100",
-          "링크": "https://investments.miraeasset.com",
-          "노출": "메인 배너",
-          "NEW": false,
-          "링크유형": "홈페이지",
-          "슬롯수": 1
-        },
-        {
-          "제목": "[이벤트] 미국 대표지수 ETF 적립식 매수 이벤트",
+          "제목": "[Hot ETF] TIGER 삼성전자SK하이닉스 미국채혼합50",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
           "NEW": true,
@@ -106,10 +154,18 @@
           "슬롯수": 1
         },
         {
-          "제목": "[액티브 ETF] TIGER 미국테크 NYSE100액티브",
+          "제목": "[이벤트] 미국 대표지수 ETF 적립식 매수 이벤트",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
           "NEW": false,
+          "링크유형": "홈페이지",
+          "슬롯수": 1
+        },
+        {
+          "제목": "[액티브 ETF] TIGER 코리아테크액티브",
+          "링크": "https://investments.miraeasset.com",
+          "노출": "메인 배너",
+          "NEW": true,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
@@ -122,7 +178,7 @@
           "슬롯수": 1
         }
       ],
-      "비고": "수집 실패(HTTPError) — 직전 데이터 유지"
+      "순서근거": "사이트 노출 순서"
     },
     {
       "브랜드": "ACE",
@@ -132,7 +188,7 @@
           "제목": "ACE 반도체Plus전략산업 — 대한민국을 이끄는 전략산업, 반도체+조·방·원에 투자!",
           "링크": "https://www.aceetf.co.kr/fund/K55101EY1762",
           "순위근거": "rank 1-1",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -168,7 +224,7 @@
           "제목": "ACE 미국빅테크TOP7 Plus — 매그니피센트7이 바꾸는 세상",
           "링크": "https://www.aceetf.co.kr/fund/K55101E52479",
           "순위근거": "rank 3-2",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -234,7 +290,7 @@
         {
           "제목": "RISE 미국 우주위성통신 현실로 다가온 우주시대 그 첫번째 캐시카우 '우주 위성 통신'",
           "링크": "https://www.riseetf.co.kr/prod/finderDetail/44K9",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 2
@@ -305,7 +361,7 @@
         {
           "제목": "PLUS ETF 8월 분배금 지급 안내",
           "링크": "https://www.plusetf.co.kr",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈",
           "노출": "메인 배너",
           "슬롯수": 1
