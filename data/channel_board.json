@@ -1,10 +1,17 @@
 {
-  "asof": "2026-08-21",
+  "asof": "2026-08-28",
   "brands": [
     {
       "브랜드": "KODEX",
       "홈": "https://www.kodex.com",
       "이벤트목록": [
+        {
+          "제목": "KODEX 코리아TDF2065액티브 적격 ETF 신규 상장 이벤트🧭",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=100",
+          "상태": "진행중",
+          "시작": "2026-08-25",
+          "종료": "2026-09-30"
+        },
         {
           "제목": "KODEX 한국, 미국 반도체 ETF 투자 이벤트",
           "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=99",
@@ -43,7 +50,7 @@
       ],
       "배너": [
         {
-          "제목": "신규상장(8/25) KODEX 코리아TDF2065액티브 적격 ETF (종목코드 : 0231Z0) 연금계좌의 국장투자 필수템 상품안내 KODEX",
+          "제목": "신규상장(8/25) KODEX 코리아TDF2065액티브 적격 ETF (종목코드 : 0231Z0) 연금계좌 투자 필수템 알아서 투자해주는 코리아",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW2",
           "NEW": true,
           "링크유형": "상품",
@@ -51,8 +58,8 @@
           "슬롯수": 1
         },
         {
-          "제목": "신규상장(7/14) KODEX 200커버드콜액티브 ETF (종목코드 : 0219E0) 월말배당 추구에 옵션 프리미엄 비과세까지 투자자가 기다린",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFV8",
+          "제목": "HOT 테마 미국반도체 투자도 역시 Kodex 글로벌 AI 패권의 종착지, 미국! 테마 상품 보러가기 → 신규상장(8/4) KODEX 미국CPU",
+          "링크": "https://www.kodex.com/etf/theme-hot.do?seq=60099",
           "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
@@ -65,6 +72,20 @@
       "브랜드": "TIGER",
       "홈": "https://www.tigeretf.com",
       "이벤트목록": [
+        {
+          "제목": "아시아 규모 1등 TIGER 미국S&P500 TIGER 미국나스닥100 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=186",
+          "상태": "진행중",
+          "시작": "2026-08-26",
+          "종료": "2026-09-25"
+        },
+        {
+          "제목": "TIGER 패밀리클럽 콘텐츠 공유 & 퀴즈 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=185",
+          "상태": "진행중",
+          "시작": "2026-08-24",
+          "종료": "2026-09-20"
+        },
         {
           "제목": "AI로 찾는 나만의 TIGER PICK! 이벤트",
           "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=184",
@@ -120,20 +141,6 @@
           "상태": "종료",
           "시작": "2026-07-06",
           "종료": "2026-07-31"
-        },
-        {
-          "제목": "TIGER 미국우주테크 매수 인증 이벤트!",
-          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=178",
-          "상태": "종료",
-          "시작": "2026-06-10",
-          "종료": "2026-07-10"
-        },
-        {
-          "제목": "Run Your Pace, TIGER ETF 20주년 X 큰별하프마라톤 이벤트(※당첨자 발표※)",
-          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=177",
-          "상태": "종료",
-          "시작": "2026-05-27",
-          "종료": "2026-06-19"
         }
       ],
       "배너": [
@@ -149,15 +156,15 @@
           "제목": "[Hot ETF] TIGER 삼성전자SK하이닉스 미국채혼합50",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
         {
-          "제목": "[이벤트] 미국 대표지수 ETF 적립식 매수 이벤트",
+          "제목": "[이벤트] 아시아 규모 1등 TIGER미국S&P500 TIGER미국나스닥100",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": false,
+          "NEW": true,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
@@ -165,7 +172,7 @@
           "제목": "[액티브 ETF] TIGER 코리아테크액티브",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
@@ -381,8 +388,8 @@
       "브랜드": "HANARO",
       "홈": "https://www.hanaroetf.com",
       "이벤트": {
-        "라벨": "공지/이벤트",
-        "링크": "https://www.hanaroetf.com/customer/notice"
+        "라벨": "제목 [EVENT] HANARO 반도체 투자 세트 매수 인증 이벤트 🎁 날짜 2026.08.20",
+        "링크": "https://www.hanaroetf.com/customer/notice/9f4823dfc6044959b174"
       },
       "배너": [
         {
