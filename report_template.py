@@ -428,9 +428,8 @@ def render_report(ctx: dict) -> str:
 
   <div class="sec"><div class="sec-h"><span class="sec-no">02</span><span class="sec-t">자금 흐름</span>
     <span class="sec-tag">순유입 · KRX</span></div>
-    <p>마케팅 반응은 <b>순유입</b>으로 읽는다 — 상장좌수 증감 × NAV, 즉 설정·환매로
-      실제 들어오고 나간 돈이다. 장내 순매수는 손바뀜이라 ETF 규모가 늘었다는 뜻이
-      아니므로 쓰지 않는다. 유입강도 = 주간 순유입 ÷ 전주 순자산 × 100.</p>
+    <p><b>유입강도 = 주간 순유입 ÷ 직전 주 순자산 × 100</b>. 순유입은 상장좌수 증감 ×
+      NAV로, 설정·환매를 통해 실제 들어오고 나간 돈이다.</p>
     <table><thead><tr><th>KODEX 유입강도 상위</th><th class="num">강도</th></tr></thead>
       <tbody>{rows_flow_kodex}</tbody></table>
     <table style="margin-top:10px;"><thead><tr><th>전체 ETF 유입강도 상위</th>
@@ -440,12 +439,9 @@ def render_report(ctx: dict) -> str:
 
   <div class="sec"><div class="sec-h"><span class="sec-no">03</span><span class="sec-t">이벤트 집행 현황</span>
     <span class="sec-tag">Channels · Live</span></div>
-    <p>KODEX가 집행 중인 이벤트다. 아래 04에서 이 건들의 효과를 잰다.</p>
     <table><thead><tr><th>KODEX 집행 이벤트</th><th>채널</th><th class="num">집행 주차</th></tr></thead>
       <tbody>{rows_camp}</tbody></table>
-    <p style="margin-top:14px;">경쟁 7개 브랜드가 같은 기간 걸고 있는 이벤트다.
-      마감이 가까운 순으로 싣는다 — 끝나는 자리가 다음 집행의 빈틈이다.</p>
-    <table><thead><tr><th>경쟁사 진행 중 이벤트</th><th>기간</th>
+    <table style="margin-top:14px;"><thead><tr><th>경쟁사 진행 중 이벤트</th><th>기간</th>
       <th class="num">마감</th></tr></thead><tbody>{rows_rival}</tbody></table>
   </div>
 
