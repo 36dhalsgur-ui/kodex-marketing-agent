@@ -670,12 +670,12 @@ def _fetch_channel_videos(brand: str, channel_id: str, n: int = 3) -> list[dict]
     한 번 실패했다고 빈 화면이 되지 않도록 간격을 두고 재시도한다."""
     url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
     last = None
-    for attempt in range(3):
+    for attempt in range(4):
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         if r.status_code == 200:
             break
         last = r.status_code
-        time.sleep(1.5 * (attempt + 1))
+        time.sleep(0.8 * (attempt + 1))
     else:
         raise RuntimeError(f"HTTP {last}")
     root = ET.fromstring(r.content)
@@ -701,7 +701,31 @@ def _fetch_channel_videos(brand: str, channel_id: str, n: int = 3) -> list[dict]
 
 
 # 직전에 성공한 결과 — 일시적 스로틀로 화면이 통째로 비는 것을 막는다
+# 유튜브 RSS는 한 번에 여러 채널을 부르면 절반 가까이 404/500을 돌려준다. 재시도로도
+# 안 풀리는 IP 단위 제한이라(실측: 5회 재시도해도 9채널 중 4개 실패), 성공한 채널만
+# 파일에 남겨 다음 실행에서 재사용한다. 여러 번 돌면 8개 브랜드가 모두 채워진다.
+_YT_CACHE_PATH = Path(__file__).parent / "data" / "youtube_cache.json"
 _YT_LAST_GOOD: dict[str, list[dict]] = {}
+
+
+def _yt_cache_load() -> None:
+    if _YT_LAST_GOOD or not _YT_CACHE_PATH.exists():
+        return
+    try:
+        d = json.loads(_YT_CACHE_PATH.read_text())
+        _YT_LAST_GOOD.update({b: v for b, v in (d.get("brands") or {}).items() if v})
+    except Exception:
+        pass
+
+
+def _yt_cache_save() -> None:
+    """배포 환경의 디스크는 재배포 때 날아간다 — 실패해도 조용히 넘어간다."""
+    try:
+        _YT_CACHE_PATH.write_text(json.dumps(
+            {"asof": dt.date.today().isoformat(), "brands": _YT_LAST_GOOD},
+            ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
 YOUTUBE_STATUS: dict[str, str] = {}
 
 
@@ -722,6 +746,7 @@ def fetch_youtube(n_per_channel: int = 3) -> dict[str, list[dict]]:
     실패 사유는 YOUTUBE_STATUS에 남겨 화면에서 '수집 실패'와 '영상 없음'을 구분한다."""
     out: dict[str, list[dict]] = {}
     YOUTUBE_STATUS.clear()
+    _yt_cache_load()
     got: dict[str, list[dict]] = {b: [] for b in YOUTUBE_CHANNELS}
     n_ok: dict[str, int] = {b: 0 for b in YOUTUBE_CHANNELS}
     errs: dict[str, list[str]] = {}
@@ -754,6 +779,7 @@ def fetch_youtube(n_per_channel: int = 3) -> dict[str, list[dict]]:
         # 채널 하나가 실패해도 다른 채널이 살아 있으면 '수집 실패'가 아니다
         if errs.get(brand) and not n_ok[brand]:
             YOUTUBE_STATUS[brand] = " / ".join(errs[brand])
+    _yt_cache_save()
     return out
 
 
