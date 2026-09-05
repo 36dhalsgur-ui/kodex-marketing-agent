@@ -1,0 +1,55 @@
+name: 앱 깨우기 유지
+
+# Streamlit Community Cloud는 트래픽이 12시간 없으면 앱을 재운다. 그러면 다음
+# 방문자에게 'Yes, get this app back up!' 화면이 먼저 뜨고, 눌러도 실시간 수집
+# 때문에 수십 초를 더 기다린다. 포트폴리오 링크로 쓰는 동안은 그 화면을 만들지
+# 않는 편이 낫다. 6시간마다 접속해 12시간 조건을 끊는다.
+#
+# 간격을 6시간으로 둔 이유: GitHub 스케줄은 정시에 안 돌고 수십 분 밀릴 수 있다.
+# 12시간에 맞춰 두면 한 번 밀렸을 때 그대로 잠든다.
+#
+# 주의 — 이 방식이 통한다는 보장은 없다. Streamlit이 '트래픽'을 어떻게 세는지
+# 공개하지 않았고, 공식이 권하는 '빈 커밋' 방식은 안 먹힌다는 보고가 많다.
+# 하루 이상 접속하지 않은 뒤 깨우기 화면이 뜨는지로 검증할 것. 실패하면 아래
+# 접속 단계를 Playwright로 바꿔 실제 세션까지 맺어야 한다.
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: keep-awake
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 앱 접속
+        env:
+          APP_URL: https://kodex-marketing-agent-tebne4rb46g2w9mgwcbgaa.streamlit.app
+        run: |
+          set -u
+          code=000
+          # 앱은 /-/auth/app 으로 한 번 돌린 뒤 본문을 준다(실측 리다이렉트 3회).
+          # 쿠키를 받아 끝까지 따라가야 실제 앱 응답에 닿는다 — 단순 GET은 303에서 멈춘다.
+          for i in 1 2 3; do
+            code=$(curl -sL -c /tmp/ck -b /tmp/ck -o /tmp/app.html \
+                        -w "%{http_code}" --max-time 90 \
+                        -A "Mozilla/5.0 (keep-awake; github-actions)" "$APP_URL" || echo 000)
+            echo "시도 $i — HTTP $code ($(wc -c < /tmp/app.html) bytes)"
+            [ "$code" = "200" ] && break
+            sleep 20
+          done
+          if [ "$code" != "200" ]; then
+            echo "::error::앱 응답 실패 (HTTP $code)"
+            exit 1
+          fi
+          # 깨우기 화면이 돌아왔다면 이 워크플로가 트래픽으로 안 잡히고 있다는 뜻이다
+          if grep -qi "get this app back up" /tmp/app.html; then
+            echo "::warning::깨우기 화면이 반환됐다 — ping이 트래픽으로 집계되지 않는다. Playwright 방식으로 교체 필요"
+          fi
+          # 앱 서버가 직접 답하는 엔드포인트까지 한 번 더 두드린다
+          curl -sL -b /tmp/ck -o /dev/null -w "  health HTTP %{http_code}\n" \
+               --max-time 30 "$APP_URL/_stcore/health" || true
