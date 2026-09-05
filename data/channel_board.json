@@ -52,7 +52,7 @@
         {
           "제목": "상품안내 KODEX 미국S&P500 ETF (종목코드 : 379800) 장기 투자의 기본, 가장 먼저 담아야 할 연금·ISA 핵심 상품 상품안내",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE4",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -60,7 +60,7 @@
         {
           "제목": "신규상장(8/25) KODEX 코리아TDF2065액티브 적격 ETF (종목코드 : 0231Z0) 국장 투자 필수템 알아서 투자해주는 코리아 TD",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW2",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -156,7 +156,7 @@
           "제목": "[Hot ETF] TIGER 미국S&P500 미국채혼합50 ETF",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
@@ -190,6 +190,50 @@
     {
       "브랜드": "ACE",
       "홈": "https://www.aceetf.co.kr",
+      "이벤트목록": [
+        {
+          "제목": "[EVENT] ACE ETF x 해태제과 에이스 콜라보 이벤트 (~10/31)",
+          "링크": "https://www.aceetf.co.kr/cs/notice/6842",
+          "상태": "진행중",
+          "시작": "2026-09-01",
+          "종료": "2026-10-31"
+        },
+        {
+          "제목": "[EVENT] ACE 반도체Plus전략산업 10주 매수 인증 이벤트(~9/10)",
+          "링크": "https://www.aceetf.co.kr/cs/notice/6682",
+          "상태": "진행중",
+          "시작": "2026-08-10",
+          "종료": "2026-09-10"
+        },
+        {
+          "제목": "[EVENT] [세미나] 한투스테이션 38회_ACE 반도체Plus전략산업ETF 알아보기",
+          "링크": "https://www.aceetf.co.kr/cs/notice/6742",
+          "상태": "",
+          "시작": "2026-08-14",
+          "종료": ""
+        },
+        {
+          "제목": "[EVENT] ACE ETF x 해태제과 에이스 콜라보 사전 이벤트 (~8/31)",
+          "링크": "https://www.aceetf.co.kr/cs/notice/6724",
+          "상태": "종료",
+          "시작": "2026-08-14",
+          "종료": "2026-08-31"
+        },
+        {
+          "제목": "[EVENT] [세미나] 한투스테이션 37회_혼란과 혼돈의 주식시장, 코스피,코스닥의 운명은!?",
+          "링크": "https://www.aceetf.co.kr/cs/notice/6482",
+          "상태": "",
+          "시작": "2026-07-14",
+          "종료": ""
+        },
+        {
+          "제목": "[EVENT] ACE K반도체TOP2+ 10주 매수 인증 이벤트(~8/7)",
+          "링크": "https://www.aceetf.co.kr/cs/notice/6383",
+          "상태": "종료",
+          "시작": "2026-07-08",
+          "종료": "2026-08-07"
+        }
+      ],
       "배너": [
         {
           "제목": "ACE 반도체Plus전략산업 — 대한민국을 이끄는 전략산업, 반도체+조·방·원에 투자!",
@@ -242,6 +286,71 @@
     {
       "브랜드": "SOL",
       "홈": "https://www.soletf.com",
+      "이벤트목록": [
+        {
+          "제목": "[SOL ETF] 4월 팬덤 이벤트 | 절세계좌 투자는 SOL ETF와 함께!",
+          "링크": "https://www.soletf.com/ko/cs/notice/86",
+          "상태": "",
+          "시작": "2026-04-01",
+          "종료": ""
+        },
+        {
+          "제목": "[SOL ETF] SOL AI반도체TOP2플러스 신규상장 순매수 인증 이벤트 | SOL AI반도체TOP2플러스 신규상장 (0167A0)",
+          "링크": "https://www.soletf.com/ko/cs/notice/81",
+          "상태": "",
+          "시작": "2026-03-17",
+          "종료": ""
+        },
+        {
+          "제목": "SOL ETF 3월 인증 이벤트 ㅣ 분배금 받고! 매수하고! 인증 이벤트",
+          "링크": "https://www.soletf.com/ko/cs/notice/77",
+          "상태": "",
+          "시작": "2026-03-03",
+          "종료": ""
+        },
+        {
+          "제목": "SOL ETF가 제시하는 2026년 글로벌반도체 투자전략 이벤트",
+          "링크": "https://www.soletf.com/ko/cs/notice/75",
+          "상태": "",
+          "시작": "2026-02-23",
+          "종료": ""
+        },
+        {
+          "제목": "SOL ETF 고객 감사 2월 인증 이벤트 ㅣ 분배금 받고! 매수하고! 인증 이벤트",
+          "링크": "https://www.soletf.com/ko/cs/notice/71",
+          "상태": "",
+          "시작": "2026-02-02",
+          "종료": ""
+        },
+        {
+          "제목": "[SOL ETF] SOL 배당성향탑픽액티브 신규상장 순매수이벤트 | SOL 배당성향탑픽액티브 신규상장 (0152E0)",
+          "링크": "https://www.soletf.com/ko/cs/notice/68",
+          "상태": "",
+          "시작": "2026-01-13",
+          "종료": ""
+        },
+        {
+          "제목": "[SOL ETF] SOL 배당성향탑픽액티브 신규상장 퀴즈이벤트 | SOL 배당성향탑픽액티브 신규상장 (0152E0)",
+          "링크": "https://www.soletf.com/ko/cs/notice/67",
+          "상태": "",
+          "시작": "2026-01-09",
+          "종료": ""
+        },
+        {
+          "제목": "SOL ETF 공식채널 구독 인증 이벤트",
+          "링크": "https://www.soletf.com/ko/cs/notice/66",
+          "상태": "",
+          "시작": "2026-01-02",
+          "종료": ""
+        },
+        {
+          "제목": "SOL ETF 1월 인증 이벤트 ㅣ 분배금 받고! 매수하고! 인증 이벤트",
+          "링크": "https://www.soletf.com/ko/cs/notice/65",
+          "상태": "",
+          "시작": "2026-01-02",
+          "종료": ""
+        }
+      ],
       "배너": [
         {
           "제목": "SOL 국제금커버드콜액티브 (0022T0)",
@@ -289,6 +398,50 @@
     {
       "브랜드": "RISE",
       "홈": "https://www.riseetf.co.kr",
+      "이벤트목록": [
+        {
+          "제목": "RISE 글로벌AI낸드메모리반도체 상장 기념 매수인증 이벤트",
+          "링크": "https://www.riseetf-event.com/event37?utm_source=hp_event&utm_medium=image&utm_campaign=Nandmemory",
+          "상태": "진행중",
+          "시작": "2026-09-01",
+          "종료": "2026-09-30"
+        },
+        {
+          "제목": "RISE 미국우주위성통신 상장 기념 매수인증 이벤트",
+          "링크": "https://www.riseetf-event.com/event36?utm_source=hp_event&utm_medium=image&utm_campaign=usspacesatellite ",
+          "상태": "진행중",
+          "시작": "2026-08-11",
+          "종료": "2026-09-10"
+        },
+        {
+          "제목": "RISE 코스닥커버드콜액티브 ETF 상장 기념 매수 인증 이벤트",
+          "링크": "/cust/event/46?page=1",
+          "상태": "종료",
+          "시작": "2026-07-28",
+          "종료": "2026-08-27"
+        },
+        {
+          "제목": "RISE 미국우주&로봇TOP2미국채혼합50 ETF 상장 기념 매수 인증 이벤트",
+          "링크": "/cust/event/45?page=1",
+          "상태": "종료",
+          "시작": "2026-07-14",
+          "종료": "2026-08-09"
+        },
+        {
+          "제목": "RISE AI전력인프라 ETF 시리즈 매수 인증 이벤트",
+          "링크": "/cust/event/44?page=1",
+          "상태": "종료",
+          "시작": "2026-06-26",
+          "종료": "2026-07-28"
+        },
+        {
+          "제목": "RISE 현대차고정피지컬AI 순자산 8천억 돌파 기념 매수인증 이벤트",
+          "링크": "/cust/event/43?page=1",
+          "상태": "종료",
+          "시작": "2026-06-17",
+          "종료": "2026-06-30"
+        }
+      ],
       "이벤트": {
         "라벨": "이벤트",
         "링크": "https://www.riseetf.co.kr/cust/event"
@@ -297,7 +450,7 @@
         {
           "제목": "RISE 글로벌AI 낸드메모리반도체 당신의 NEW 반도체 투자가 향하는 곳은 어디입니까?",
           "링크": "https://www.riseetf.co.kr/prod/finderDetail/44L0",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -340,6 +493,29 @@
     {
       "브랜드": "PLUS",
       "홈": "https://www.plusetf.co.kr",
+      "이벤트목록": [
+        {
+          "제목": "[매수 이벤트] PLUS SK하이닉스샌디스크채권혼합50 매수 인증 이벤트 (~9/4)",
+          "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=31834",
+          "상태": "종료",
+          "시작": "2026-08-04",
+          "종료": "2026-09-04"
+        },
+        {
+          "제목": "[이벤트] PLUS 글로벌HBM반도체 순자산 2조원 돌파 이벤트 (~7/10)",
+          "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=31655",
+          "상태": "종료",
+          "시작": "2026-06-25",
+          "종료": "2026-07-10"
+        },
+        {
+          "제목": "[매수 이벤트] PLUS 글로벌HBM반도체 매수 인증 이벤트 시즌2! (~7/10)",
+          "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=31618",
+          "상태": "종료",
+          "시작": "2026-06-18",
+          "종료": "2026-07-10"
+        }
+      ],
       "배너": [
         {
           "제목": "PLUS ETF 8월 분배금 지급 안내",
@@ -360,7 +536,7 @@
         {
           "제목": "단일 종목 레버리지·인버스2X 투자 유의사항 안내",
           "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=31496",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "공지",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -368,7 +544,7 @@
         {
           "제목": "PLUS ETF가 제안하는 전략투자 솔루션",
           "링크": "https://www.plusetf.co.kr/insight/guide/detail?n=2070",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -376,7 +552,7 @@
         {
           "제목": "당신의 내일을 준비할 핵심 상품",
           "링크": "https://www.plusetf.co.kr",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -387,6 +563,43 @@
     {
       "브랜드": "HANARO",
       "홈": "https://www.hanaroetf.com",
+      "이벤트목록": [
+        {
+          "제목": "[EVENT] HANARO 반도체 투자 세트 매수 인증 이벤트 🎁",
+          "링크": "https://www.hanaroetf.com/customer/notice/9f4823dfc6044959b174",
+          "상태": "",
+          "시작": "2026-08-20",
+          "종료": ""
+        },
+        {
+          "제목": "[EVENT 종료] HANARO 미국AI메모리반도체TOP4+ ETF (0181B0) 신규 상장 기념 매수 인증 이벤트 🎁",
+          "링크": "https://www.hanaroetf.com/customer/notice/4e89ecfb59e449284af2",
+          "상태": "종료",
+          "시작": "2026-05-11",
+          "종료": ""
+        },
+        {
+          "제목": "[EVENT 종료] HANARO 글로벌피지컬AI 액티브 ETF 상장 1주년 기념 퀴즈 이벤트 🎁",
+          "링크": "https://www.hanaroetf.com/customer/notice/cb802bac35245b5932a5",
+          "상태": "종료",
+          "시작": "2026-04-21",
+          "종료": ""
+        },
+        {
+          "제목": "[EVENT 종료] HANARO K휴머노이드테마TOP10 거래량이벤트 (한국투자증권)",
+          "링크": "https://www.hanaroetf.com/customer/notice/78ec3519c9844d5a3089",
+          "상태": "종료",
+          "시작": "2026-03-03",
+          "종료": ""
+        },
+        {
+          "제목": "[EVENT 종료] NH-Amundi 대표 ETF & 펀드 매수 이벤트 🎁 국내 증시 & 유망 테마 투자하고 경품 당첨 행운까지!",
+          "링크": "https://www.hanaroetf.com/customer/notice/589c5d6d8ef4edfa9d1b",
+          "상태": "종료",
+          "시작": "2026-02-23",
+          "종료": ""
+        }
+      ],
       "이벤트": {
         "라벨": "제목 [EVENT] HANARO 반도체 투자 세트 매수 인증 이벤트 🎁 날짜 2026.08.20",
         "링크": "https://www.hanaroetf.com/customer/notice/9f4823dfc6044959b174"
@@ -430,6 +643,15 @@
     {
       "브랜드": "TIMEFOLIO",
       "홈": "https://timeetf.co.kr",
+      "이벤트목록": [
+        {
+          "제목": "[EVENT] TIME 액티브 ETF 순자산 10조 돌파 기념! 액티브 ETF 가이드북 무료 배포 이벤트",
+          "링크": "https://timeetf.co.kr/board/board.php?bbsid=event",
+          "상태": "종료",
+          "시작": "2026-07-06",
+          "종료": "2026-07-31"
+        }
+      ],
       "이벤트": {
         "라벨": "이벤트",
         "링크": "https://timeetf.co.kr/board/board.php?bbsid=event"

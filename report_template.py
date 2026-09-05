@@ -239,6 +239,25 @@ def render_report(ctx: dict) -> str:
         # 상한을 두지 않는다 — 집행 건수가 04 DiD 표와 맞아야 한다
         for c in ctx["campaigns"]) or '<tr><td colspan="3">감지된 이벤트 없음</td></tr>'
 
+    # 03 경쟁사 진행 중 이벤트 — 마감 임박순
+    _today = dt.date.today()
+
+    def _dday(end: str) -> str:
+        if not end:
+            return "기간 미상"
+        try:
+            n = (dt.date.fromisoformat(end) - _today).days
+        except ValueError:
+            return "기간 미상"
+        return f"D-{n}" if n >= 0 else "종료"
+
+    rows_rival = "".join(
+        f'<tr><td><span class="co-tag">{_esc(e["브랜드"])}</span>{_esc(e["제목"])}</td>'
+        f'<td class="ph">{_esc(e["시작"] or "?")} ~ {_esc(e["종료"] or "?")}</td>'
+        f'<td class="num">{_dday(e["종료"])}</td></tr>'
+        for e in (ctx.get("rival_events") or [])[:10]
+    ) or '<tr><td colspan="3">진행 중인 경쟁사 이벤트 없음</td></tr>'
+
     # 02 자금
     rows_flow = "".join(
         f'<tr><td>{_esc(nm)}</td><td class="num up">{v:+.2f}%</td></tr>'
@@ -421,9 +440,13 @@ def render_report(ctx: dict) -> str:
 
   <div class="sec"><div class="sec-h"><span class="sec-no">03</span><span class="sec-t">이벤트 집행 현황</span>
     <span class="sec-tag">Channels · Live</span></div>
-    <p>이번 주 KODEX가 집행 중인 이벤트다. 아래 04에서 이 건들의 효과를 잰다.</p>
+    <p>KODEX가 집행 중인 이벤트다. 아래 04에서 이 건들의 효과를 잰다.</p>
     <table><thead><tr><th>KODEX 집행 이벤트</th><th>채널</th><th class="num">집행 주차</th></tr></thead>
       <tbody>{rows_camp}</tbody></table>
+    <p style="margin-top:14px;">경쟁 7개 브랜드가 같은 기간 걸고 있는 이벤트다.
+      마감이 가까운 순으로 싣는다 — 끝나는 자리가 다음 집행의 빈틈이다.</p>
+    <table><thead><tr><th>경쟁사 진행 중 이벤트</th><th>기간</th>
+      <th class="num">마감</th></tr></thead><tbody>{rows_rival}</tbody></table>
   </div>
 
   <div class="sec"><div class="sec-h"><span class="sec-no">04</span><span class="sec-t">이벤트 효과 — DiD</span>

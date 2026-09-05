@@ -2500,6 +2500,21 @@ with tab_report:
     rep_events, _rep_all = kodex_campaigns(_ch, youtube, rep_blogs, netbuy_df)
     # 리포트가 말하는 '집행'도 ③과 같이 이벤트 기준 — 콘텐츠 푸시는 ②에서 본다
     rep_campaigns = [c for c in _rep_all if c["유형"] == D.EVENT]
+
+    # 경쟁사 진행 중 이벤트 — 마감 임박순. 발행량 건수보다 '어디에 돈을 걸었나'가
+    # 03이 답해야 할 질문이다. 종료일을 못 읽은 건(제목에 기간 표기가 없는 공지)은
+    # 순서를 판단할 수 없어 뒤로 보낸다.
+    _today = dt.date.today().isoformat()
+    rival_events = []
+    for _b in (_ch.get("brands") or []):
+        for _e in (_b.get("이벤트목록") or []):
+            if _b.get("브랜드") == "KODEX" or _e.get("상태") == "종료":
+                continue
+            rival_events.append({"브랜드": _b.get("브랜드", ""), "제목": _e.get("제목", ""),
+                                 "시작": _e.get("시작", ""), "종료": _e.get("종료", ""),
+                                 "상태": _e.get("상태", "")})
+    rival_events.sort(key=lambda e: e["종료"] or "9999-99-99")
+
     _uni_r = universe_frame(netbuy_df)
 
     from collections import Counter as _C
@@ -2700,7 +2715,7 @@ with tab_report:
         "stage_counts": stage_ct, "regime": regime,
         "bench_ret": _sb_all.get("벤치주간수익률"),
         "top_up": top_up, "top_dn": top_dn,
-        "campaigns": rep_campaigns,
+        "campaigns": rep_campaigns, "rival_events": rival_events,
         "flow_top": flow_top, "flow_kodex": flow_kodex,
         "did_all": did_all,
         "review": review, "review_read": review_read,

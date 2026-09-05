@@ -893,8 +893,13 @@ def _reg_kind(title: str) -> str:
 
 # 보도자료 게시판은 같은 요청에도 응답이 3~10초로 널뛴다(실측). 10초로 잡으면
 # 로컬에서도 아슬아슬하고, 배포본은 해외 리전이라 왕복이 더 걸려 상시 실패한다.
-FSC_TIMEOUT = 25
-FSC_RETRY = 3
+# 첫 로딩에서 이 수집이 전체 실시간 수집 시간의 절반을 넘게 차지했다(실측 9.0초/16초).
+# 앱이 절전에서 깨어난 직후 방문자가 그대로 기다리는 시간이라 상한을 줄인다.
+# 25초×3회는 한 페이지에서만 최악 75초였다.
+FSC_TIMEOUT = 10
+FSC_RETRY = 2
+# 수집이 실패한 주에 화면이 통째로 비지 않도록 직전 성공분을 들고 있는다
+_FSC_LAST_GOOD: dict[str, list[dict]] = {}
 
 
 def _fsc_page(path: str, link_pat: str, source: str, page: int) -> list[dict]:
@@ -953,38 +958,48 @@ def fetch_regulations(limit: int = 12) -> tuple[list[dict], dict]:
     수집 실패와 '수집은 됐지만 관련 건이 없음'을 화면에서 구분할 수 있어야 하므로
     예외를 삼키지 않고 사유를 함께 돌려준다.
     """
+    def _page(args):
+        path, pat, src, pg = args
+        last = None
+        for attempt in range(FSC_RETRY):   # 응답이 널뛰는 소스라 재시도가 가장 효과적
+            try:
+                return _fsc_page(path, pat, src, pg), None
+            except Exception as e:
+                last = f"{type(e).__name__}: {e}"
+                time.sleep(1.5 * (attempt + 1))
+        return None, last
+
+    # 9개 페이지를 순서대로 받으면 그것만 9초다(실측). 어차피 최대 9개라 한꺼번에
+    # 받는다 — '연속 2페이지가 비면 중단'하던 조기 종료는 병렬에서는 의미가 없다.
+    jobs = [(path, pat, src, pg)
+            for path, pat, src, pages in FSC_BOARDS for pg in range(1, pages + 1)]
+    with ThreadPoolExecutor(max_workers=9) as ex:
+        fetched = dict(zip(jobs, ex.map(_page, jobs)))
+
     items: list[dict] = []
     status: dict[str, dict] = {}
     for path, pat, src, pages in FSC_BOARDS:
-        got, err, seen, blank = [], None, set(), 0
+        got, err, seen = [], None, set()
         for pg in range(1, pages + 1):
-            rows, last = None, None
-            for attempt in range(FSC_RETRY):   # 응답이 널뛰는 소스라 재시도가 가장 효과적
-                try:
-                    rows = _fsc_page(path, pat, src, pg)
-                    break
-                except Exception as e:
-                    last = f"{type(e).__name__}: {e}"
-                    time.sleep(1.5 * (attempt + 1))
+            rows, last = fetched[(path, pat, src, pg)]
             if rows is None:
-                err = last
-                break
-            fresh = [r for r in rows if r["제목"] not in seen]
-            if not fresh:
-                # 1페이지가 비어도 뒤 페이지엔 목록이 살아 있는 경우가 있다(실측).
-                # 즉시 멈추지 않고 연속 2페이지가 비었을 때만 끝으로 본다.
-                blank += 1
-                if blank >= 2:
-                    break
+                err = err or last
                 continue
-            blank = 0
+            fresh = [r for r in rows if r["제목"] not in seen]
             seen.update(r["제목"] for r in fresh)
             got += fresh
         if not got and err is None:
             # 예외 없이 0건이면 조용히 비는 것 — 사유를 남겨야 화면에서 구분된다
             err = "응답은 받았으나 목록을 찾지 못함 — 게시판 구조 변경 가능성"
+        if got:
+            _FSC_LAST_GOOD[src] = got
+        elif _FSC_LAST_GOOD.get(src):
+            # 이번엔 못 받았지만 직전 수집분이 있으면 그걸 쓴다. 규제 동향은 매일
+            # 바뀌는 값이 아니라 하루 묵은 목록이 빈 화면보다 낫다.
+            got = _FSC_LAST_GOOD[src]
+            err = f"{err} (직전 수집분 표시)"
         status[src] = {"수집": len(got), "관련": sum(1 for r in got if r["관련"]),
-                       "오류": err if not got else None}
+                       "오류": err}
         items += got
     items.sort(key=lambda x: (x["date"] or "", x["관련"]), reverse=True)
     return items, status

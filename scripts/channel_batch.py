@@ -123,7 +123,154 @@ def _dedup_events(rows: list[dict]) -> list[dict]:
     return out
 
 
-EVENT_BOARDS = {"KODEX": kodex_events, "TIGER": tiger_events}
+# ── 공지 게시판형 이벤트 ────────────────────────────────────────
+# ACE·SOL·PLUS·HANARO는 이벤트 전용 페이지가 없고 공지사항에 섞어 올린다.
+# 제목으로 골라내고, 제목 끝의 '(~10/31)' 같은 표기에서 종료일을 읽는다.
+# 시작일은 공지 등록일로 대신한다 — 정확한 개시일이 어디에도 없다.
+# (경쟁사 이벤트는 화면 표시용이다. DiD의 개입 시점은 KODEX 이벤트 보드만 쓴다.)
+EVENT_TITLE = re.compile(r"이벤트|EVENT|경품|매수\s?인증|응모")
+# 당첨자 발표·결과 안내는 집행이 아니라 끝난 뒤의 사후 공지다
+EVENT_EXCLUDE = re.compile(r"당첨자|당첨\s?발표|결과\s?안내|유의\s?사항")
+
+
+def _tail_deadline(title: str, posted: str) -> str:
+    """'(~10/31)' → '2026-10-31'. 연도는 등록일 기준으로 붙이되 해를 넘기면 +1년."""
+    m = re.search(r"~\s*(\d{1,2})\s*/\s*(\d{1,2})\s*\)", title)
+    if not m or not posted:
+        return ""
+    mm, dd = int(m.group(1)), int(m.group(2))
+    try:
+        y = int(posted[:4])
+        if (mm, dd) < (int(posted[5:7]), int(posted[8:10])):
+            y += 1                      # 12월 공지의 '(~1/15)'는 다음 해다
+        return f"{y}-{mm:02d}-{dd:02d}"
+    except ValueError:
+        return ""
+
+
+def _notice_event(title: str, link: str, posted: str) -> dict | None:
+    """공지 한 건을 이벤트 형식으로. 이벤트가 아니면 None."""
+    if not EVENT_TITLE.search(title) or EVENT_EXCLUDE.search(title):
+        return None
+    end = _tail_deadline(title, posted)
+    state = ""
+    if end:
+        state = "진행중" if end >= date.today().isoformat() else "종료"
+    elif re.search(r"종료|마감", title):
+        state = "종료"          # 제목에 이미 박혀 있으면 기간이 없어도 안다
+    return {"제목": clean(title, 90), "링크": link,
+            "상태": state, "시작": posted, "종료": end}
+
+
+def ace_events():
+    """ACE는 Next.js SPA — 목록을 만드는 API를 직접 부른다."""
+    h = dict(UA, Accept="application/json", Origin="https://www.aceetf.co.kr",
+             Referer="https://www.aceetf.co.kr/")
+    d = requests.get("https://papi.aceetf.co.kr/api/notices",
+                     params={"page": 1, "size": 30}, headers=h, timeout=15).json()
+    out = []
+    for it in d.get("data") or []:
+        e = _notice_event(it.get("title", ""),
+                          f"https://www.aceetf.co.kr/cs/notice/{it.get('id','')}",
+                          (it.get("regDate") or "")[:10])
+        if e:
+            out.append(e)
+    return _dedup_events(out)
+
+
+def sol_events():
+    """SOL도 목록이 JS로 그려진다 — 공지 API를 직접 부른다."""
+    out = []
+    # 한 페이지가 10건뿐이라 분배금 공지에 밀려 이벤트가 뒤로 간다 — 앞 3페이지를 본다
+    for pg in (1, 2, 3):
+        # 페이지 파라미터는 nowPage가 아니라 page다(nowPage는 응답 필드일 뿐 무시된다)
+        d = requests.get("https://www.soletf.com/api/cs/notice",
+                         params={"page": pg},
+                         headers=dict(UA, Accept="application/json"), timeout=15).json()
+        for it in d.get("items") or []:
+            e = _notice_event(it.get("TITLE", ""),
+                              f"https://www.soletf.com/ko/cs/notice/{it.get('NO','')}",
+                              (it.get("REG_DATE") or "")[:10])
+            if e:
+                out.append(e)
+    return _dedup_events(out)
+
+
+def plus_events():
+    """PLUS는 공지 목록이 정적 HTML로 온다."""
+    base = "https://www.plusetf.co.kr"
+    soup = get_soup(base + "/customer/notice/list")
+    out = []
+    for a in soup.select("a[href*='notice/detail']"):
+        txt = " ".join(a.get_text(" ", strip=True).split())
+        m = re.search(r"(20\d\d[.\-]\d\d[.\-]\d\d)\s*$", txt)
+        posted = m.group(1).replace(".", "-") if m else ""
+        title = re.sub(r"^\d+\s*", "", txt[:m.start()] if m else txt).strip()
+        e = _notice_event(title, absol(base, a["href"]), posted)
+        if e:
+            out.append(e)
+    return _dedup_events(out)
+
+
+def hanaro_events():
+    """HANARO 공지 목록은 ajax로 조각 HTML을 받아 그린다 — 그 조각을 직접 받는다."""
+    r = requests.get("https://www.hanaroetf.com/customer/notice-list-ajax",
+                     params={"currentPage": 1, "pageListSize": 30, "searchWord": ""},
+                     headers=dict(UA, **{"X-Requested-With": "XMLHttpRequest",
+                                         "Referer": "https://www.hanaroetf.com/customer/notice"}),
+                     timeout=15)
+    r.raise_for_status()
+    soup = BeautifulSoup(r.text, "html.parser")
+    out = []
+    for a in soup.select("a[href*='/customer/notice/']"):
+        txt = " ".join(a.get_text(" ", strip=True).split())
+        m = re.search(r"(20\d\d-\d\d-\d\d)\s*$", txt)
+        posted = m.group(1) if m else ""
+        title = re.sub(r"^공지\s*", "", txt[:m.start()] if m else txt).strip()
+        e = _notice_event(title, absol("https://www.hanaroetf.com", a["href"].split("?")[0]),
+                          posted)
+        if e:
+            out.append(e)
+    return _dedup_events(out)
+
+
+def rise_events():
+    """RISE는 이벤트 전용 페이지가 있고 상태·기간이 그대로 적혀 있다."""
+    soup = get_soup("https://www.riseetf.co.kr/cust/event")
+    out = []
+    for li in soup.select("li"):
+        txt = " ".join(li.get_text(" ", strip=True).split())
+        if "이벤트 기간" not in txt:
+            continue
+        st, en = _period(txt)
+        a = li.find("a", href=True)
+        state = "진행중" if txt.startswith("진행중") else ("종료" if txt.startswith("종료") else "")
+        title = re.sub(r"^(진행중|종료)\s*", "", txt).split("이벤트 기간")[0].strip()
+        out.append({"제목": clean(title, 90),
+                    "링크": a["href"] if a else "https://www.riseetf.co.kr/cust/event",
+                    "상태": state, "시작": st, "종료": en})
+    return _dedup_events(out)
+
+
+def timefolio_events():
+    """TIME ETF 이벤트 페이지 — '이벤트기간 2026.07.06~2026.07.31' 형태."""
+    soup = get_soup("https://timeetf.co.kr/board/board.php?bbsid=event")
+    txt = " ".join(soup.get_text(" ", strip=True).split())
+    out = []
+    for m in re.finditer(r"(\[EVENT\][^\[]{5,80}?)\s*이벤트기간\s*"
+                         r"(20\d\d\.\d\d\.\d\d)\s*~\s*(20\d\d\.\d\d\.\d\d)", txt):
+        en = m.group(3).replace(".", "-")
+        out.append({"제목": clean(m.group(1), 90),
+                    "링크": "https://timeetf.co.kr/board/board.php?bbsid=event",
+                    "상태": "진행중" if en >= date.today().isoformat() else "종료",
+                    "시작": m.group(2).replace(".", "-"), "종료": en})
+    return _dedup_events(out)
+
+
+EVENT_BOARDS = {"KODEX": kodex_events, "TIGER": tiger_events,
+                "ACE": ace_events, "SOL": sol_events, "PLUS": plus_events,
+                "HANARO": hanaro_events, "RISE": rise_events,
+                "TIMEFOLIO": timefolio_events}
 
 
 # ── 사이트별 추출기: [{제목, 링크}] 반환 ──────────────────────────
