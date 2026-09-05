@@ -1825,11 +1825,17 @@ with tab_channel:
             f'01이 <b>지금 무엇을 걸어놨는지</b>를 본다면, 여기서는 그 캠페인이 '
             f'<b>언제 시작해 언제 끝나는지</b>를 봅니다. 집행 기간이 명시돼 있어 '
             f'③ 효과 측정에서 집행 시점을 정의하는 데 가장 적합한 신호입니다. '
-            f'이벤트 보드를 파싱할 수 있는 곳은 KODEX·TIGER 2개사입니다.</div>', unsafe_allow_html=True)
-        if _ev_brands:
+            f'8개 브랜드 전부에서 수집하며, 진행 중인 건이 있는 브랜드만 싣습니다.</div>',
+            unsafe_allow_html=True)
+        # 진행 중이 없는 브랜드는 카드를 만들지 않는다 — '진행 중 0건'만 적힌 빈 카드가
+        # 늘어나면 정작 걸려 있는 캠페인이 묻힌다. 대신 아래 한 줄로 확인 사실만 남긴다.
+        _ev_live = [(b, [e for e in evs if e.get("상태") == "진행중"], evs)
+                    for b, evs in _ev_brands]
+        _ev_none = [b for b, live, _ in _ev_live if not live]
+        _ev_live = [(b, live, evs) for b, live, evs in _ev_live if live]
+        if _ev_live:
             _today_iso = dt.date.today().isoformat()
-            for _b, _evs in _ev_brands:
-                _live = [e for e in _evs if e.get("상태") == "진행중"]
+            for _b, _live, _evs in _ev_live:
                 _rows = ""
                 for e in sorted(_live, key=lambda x: x.get("종료") or "9999")[:8]:
                     _end = e.get("종료") or ""
@@ -1851,10 +1857,15 @@ with tab_channel:
                     f'<div class="card" style="padding:8px 16px;margin-bottom:12px;">'
                     f'<div style="font-size:0.8rem;font-weight:800;color:{INK};padding:4px 0;">'
                     f'{_b} <span style="font-size:0.7rem;color:{FAINT};font-weight:600;">'
-                    f'진행 중 {len(_live)}건 / 수집 {len(_evs)}건</span></div>'
+                    f'진행 중 {len(_live)}건</span></div>'
                     f'{_rows}</div>', unsafe_allow_html=True)
+        elif _ev_brands:
+            st.info("진행 중인 이벤트가 없습니다 — 8개 브랜드 모두 확인했습니다.")
         else:
             st.info("이벤트 데이터가 없습니다 — `python scripts/channel_batch.py` 실행 후 커밋하면 표시됩니다.")
+        if _ev_none:
+            # '수집은 했는데 진행 중이 없다'와 '아예 못 봤다'를 구분해 준다
+            st.caption(f"진행 중 없음 — {' · '.join(_ev_none)}")
 
         # 개별 이벤트까지는 못 긁지만 이벤트 메뉴는 운영하는 브랜드 — 수동 확인용 링크
         _ev_menu = [(b, ch_brands[b]["이벤트"]) for b in D.ISSUERS
