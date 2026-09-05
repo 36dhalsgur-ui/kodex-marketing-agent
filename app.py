@@ -2500,7 +2500,6 @@ with tab_report:
     rep_events, _rep_all = kodex_campaigns(_ch, youtube, rep_blogs, netbuy_df)
     # 리포트가 말하는 '집행'도 ③과 같이 이벤트 기준 — 콘텐츠 푸시는 ②에서 본다
     rep_campaigns = [c for c in _rep_all if c["유형"] == D.EVENT]
-    _week_ago_r = (dt.date.today() - dt.timedelta(days=7)).isoformat()
     _uni_r = universe_frame(netbuy_df)
 
     from collections import Counter as _C
@@ -2528,11 +2527,6 @@ with tab_report:
         f"지속 {n_keep}건 · 축소 {n_cut}건 — 국면별로 집행 강도를 조정할 시점입니다.")
 
     # 브랜드 발행량
-    brand_act = sorted(
-        ((b, sum(1 for v in youtube.get(b, []) if v.get("published", "") >= _week_ago_r)
-          + sum(1 for p in rep_blogs.get(b, []) if p.get("date", "") >= _week_ago_r))
-         for b in D.ISSUERS), key=lambda x: -x[1])
-
     # 자금 상위
     flow_top, flow_kodex = [], []
     if netbuy_live:
@@ -2706,8 +2700,7 @@ with tab_report:
         "stage_counts": stage_ct, "regime": regime,
         "bench_ret": _sb_all.get("벤치주간수익률"),
         "top_up": top_up, "top_dn": top_dn,
-        "campaigns": rep_campaigns, "top_brand": brand_act[0] if brand_act else ("—", 0),
-        "brand_act": brand_act,
+        "campaigns": rep_campaigns,
         "flow_top": flow_top, "flow_kodex": flow_kodex,
         "did_all": did_all,
         "review": review, "review_read": review_read,

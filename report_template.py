@@ -239,12 +239,6 @@ def render_report(ctx: dict) -> str:
         # 상한을 두지 않는다 — 집행 건수가 04 DiD 표와 맞아야 한다
         for c in ctx["campaigns"]) or '<tr><td colspan="3">감지된 이벤트 없음</td></tr>'
 
-    # 03 브랜드 발행량 — '경쟁 환경'이라 이름 붙여놓고 KODEX 표만 있었다
-    rows_brand = "".join(
-        f'<tr><td>{_esc(b)}</td><td class="num">{n}</td></tr>'
-        for b, n in (ctx.get("brand_act") or [])[:8]
-    ) or '<tr><td colspan="2">데이터 없음</td></tr>'
-
     # 02 자금
     rows_flow = "".join(
         f'<tr><td>{_esc(nm)}</td><td class="num up">{v:+.2f}%</td></tr>'
@@ -425,14 +419,11 @@ def render_report(ctx: dict) -> str:
       <tbody>{rows_flow}</tbody></table>
   </div>
 
-  <div class="sec"><div class="sec-h"><span class="sec-no">03</span><span class="sec-t">마케팅 경쟁 추이</span>
+  <div class="sec"><div class="sec-h"><span class="sec-no">03</span><span class="sec-t">이벤트 집행 현황</span>
     <span class="sec-tag">Channels · Live</span></div>
-    <p>이번 주 KODEX가 집행한 이벤트와 8개 브랜드의 콘텐츠 발행량이다.
-      발행량 1위는 <b>{_esc(ctx['top_brand'][0])}</b>({ctx['top_brand'][1]}건)였다.</p>
+    <p>이번 주 KODEX가 집행 중인 이벤트다. 아래 04에서 이 건들의 효과를 잰다.</p>
     <table><thead><tr><th>KODEX 집행 이벤트</th><th>채널</th><th class="num">집행 주차</th></tr></thead>
       <tbody>{rows_camp}</tbody></table>
-    <table class="mini" style="margin-top:12px;"><thead><tr><th>브랜드 발행량 (최근 7일)</th>
-      <th class="num">건</th></tr></thead><tbody>{rows_brand}</tbody></table>
   </div>
 
   <div class="sec"><div class="sec-h"><span class="sec-no">04</span><span class="sec-t">이벤트 효과 — DiD</span>
