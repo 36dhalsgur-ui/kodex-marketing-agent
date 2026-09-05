@@ -640,12 +640,20 @@ def fetch_live_indices() -> list[dict]:
 # API 키(YOUTUBE_API_KEY)가 있으면 좋아요·댓글 수까지 확장 가능
 # ══════════════════════════════════════════════
 YOUTUBE_CHANNELS = {
-    "KODEX": "UCQSlMWKs6L5lf5pz5FTbgKQ",       # 삼성자산운용
+    # 삼성자산운용은 채널을 나눠 쓴다 — ETF 브랜드 채널이 주력(주 9.5건),
+    # 운용사 채널은 연금·교육 위주로 뜸하다(주 0.5건). 예전에는 운용사 채널만
+    # 봐서 KODEX 발행량이 8개 브랜드 중 꼴찌로 잡혔다(실측 최근 7일 0건 → 8건).
+    # '강남역 8번출구'는 ETF 상품 마케팅이 아니라 투자 교육 채널이라 뺀다.
+    "KODEX": ["UCohjHDdtYtoKYtiCSVFoHAw",      # KODEX ETF 공식 채널 (@kodexetf)
+              "UCQSlMWKs6L5lf5pz5FTbgKQ"],     # 삼성자산운용 (@samsungfund)
     "TIGER": "UCNcMZz0cIba-4xBLZcoWrBA",
     "ACE": "UCnuyNitL5SIfBJvTJcdDNLQ",
     "SOL": "UCZ_aq57IPiAdmNYlxGZ8Pfg",
     "HANARO": "UCnK3ANYTFZnF8pkEh3_cOgg",
-    "RISE": "UCZ_xAP42i9KMUKZbomB6JSQ",
+    # 기존 값 UCZ_xAP42...는 KB'금융그룹' 채널이라 ETF와 무관한 CSR 콘텐츠가
+    # 대표 영상으로 잡혔다(실측: RISE 카드에 'KB마음가게 감자탕'). 운용사 채널
+    # (@kb_am)도 ETF를 다루지만 일반 펀드 홍보가 섞여 ETF 브랜드 채널만 쓴다.
+    "RISE": "UCZ9jozYXT6BXl2TchjNH8hw",        # RISE ETF (@rise_etf)
     "PLUS": "UCEznrN8oroicBCrwjSyvCDA",           # 한화자산운용 (PLUS ETF)
     "TIMEFOLIO": "UCs7024kj-wa_c9Z5WgXbMFQ",      # TIME 액티브 ETF (타임폴리오)
 }
@@ -697,6 +705,15 @@ _YT_LAST_GOOD: dict[str, list[dict]] = {}
 YOUTUBE_STATUS: dict[str, str] = {}
 
 
+def _channel_tasks() -> list[tuple[str, str]]:
+    """브랜드 → 채널 ID. 값이 문자열이면 1개, 리스트면 여러 개로 편다."""
+    tasks = []
+    for b, v in YOUTUBE_CHANNELS.items():
+        for cid in ([v] if isinstance(v, str) else v):
+            tasks.append((b, cid))
+    return tasks
+
+
 def fetch_youtube(n_per_channel: int = 3) -> dict[str, list[dict]]:
     """8개 브랜드 유튜브 채널의 최신 영상 수집.
 
@@ -705,20 +722,38 @@ def fetch_youtube(n_per_channel: int = 3) -> dict[str, list[dict]]:
     실패 사유는 YOUTUBE_STATUS에 남겨 화면에서 '수집 실패'와 '영상 없음'을 구분한다."""
     out: dict[str, list[dict]] = {}
     YOUTUBE_STATUS.clear()
+    got: dict[str, list[dict]] = {b: [] for b in YOUTUBE_CHANNELS}
+    n_ok: dict[str, int] = {b: 0 for b in YOUTUBE_CHANNELS}
+    errs: dict[str, list[str]] = {}
     with ThreadPoolExecutor(max_workers=3) as ex:
         futures = {
-            ex.submit(_fetch_channel_videos, b, cid, n_per_channel): b
-            for b, cid in YOUTUBE_CHANNELS.items()
+            ex.submit(_fetch_channel_videos, b, cid, n_per_channel): (b, cid)
+            for b, cid in _channel_tasks()
         }
-        for fut, brand in futures.items():
+        for fut in futures:
+            brand, _ = futures[fut]
             try:
-                vids = fut.result()
-                out[brand] = vids
-                if vids:
-                    _YT_LAST_GOOD[brand] = vids
+                got[brand].extend(fut.result())
+                n_ok[brand] += 1
             except Exception as e:
-                out[brand] = _YT_LAST_GOOD.get(brand, [])
-                YOUTUBE_STATUS[brand] = f"{type(e).__name__}: {e}"
+                errs.setdefault(brand, []).append(f"{type(e).__name__}: {e}")
+    for brand in YOUTUBE_CHANNELS:
+        # 채널이 여러 개인 브랜드는 합쳐서 최신순으로 n건만 남긴다. 채널 수만큼
+        # 늘려 두면 브랜드 발행량 비교에서 그 브랜드만 상한이 커진다.
+        seen, merged = set(), []
+        for v in sorted(got[brand], key=lambda x: x["published"], reverse=True):
+            if v["videoId"] in seen:
+                continue
+            seen.add(v["videoId"])
+            merged.append(v)
+        if merged:
+            out[brand] = merged[:n_per_channel]
+            _YT_LAST_GOOD[brand] = out[brand]
+        else:
+            out[brand] = _YT_LAST_GOOD.get(brand, [])
+        # 채널 하나가 실패해도 다른 채널이 살아 있으면 '수집 실패'가 아니다
+        if errs.get(brand) and not n_ok[brand]:
+            YOUTUBE_STATUS[brand] = " / ".join(errs[brand])
     return out
 
 

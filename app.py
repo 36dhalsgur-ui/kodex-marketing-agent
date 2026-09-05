@@ -669,7 +669,11 @@ def load_theme_returns():
 
 @st.cache_data(ttl=1800)
 def _load_youtube_cached():
-    return D.fetch_youtube(n_per_channel=8)
+    # RSS가 한 번에 15건을 주고 코드가 받은 뒤 잘라내므로, 8로 두면 받아온 걸
+    # 버리는 셈이다. 상한이 낮으면 발행량 상위 브랜드가 전부 8에서 붙어 순위가
+    # 안 갈린다(실측: KODEX·TIGER·RISE 모두 8). 화면 카드 수와는 무관하다 —
+    # 브랜드별 최신 1건 + 조회수 상위 8건으로 고정이라 표시량은 그대로다.
+    return D.fetch_youtube(n_per_channel=15)
 
 
 def load_youtube():
