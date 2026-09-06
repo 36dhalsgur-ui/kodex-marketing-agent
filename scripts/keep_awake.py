@@ -26,26 +26,39 @@ URL = os.environ.get("APP_URL", "").strip()
 SLEEP_MARK = "get this app back up"
 # 앱이 실제로 떴는지 알려주는 문구 — 탭 이름은 앱을 고쳐도 잘 안 바뀐다
 READY_MARKS = ("시장 트렌드", "채널 모니터링", "주간 리포트")
-BOOT_WAIT = 240          # 콜드 스타트가 길다(실시간 수집 포함). 넉넉히 준다.
+BOOT_WAIT = 420          # 컨테이너 기동 + 실시간 수집. 넉넉히 준다.
 POLL = 5
 
 
 def body_text(page) -> str:
-    try:
-        return page.inner_text("body")
-    except Exception:
-        return ""
+    """최상위와 모든 iframe의 본문을 합쳐서 본다.
+
+    *.streamlit.app은 앱을 iframe에 담아 띄운다 — 최상위 body만 보면 텍스트가
+    비어 있어 '기동 실패'로 오판한다(실측: 깨운 뒤 본문 0자).
+    잠금 화면은 최상위에 그려지므로 둘 다 필요하다.
+    """
+    parts = []
+    for f in [page] + list(page.frames):
+        try:
+            parts.append(f.locator("body").inner_text(timeout=3_000))
+        except Exception:
+            pass
+    return "\n".join(parts)
 
 
-def wait_ready(page, limit: int) -> tuple[bool, str]:
-    """앱 본문이 뜰 때까지 기다린다. (준비됨, 마지막 본문)"""
+def wait_ready(page, limit: int, bail_on_sleep: bool = True) -> tuple[bool, str]:
+    """앱 본문이 뜰 때까지 기다린다. (준비됨, 마지막 본문)
+
+    깨운 뒤에는 bail_on_sleep=False로 부른다 — 최상위에 잠금 화면 문구가 남아
+    있어도 앱은 iframe에서 뜨는 중이라, 여기서 나가면 매번 실패로 끝난다.
+    """
     end = time.time() + limit
     txt = ""
     while time.time() < end:
         txt = body_text(page)
         if any(m in txt for m in READY_MARKS):
             return True, txt
-        if SLEEP_MARK in txt:
+        if bail_on_sleep and SLEEP_MARK in txt:
             return False, txt          # 잠든 상태는 기다려도 안 바뀐다
         time.sleep(POLL)
     return False, txt
@@ -68,7 +81,7 @@ def main() -> int:
             # 감지에서 멈추지 않는다 — 여기서 깨워둬야 다음 방문자가 안 본다
             print("::warning::앱이 잠들어 있었다 — 깨운다. 실행 간격을 더 좁혀야 한다")
             page.get_by_text("Yes, get this app back up!").click(timeout=30_000)
-            ready, txt = wait_ready(page, BOOT_WAIT)
+            ready, txt = wait_ready(page, BOOT_WAIT, bail_on_sleep=False)
 
         browser.close()
 
