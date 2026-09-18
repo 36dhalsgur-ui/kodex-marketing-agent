@@ -1,10 +1,17 @@
 {
-  "asof": "2026-09-12",
+  "asof": "2026-09-18",
   "brands": [
     {
       "브랜드": "KODEX",
       "홈": "https://www.kodex.com",
       "이벤트목록": [
+        {
+          "제목": "KODEX 미국AI메모리TOP2플러스 ETF 투자 이벤트",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=105",
+          "상태": "진행중",
+          "시작": "2026-09-15",
+          "종료": "2026-10-31"
+        },
         {
           "제목": "매월 참여하는 KODEX 연금계좌 투자 이벤트",
           "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=103",
@@ -64,17 +71,17 @@
       ],
       "배너": [
         {
-          "제목": "신규상장(9/15) KODEX 미국AI메모리TOP2플러스 ETF (종목코드 : 0238F0) 미국판 삼전닉스 샌디스크, 마이크론 집중투자! 상품",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW3",
+          "제목": "상품안내 KODEX 미국S&P500 ETF (종목코드 : 379800) 장기 투자의 기본, 가장 먼저 담아야 할 연금·ISA 핵심 상품 상품안내",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE4",
           "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
         },
         {
-          "제목": "신규상장(8/25) KODEX 코리아TDF2065액티브 적격 ETF (종목코드 : 0231Z0) 국장 투자 필수템 알아서 투자해주는 코리아 TD",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW2",
-          "NEW": false,
+          "제목": "신규상장(9/15) KODEX 미국AI메모리TOP2플러스 ETF (종목코드 : 0238F0) 미국판 삼전닉스! 샌디스크, 마이크론 집중투자 HO",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW3",
+          "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -143,7 +150,7 @@
           "종료": ""
         },
         {
-          "제목": "AI로 찾는 나만의 TIGER PICK! 이벤트",
+          "제목": "(※당첨자 발표※)AI로 찾는 나만의 TIGER PICK! 이벤트",
           "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=184",
           "상태": "종료",
           "시작": "2026-08-10",
@@ -206,18 +213,18 @@
       "홈": "https://www.aceetf.co.kr",
       "이벤트목록": [
         {
+          "제목": "[EVENT] ACE를 소문내자!_추가 이벤트 (~10/31)",
+          "링크": "https://www.aceetf.co.kr/cs/notice/6967",
+          "상태": "진행중",
+          "시작": "2026-09-17",
+          "종료": "2026-10-31"
+        },
+        {
           "제목": "[EVENT] ACE ETF x 해태제과 에이스 콜라보 이벤트 (~10/31)",
           "링크": "https://www.aceetf.co.kr/cs/notice/6842",
           "상태": "진행중",
           "시작": "2026-09-01",
           "종료": "2026-10-31"
-        },
-        {
-          "제목": "[EVENT] ACE 반도체Plus전략산업 10주 매수 인증 이벤트(~9/10)",
-          "링크": "https://www.aceetf.co.kr/cs/notice/6682",
-          "상태": "종료",
-          "시작": "2026-08-10",
-          "종료": "2026-09-10"
         },
         {
           "제목": "[EVENT] [세미나] 한투스테이션 38회_ACE 반도체Plus전략산업ETF 알아보기",
@@ -234,11 +241,11 @@
           "종료": "2026-08-31"
         },
         {
-          "제목": "[EVENT] [세미나] 한투스테이션 37회_혼란과 혼돈의 주식시장, 코스피,코스닥의 운명은!?",
-          "링크": "https://www.aceetf.co.kr/cs/notice/6482",
-          "상태": "",
-          "시작": "2026-07-14",
-          "종료": ""
+          "제목": "[EVENT] ACE 반도체Plus전략산업 10주 매수 인증 이벤트(~9/10)",
+          "링크": "https://www.aceetf.co.kr/cs/notice/6682",
+          "상태": "종료",
+          "시작": "2026-08-10",
+          "종료": "2026-09-10"
         }
       ],
       "배너": [
@@ -415,7 +422,7 @@
         },
         {
           "제목": "RISE 미국우주위성통신 상장 기념 매수인증 이벤트",
-          "링크": "javascript:;",
+          "링크": "/cust/event/47?page=1",
           "상태": "종료",
           "시작": "2026-08-11",
           "종료": "2026-09-10"
@@ -502,6 +509,13 @@
       "홈": "https://www.plusetf.co.kr",
       "이벤트목록": [
         {
+          "제목": "[이벤트]PLUS ETF 브랜드 필름 런칭 기념! 감상평 댓글 이벤트 (~9/30)",
+          "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=32059",
+          "상태": "진행중",
+          "시작": "2026-09-14",
+          "종료": "2026-09-30"
+        },
+        {
           "제목": "[매수 이벤트] PLUS SK하이닉스샌디스크채권혼합50 매수 인증 이벤트 (~9/4)",
           "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=31834",
           "상태": "종료",
@@ -514,20 +528,13 @@
           "상태": "종료",
           "시작": "2026-06-25",
           "종료": "2026-07-10"
-        },
-        {
-          "제목": "[매수 이벤트] PLUS 글로벌HBM반도체 매수 인증 이벤트 시즌2! (~7/10)",
-          "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=31618",
-          "상태": "종료",
-          "시작": "2026-06-18",
-          "종료": "2026-07-10"
         }
       ],
       "배너": [
         {
           "제목": "PLUS ETF 9월 분배금 지급 안내",
           "링크": "https://www.plusetf.co.kr",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -541,18 +548,18 @@
           "슬롯수": 1
         },
         {
-          "제목": "단일 종목 레버리지·인버스2X 투자 유의사항 안내",
-          "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=31496",
-          "NEW": false,
-          "링크유형": "공지",
+          "제목": "PLUS AI반도체소부장액티브 ETF",
+          "링크": "https://www.plusetf.co.kr/product/detail?n=006410",
+          "NEW": true,
+          "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
         },
         {
-          "제목": "PLUS ETF가 제안하는 전략투자 솔루션",
-          "링크": "https://www.plusetf.co.kr/insight/guide/detail?n=2088",
-          "NEW": false,
-          "링크유형": "홈페이지",
+          "제목": "PLUS 코리아HBM반도체 ETF",
+          "링크": "https://www.plusetf.co.kr/product/detail?n=006409",
+          "NEW": true,
+          "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
         },
@@ -612,6 +619,14 @@
         "링크": "https://www.hanaroetf.com/customer/notice/9f4823dfc6044959b174"
       },
       "배너": [
+        {
+          "제목": "HANARO 미국에이전틱AI TOP2+ 미국 에이전틱 AI 밸류체인 핵심기업 TOP2를 중심으로 투자하는 ETF",
+          "링크": "https://www.hanaroetf.com/fund/E5B1094831A64EB6",
+          "NEW": true,
+          "링크유형": "상품",
+          "노출": "메인 배너",
+          "슬롯수": 1
+        },
         {
           "제목": "HANARO 미국AI광통신TOP10 미국 AI광통신 인프라의 핵심 기업 TOP10에 투자하는 ETF",
           "링크": "https://www.hanaroetf.com/fund/A7499D2757FC46EF",
