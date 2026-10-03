@@ -1,5 +1,5 @@
 {
-  "asof": "2026-09-26",
+  "asof": "2026-10-03",
   "brands": [
     {
       "브랜드": "KODEX",
@@ -41,20 +41,6 @@
           "종료": "2026-12-31"
         },
         {
-          "제목": "KODEX 코리아TDF2065액티브 적격 ETF 신규 상장 이벤트🧭",
-          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=100",
-          "상태": "진행중",
-          "시작": "2026-08-25",
-          "종료": "2026-09-30"
-        },
-        {
-          "제목": "KODEX 한국, 미국 반도체 ETF 투자 이벤트",
-          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=99",
-          "상태": "진행중",
-          "시작": "2026-08-05",
-          "종료": "2026-09-30"
-        },
-        {
           "제목": "KODEX 미국대표지수 ETF 적립식 매수 이벤트📈",
           "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=92",
           "상태": "진행중",
@@ -71,8 +57,8 @@
       ],
       "배너": [
         {
-          "제목": "지금 Hot한 ETF KODEX 미국CPU반도체TOP10 ETF (종목코드 : 0225V0) AI에이전트 지속 성장 기대! 지금 필요한 건 CP",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFV9",
+          "제목": "상품안내 KODEX 미국S&P500 ETF (종목코드 : 379800) 장기 투자의 기본, 가장 먼저 담아야 할 연금·ISA 핵심 상품 지금 H",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE4",
           "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
@@ -81,7 +67,7 @@
         {
           "제목": "신규상장(9/15) KODEX 미국AI메모리TOP2플러스 ETF (종목코드 : 0238F0) 미국판 삼전닉스! 샌디스크, 마이크론 집중투자 상품",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW3",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -142,6 +128,13 @@
       "홈": "https://www.aceetf.co.kr",
       "이벤트목록": [
         {
+          "제목": "[EVENT] ACE 미국 대표지수 라인업 매수이벤트(~11/30)",
+          "링크": "https://www.aceetf.co.kr/cs/notice/7062",
+          "상태": "진행중",
+          "시작": "2026-10-01",
+          "종료": "2026-11-30"
+        },
+        {
           "제목": "[EVENT] ACE를 소문내자!_추가 이벤트 (~10/31)",
           "링크": "https://www.aceetf.co.kr/cs/notice/6967",
           "상태": "진행중",
@@ -156,6 +149,13 @@
           "종료": "2026-10-31"
         },
         {
+          "제목": "[EVENT] [세미나] 한투스테이션 39회_미국 대표지수·채권혼합형 ETF 알아보기",
+          "링크": "https://www.aceetf.co.kr/cs/notice/7003",
+          "상태": "",
+          "시작": "2026-09-28",
+          "종료": ""
+        },
+        {
           "제목": "[EVENT] [세미나] 한투스테이션 38회_ACE 반도체Plus전략산업ETF 알아보기",
           "링크": "https://www.aceetf.co.kr/cs/notice/6742",
           "상태": "",
@@ -168,13 +168,6 @@
           "상태": "종료",
           "시작": "2026-08-14",
           "종료": "2026-08-31"
-        },
-        {
-          "제목": "[EVENT] ACE 반도체Plus전략산업 10주 매수 인증 이벤트(~9/10)",
-          "링크": "https://www.aceetf.co.kr/cs/notice/6682",
-          "상태": "종료",
-          "시작": "2026-08-10",
-          "종료": "2026-09-10"
         }
       ],
       "배너": [
@@ -277,13 +270,6 @@
           "링크": "https://www.soletf.com/ko/cs/notice/67",
           "상태": "",
           "시작": "2026-01-09",
-          "종료": ""
-        },
-        {
-          "제목": "SOL ETF 공식채널 구독 인증 이벤트",
-          "링크": "https://www.soletf.com/ko/cs/notice/66",
-          "상태": "",
-          "시작": "2026-01-02",
           "종료": ""
         }
       ],
@@ -390,7 +376,7 @@
         {
           "제목": "[이벤트]PLUS ETF 브랜드 필름 런칭 기념! 감상평 댓글 이벤트 (~9/30)",
           "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=32059",
-          "상태": "진행중",
+          "상태": "종료",
           "시작": "2026-09-14",
           "종료": "2026-09-30"
         },
@@ -458,9 +444,9 @@
       "홈": "https://www.hanaroetf.com",
       "이벤트목록": [
         {
-          "제목": "[EVENT] HANARO 반도체 투자 세트 매수 인증 이벤트 🎁",
+          "제목": "[EVENT 종료] HANARO 반도체 투자 세트 매수 인증 이벤트 🎁",
           "링크": "https://www.hanaroetf.com/customer/notice/9f4823dfc6044959b174",
-          "상태": "",
+          "상태": "종료",
           "시작": "2026-08-20",
           "종료": ""
         },
@@ -494,8 +480,8 @@
         }
       ],
       "이벤트": {
-        "라벨": "제목 [EVENT] HANARO 반도체 투자 세트 매수 인증 이벤트 🎁 날짜 2026.08.20",
-        "링크": "https://www.hanaroetf.com/customer/notice/9f4823dfc6044959b174"
+        "라벨": "제목 [당첨자 발표] HANARO 반도체 투자 세트 매수 인증 이벤트 날짜 2026.10.02",
+        "링크": "https://www.hanaroetf.com/customer/notice/fd9482ed7d641dda7bfc"
       },
       "배너": [
         {
