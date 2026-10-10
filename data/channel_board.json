@@ -1,5 +1,5 @@
 {
-  "asof": "2026-10-03",
+  "asof": "2026-10-10",
   "brands": [
     {
       "브랜드": "KODEX",
@@ -57,17 +57,17 @@
       ],
       "배너": [
         {
-          "제목": "상품안내 KODEX 미국S&P500 ETF (종목코드 : 379800) 장기 투자의 기본, 가장 먼저 담아야 할 연금·ISA 핵심 상품 지금 H",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE4",
+          "제목": "신규상장(10/13) KODEX 미국AI에이전트액티브 ETF (종목코드 : 0241D0) AI가 일하는 세상, AI 에이전트를 만드는 핵심 기업",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW4",
           "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
         },
         {
-          "제목": "신규상장(9/15) KODEX 미국AI메모리TOP2플러스 ETF (종목코드 : 0238F0) 미국판 삼전닉스! 샌디스크, 마이크론 집중투자 상품",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW3",
-          "NEW": false,
+          "제목": "투자가이드북 ETF 연금술사, 나의 시간을 연금 자산으로 바꾸는 기술 연금투자 가이드북 보러가기 → 상품안내 KODEX 200커버드콜액티브 ET",
+          "링크": "https://www.kodex.com/etf/insight/investment-guide/view.do?seqn=79973",
+          "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -320,11 +320,7 @@
     {
       "브랜드": "RISE",
       "홈": "https://www.riseetf.co.kr",
-      "이벤트목록": [],
-      "이벤트": {
-        "라벨": "이벤트",
-        "링크": "https://www.riseetf.co.kr/support/events"
-      },
+      "이벤트비고": "이벤트 수집 실패: ConnectTimeout",
       "배너": [
         {
           "제목": "RISE 글로벌AI 낸드메모리반도체 당신의 NEW 반도체 투자가 향하는 곳은 어디입니까?",
@@ -367,7 +363,7 @@
           "슬롯수": 1
         }
       ],
-      "비고": "수집 실패(ValueError) — 직전 데이터 유지"
+      "비고": "수집 실패(ConnectTimeout) — 직전 데이터 유지"
     },
     {
       "브랜드": "PLUS",
