@@ -2635,10 +2635,13 @@ with tab_report:
     # 라인업 공백은 신규 상장이 있어야 바뀌는 지표라 주 단위로는 잘 안 움직인다.
     # 화면에 기준을 밝히지 않으면 "갱신이 안 된다"로 오해된다.
     gaps = D.lineup_gaps() if hasattr(D, "lineup_gaps") else []
-    _names_p = Path(__file__).parent / "data" / "etf_names.json"
+    # 기준 날짜는 배치가 적어둔 asof를 쓴다. 예전에는 etf_names.json의 파일 수정
+    # 시각을 썼는데, 배포 서버에선 그게 체크아웃 시각이라 7월에 멈춘 명단에 최근
+    # 날짜가 찍혔다 — '기준을 밝혀 오해를 막는다'는 의도와 정반대로 동작했다.
     try:
-        _gap_basis = (len(json.loads(_names_p.read_text())),
-                      dt.date.fromtimestamp(_names_p.stat().st_mtime).isoformat())
+        _gap_basis = (len(D._etf_names()),
+                      json.loads((Path(__file__).parent / "data" / "etf_flows.json")
+                                 .read_text()).get("asof", ""))
     except Exception:
         _gap_basis = (0, "")
     def _gap_detail(g: dict, judged: dict | None = None) -> dict:
@@ -2648,7 +2651,10 @@ with tab_report:
         _types = _C(D.etf_product_type(p) for p in _peers) if _peers else {}
         _dom = max(_types, key=_types.get) if _types else "지수추종"
         _all_same = len(_types) == 1
-        _stage = next((r.get("단계", "") for r in rep_board if r["섹터"] == g["테마"]), "")
+        # 국면은 판정이 쓴 값을 그대로 받는다. 여기서 테마 이름으로 다시 찾으면
+        # 시장이 빠져 '글로벌' 테마에 국내 섹터 국면이 붙는다(판정과 카드가 어긋남).
+        _stage = (judged or {}).get("국면", "")
+        _basis = (judged or {}).get("국면근거", "")
         _srch = rep_search.get(g["테마"]) or rep_search.get(
             "AI반도체" if g["테마"] == "반도체" else "", None)
         j = judged or {}
@@ -2685,8 +2691,10 @@ with tab_report:
             "유형요약": (f'{g["경쟁사수"]}종 모두 {_dom}' if _all_same
                       else f'{_dom} 중심 {g["경쟁사수"]}종'),
             "국면": _stage,
+            # 어느 섹터의 국면인지 밝힌다 — 해외 테마가 국내 국면으로 판정되던 문제를
+            # 화면에서 바로 확인할 수 있어야 한다
             "신호설명": (f'검색 {_srch:+.1f}%' if _srch is not None else "검색 신호 없음")
-                        + (f' · 국면상 {_stage}' if _stage else ""),
+                        + (f' · {_basis} 기준' if _stage else " · 대응 섹터 없음"),
             "기준": f"전체 ETF {_gap_basis[0]:,}종 · {_gap_basis[1]} 수집" if _gap_basis[0] else "",
             "공백수": len(gaps),
             "타이밍": j.get("판정") or ("대기" if _stage in ("과열기", "쇠퇴기") else "검토"),
@@ -2709,7 +2717,7 @@ with tab_report:
     except Exception:
         pass
     _stage_of = {r["섹터"]: r.get("단계", "") for r in rep_board}
-    _gap_judged = D.gap_launch_review(gaps, lambda t: _stage_of.get(t, ""),
+    _gap_judged = D.gap_launch_review(gaps, lambda sector: _stage_of.get(sector, ""),
                                       lambda n: _gap_aum.get(n), limit=len(gaps))
     _n_gap = len(_gap_judged)
     gaps_all, _gap_dropped = D.split_actionable(_gap_judged, D.GAP_ACTIONABLE)
@@ -2998,7 +3006,8 @@ with tab_report:
                 st.caption(
                     "공백은 '경쟁사는 있는데 KODEX만 없는' 테마로 정의합니다. 따라서 아무도 "
                     "출시하지 않은 테마는 이 방식으로 탐지되지 않습니다.  \n"
-                    + (gap_ctx["기준"] if gap_ctx else "") + " · 신규 상장이 있을 때만 바뀝니다.")
+                    + (gap_ctx["기준"] if gap_ctx else "")
+                    + " · 공백 목록은 신규 상장이 있을 때, 판정은 매주 국면·순자산으로 다시 매깁니다.")
         else:
             st.markdown(
                 f'<div class="card"><div style="font-size:0.82rem;color:{MUTED};line-height:1.6;">'

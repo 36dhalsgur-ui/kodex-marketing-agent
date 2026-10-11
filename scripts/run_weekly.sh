@@ -39,6 +39,18 @@ if [ -z "${KRX_API_KEY:-}" ]; then
     exit 1
 fi
 
+# 시작 전에 원격을 먼저 받는다. 로컬이 실패한 주에 Actions 백업이 대신 올리면,
+# 로컬은 뒤처진 채로 다음 주 커밋을 쌓아 이력이 갈라진다. 그 뒤로는 push가 매주
+# 거부되고 로컬 결과가 계속 버려진다(실측 2026-09-26 ~ 10-10, 3주 연속).
+if [ -z "${NO_PUSH:-}" ]; then
+    if git pull -q --rebase --autostash; then
+        log "✓ 원격 동기화"
+    else
+        git rebase --abort 2>/dev/null
+        log "! 원격 동기화 실패 — 계속 진행하고 push 단계에서 다시 맞춘다"
+    fi
+fi
+
 log "주간 배치 시작 (python: $PY)"
 failed=()
 for s in weekly_batch etf_batch channel_batch sector_universe; do
@@ -113,8 +125,16 @@ if ! git diff --quiet -- data/ || [ -n "$(git status --porcelain -- data/)" ]; t
     if [ -z "${NO_PUSH:-}" ]; then
         if git push -q; then
             log "✓ 푸시 완료 — Streamlit이 자동 재배포합니다"
+        # 배치가 도는 두어 시간 사이 다른 쪽이 먼저 올렸을 수 있다. 원격 위에 다시
+        # 얹고 한 번 더 시도한다. 데이터가 겹치면 방금 만든 이쪽을 남긴다 — rebase에서
+        # 'theirs'는 다시 얹히는 커밋(=이번 배치 결과)이다.
+        elif git pull -q --rebase -X theirs && git push -q; then
+            log "✓ 푸시 완료 (원격 변경분 위에 다시 얹음) — Streamlit이 자동 재배포합니다"
         else
-            log "✗ 푸시 실패 (인증 확인 필요)"
+            git rebase --abort 2>/dev/null
+            # 예전 문구는 '인증 확인 필요'였지만 실제 원인은 이력 갈라짐이었다.
+            # 원인을 단정하지 않고 확인 방법을 남긴다.
+            log "✗ 푸시 실패 — 원격과 이력이 갈라졌거나 인증 문제. 'git status'·'git log origin/main..'로 확인"
             exit 1
         fi
     fi

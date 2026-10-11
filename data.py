@@ -149,6 +149,27 @@ _ETF_NAMES_PATH = Path(__file__).parent / "data" / "etf_names.json"
 _LINEUP_EXCLUDE = re.compile(r"인버스|레버리지|2X|3X|곱버스|선물\(H\)|합성")
 
 
+def _etf_names() -> dict[str, str]:
+    """{티커: 종목명} — 주간 배치가 매주 새로 쓰는 etf_flows.json에서 읽는다.
+
+    예전에는 etf_names.json을 읽었는데, 이 파일을 갱신하는 배치가 없어 2026-07-21
+    상태로 멈춰 있었다(실측 10월: 신규 상장 26종 누락, KODEX 3종 포함). 라인업
+    공백을 판단하는 명단이 낡으면 KODEX가 이미 낸 테마가 후보로 남는다.
+    etf_flows가 없을 때만 옛 파일로 물러난다.
+    """
+    try:
+        etfs = json.loads(_ETF_FLOWS_PATH.read_text()).get("etfs") or []
+        names = {e["티커"]: e["종목명"] for e in etfs if e.get("티커") and e.get("종목명")}
+        if names:
+            return names
+    except Exception:
+        pass
+    try:
+        return json.loads(_ETF_NAMES_PATH.read_text())
+    except Exception:
+        return {}
+
+
 # 공백 후보로 올릴 최소 경쟁사 수. 3으로 두면 '선발이 1~2곳뿐인 테마'가 통째로
 # 빠지는데(실측 13건), 그런 곳이야말로 선점 여지가 크다. 1로 낮춰 후보에 넣고
 # 경쟁사가 적을 때의 위험(시장이 검증되지 않았을 수 있다)은 판정 단계에서 가른다.
@@ -157,9 +178,8 @@ _LINEUP_EXCLUDE = re.compile(r"인버스|레버리지|2X|3X|곱버스|선물\(H\
 def lineup_gaps(min_competitors: int = 1) -> list[dict]:
     """전체 ETF 명단(배치 캐시)에서 'KODEX 미보유 + 경쟁사 다수 보유' 테마×시장 공백.
     반환: [{테마, 시장, 경쟁사수, 브랜드}] 경쟁사 많은 순. 캐시 없으면 빈 리스트."""
-    try:
-        names = json.loads(_ETF_NAMES_PATH.read_text())
-    except Exception:
+    names = _etf_names()
+    if not names:
         return []
     from collections import defaultdict
     cov: dict = defaultdict(lambda: defaultdict(int))
@@ -191,10 +211,7 @@ def etf_product_type(name: str) -> str:
 
 def gap_competitors(theme: str, market: str, limit: int = 6) -> list[str]:
     """해당 테마×시장의 비(非)KODEX 경쟁 상품 실제 목록."""
-    try:
-        names = json.loads(_ETF_NAMES_PATH.read_text())
-    except Exception:
-        return []
+    names = _etf_names()
     out = []
     for nm in names.values():
         b = etf_brand_of(nm)
@@ -263,8 +280,34 @@ def _reul(w: str) -> str:    # 을/를
 
 
 # 국면(RRG 22섹터)에 매핑되는 ETF 테마만 국면 판정 대상 — 나머지는 전략상품(레짐 로직)
-_THEME_TO_SECTOR = {"반도체": "반도체", "AI·전력": "AI·전력", "2차전지": "2차전지",
-                    "방산": "방산", "조선": "조선", "원자력": "원자력"}
+# 테마×시장 → 시그널 보드 섹터. 이름이 아니라 '실제로 담는 종목이 같은가'로 잇는다.
+#
+# 시장을 빼고 테마 이름만으로 찾으면 해외 상품이 국내 섹터 국면으로 판정된다.
+# 실측(2026-10): 'AI·전력·글로벌'이 국내 AI·전력의 '태동기'로 잡혀 출시 후보 1순위에
+# 올랐는데, 실제로 봐야 할 미국AI전력은 '쇠퇴기'였다. KODEX 미국반도체도 국내
+# 반도체 국면으로 판정되고 있었다.
+#
+# 구성종목이 다른 조합은 일부러 비워둔다 — 틀린 국면은 '미상'보다 나쁘다.
+#   방산·글로벌(록히드·RTX)  ≠ 미국우주항공(로켓랩·AST 소형 우주주)
+#   빅테크·글로벌(경쟁 상품이 게임테크 1종) ≠ 미국AI테크(엔비디아·MS 대형주)
+#   원자력·글로벌(카메코·우라늄)  ≠ 미국AI전력(GE버노바·버티브 전력 인프라)
+_SECTOR_MAP = {
+    # 국내 — 같은 이름의 KRX 섹터·KODEX 테마
+    ("반도체", "한국"): "반도체", ("AI·전력", "한국"): "AI·전력",
+    ("2차전지", "한국"): "2차전지", ("방산", "한국"): "방산",
+    ("조선", "한국"): "조선", ("원자력", "한국"): "원자력",
+    ("바이오", "한국"): "헬스케어",        # KRX 헬스케어 = 삼성바이오·셀트리온·알테오젠
+    ("빅테크", "한국"): "정보기술",        # 코리아테크 계열 = 삼성전자·SK하이닉스 중심
+    # 해외 — 시그널 보드의 해외 섹터는 미국 상장 종목으로 구성된다.
+    # 글로벌 반도체·AI전력 상품도 구성 대부분이 미국 종목이라 같은 섹터로 본다.
+    ("반도체", "미국"): "미국반도체", ("반도체", "글로벌"): "미국반도체",
+    ("AI·전력", "미국"): "미국AI전력", ("AI·전력", "글로벌"): "미국AI전력",
+}
+
+
+def sector_for(theme: str, market: str) -> str | None:
+    """테마×시장의 국면을 읽을 시그널 보드 섹터. 근거가 없으면 None(국면 미상)."""
+    return _SECTOR_MAP.get((theme, market))
 _STRATEGY_THEMES = {"커버드콜", "채권", "시장대표", "배당", "금·원자재", "빅테크", "바이오"}
 
 
@@ -293,10 +336,10 @@ def review_current_marketing(events: list, board: list, netbuy_df, week: str) ->
             continue
         seen.add(name)
         etf = e.get("ETF", name)
-        theme, _ = classify_etf(etf if e.get("분석가능") else name)
+        theme, market = classify_etf(etf if e.get("분석가능") else name)
         inten = _intensity_at(netbuy_df, etf, week)
         newlisting = inten is not None and inten >= _NEWLISTING_INTENSITY
-        sector = _THEME_TO_SECTOR.get(theme)
+        sector = sector_for(theme, market)
         phase = stage.get(sector) if sector else None
 
         if phase is None or theme in _STRATEGY_THEMES:
@@ -1613,11 +1656,13 @@ def gap_launch_review(gaps: list[dict], stage_of, aum_of, limit: int = 8) -> lis
         total = sum(v for _, v in sizes)
         top = max(sizes, key=lambda x: x[1]) if sizes else None
         share = (top[1] / total) if (top and total > 0) else None
-        stage = stage_of(theme) or ""
+        sector = sector_for(theme, market)
+        stage = (stage_of(sector) or "") if sector else ""
         row = {"테마": theme, "시장": market, "경쟁사수": g["경쟁사수"],
                "브랜드": ", ".join(f"{b} {n}" for b, n in
                                  sorted(g["브랜드"].items(), key=lambda x: -x[1])),
-               "국면": stage, "시장규모억": total if sizes else None,
+               "국면": stage, "국면근거": sector or "",
+               "시장규모억": total if sizes else None,
                "1위": top[0] if top else "", "1위순자산": top[1] if top else None,
                "점유율": share, "확인종수": len(sizes)}
 
