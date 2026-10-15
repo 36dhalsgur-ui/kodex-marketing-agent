@@ -2627,7 +2627,10 @@ with tab_report:
             "배지": top["판정"],
             "peer_note": top["근거"],
         }
-    emerging_names = ", ".join(e["섹터"] for e in emerging_all)
+    # 01 시장 국면은 국면 분포를 설명하는 문장이라 두 목록 모두 시그널 보드에서 뽑는다.
+    # 예전에는 태동만 emerging_all(B섹션 '착수 판정을 통과한' 태동 섹터)을 써서, 착수
+    # 대상이 없는 주에는 태동 섹터가 3개 있어도 "태동 국면은 없음"으로 찍혔다(10월 2주).
+    emerging_names = ", ".join(r["섹터"] for r in rep_board if r.get("단계") == "태동기")
     expanding_names = ", ".join(r["섹터"] for r in rep_board if r.get("단계") == "확산기")
 
     # 신규 ETF 출시 후보 (라인업 공백 1순위) — B가 "있는 상품을 밀까"라면
