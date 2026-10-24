@@ -2474,12 +2474,16 @@ def _fetch_weekly_one(label: str, kind: str, code: str) -> dict:
         ).json()
         closes = [_parse_price(r["closePrice"]) for r in rows]
     else:  # fx
-        rows = requests.get(
+        # pageSize는 10 이상이어야 한다 — 7로 보내면 'too_small' 오류 JSON이 오고
+        # result가 없어 KeyError로 폴백값이 떴다(실측 2026-10: 화면 1,522.40 · 실제 1,326.50).
+        d = requests.get(
             "https://m.stock.naver.com/front-api/marketIndex/prices"
-            f"?category=exchange&reutersCode={code}&page=1&pageSize=7",
+            f"?category=exchange&reutersCode={code}&page=1&pageSize=10",
             headers=headers, timeout=4,
-        ).json()["result"]
-        closes = [_parse_price(r["closePrice"]) for r in rows]
+        ).json()
+        if "result" not in d:
+            raise ValueError(f"환율 응답 오류: {d.get('detailCode') or d.get('message', '')[:80]}")
+        closes = [_parse_price(r["closePrice"]) for r in d["result"]]
     if len(closes) < 6:
         raise ValueError("이력 부족")
     # 같은 응답(7일치 종가)에서 일간·주간을 함께 계산 — 추가 호출이 없다
@@ -2498,8 +2502,10 @@ def fetch_weekly_market() -> list[dict]:
         for fut, label in futures.items():
             try:
                 results[label] = fut.result()
-            except Exception:
-                results[label] = fallback[label]
+            except Exception as e:
+                # 폴백값은 실시간처럼 보이면 안 된다 — 화면이 '조회 실패'로 그리도록 표시한다
+                results[label] = {**fallback[label], "stale": True,
+                                  "error": f"{type(e).__name__}: {e}"[:120]}
     return [results[label] for label, _, _ in WEEKLY_SOURCES]
 
 

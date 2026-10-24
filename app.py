@@ -1076,6 +1076,13 @@ with tab_home:
     # ── 시장 지수 — 전일 대비를 앞에, 주간 누적을 보조로 (같은 응답에서 둘 다 계산됨)
     _cells = ""
     for m in load_weekly_market():
+        if m.get("stale"):
+            # 조회 실패 — 고정된 대체값을 실시간처럼 보여주면 틀린 숫자를 믿게 된다
+            _cells += (
+                f'<div class="mkt-cell"><div class="mkt-n">{m["name"]}</div>'
+                f'<div class="mkt-v" style="color:{FAINT};">—</div>'
+                f'<div class="mkt-s" style="color:{FAINT};">조회 실패</div></div>')
+            continue
         _d, _w = m.get("daily", 0.0), m["weekly"]
         _cells += (
             f'<div class="mkt-cell"><div class="mkt-n">{m["name"]}</div>'
