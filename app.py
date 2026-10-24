@@ -638,6 +638,11 @@ def base_layout(fig: go.Figure, height: int = 380) -> go.Figure:
 # ──────────────────────────────────────────────
 @st.cache_data(ttl=1800)
 def load_weekly_market():
+    """시장 지수·환율 — 30분 캐시.
+
+    조회 실패분(stale)이 섞이면 호출부에서 캐시를 비운다. 실패 결과가 30분 동안
+    남으면, 원인을 고쳐 배포해도 화면은 계속 대체값을 보여준다(실측 2026-10-24 환율).
+    """
     return D.fetch_weekly_market()
 
 
@@ -1075,7 +1080,10 @@ with tab_home:
 
     # ── 시장 지수 — 전일 대비를 앞에, 주간 누적을 보조로 (같은 응답에서 둘 다 계산됨)
     _cells = ""
-    for m in load_weekly_market():
+    _mkt = load_weekly_market()
+    if any(m.get("stale") for m in _mkt):
+        load_weekly_market.clear()      # 실패분은 다음 실행에서 다시 조회
+    for m in _mkt:
         if m.get("stale"):
             # 조회 실패 — 고정된 대체값을 실시간처럼 보여주면 틀린 숫자를 믿게 된다
             _cells += (
