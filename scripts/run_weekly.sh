@@ -116,11 +116,16 @@ then
     failed+=("날짜검증")
 fi
 
+# 커밋 주체는 환경변수로 고정한다. 예전에는 commit에만 -c user.name을 붙여서, push가
+# 거부돼 원격 위에 다시 얹는 단계(git pull --rebase)는 주체 없이 돌다가 GitHub 러너에서
+# 'empty ident name'으로 실패했다(실측 2026-10-24 — 수집은 다 됐는데 push 못 해 한 주가
+# 통째로 빠짐). 로컬 맥은 전역 설정이 있어 드러나지 않았다.
+export GIT_AUTHOR_NAME="kodex-batch" GIT_AUTHOR_EMAIL="batch@users.noreply.github.com"
+export GIT_COMMITTER_NAME="kodex-batch" GIT_COMMITTER_EMAIL="batch@users.noreply.github.com"
+
 if ! git diff --quiet -- data/ || [ -n "$(git status --porcelain -- data/)" ]; then
     git add data/
-    git -c user.name="kodex-batch" \
-        -c user.email="batch@users.noreply.github.com" \
-        commit -q -m "데이터: 주간 배치 자동 갱신 ($(date '+%Y-%m-%d'))${failed:+ — 실패: ${failed[*]}}"
+    git commit -q -m "데이터: 주간 배치 자동 갱신 ($(date '+%Y-%m-%d'))${failed:+ — 실패: ${failed[*]}}"
     log "✓ 커밋 완료"
     if [ -z "${NO_PUSH:-}" ]; then
         if git push -q; then
