@@ -1,5 +1,5 @@
 {
-  "asof": "2026-10-24",
+  "asof": "2026-10-30",
   "brands": [
     {
       "브랜드": "KODEX",
@@ -84,7 +84,7 @@
         {
           "제목": "신규상장(10/20) 종목코드 : 0254S0 KODEX 미국배당다우존스액티브 ETF 다우존스 지수로 미국 배당주 투자와 액티브한 초과성과 추구",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW7",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -92,7 +92,7 @@
         {
           "제목": "상품안내 종목코드 : 379800 KODEX 미국S&P500 ETF 장기 투자의 기본, 가장 먼저 담아야 할 연금·ISA 필수 상품 현재가 22",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE4",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -108,7 +108,7 @@
         {
           "제목": "상품안내 종목코드 : 379810 KODEX 미국나스닥100 ETF 장기 투자의 기본, 가장 먼저 담아야 할 연금·ISA 필수 상품 현재가 25",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE3",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -116,7 +116,7 @@
         {
           "제목": "신규상장(10/20) 종목코드 : 0254C0 KODEX 27-12 금융채(AA-이상)액티브 ETF ETF로 마음 편히 투자하는 우량등급 금융채",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW5",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -127,21 +127,92 @@
     {
       "브랜드": "TIGER",
       "홈": "https://www.tigeretf.com",
-      "이벤트비고": "이벤트 수집 실패: HTTPError",
+      "이벤트목록": [
+        {
+          "제목": "나만의 TIGER ETF 적립식 포트폴리오 만들기 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=196",
+          "상태": "진행중",
+          "시작": "2026-10-26",
+          "종료": "2026-11-15"
+        },
+        {
+          "제목": "TIGER ETF 절세 투자 가이드북 다운로드 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=195",
+          "상태": "진행중",
+          "시작": "2026-10-23",
+          "종료": "2026-11-30"
+        },
+        {
+          "제목": "TIGER 커버드콜 ETF 매수 인증 & 7행시 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=194",
+          "상태": "진행중",
+          "시작": "2026-10-22",
+          "종료": "2026-11-20"
+        },
+        {
+          "제목": "2026 TIGER ETF 모의고사 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=193",
+          "상태": "진행중",
+          "시작": "2026-10-19",
+          "종료": "2026-11-08"
+        },
+        {
+          "제목": "TIGER 200 ETF 매수 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=191",
+          "상태": "진행중",
+          "시작": "2026-10-05",
+          "종료": "2026-11-04"
+        },
+        {
+          "제목": "(11월 초 당첨자 발표 예정) 순자산 규모 아시아 1등 미국 대표지수 TIGER ETF 보유 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=190",
+          "상태": "진행중",
+          "시작": "2026-09-23",
+          "종료": "2026-11-29"
+        },
+        {
+          "제목": "월 2번 배당을 기대할 수 있다면? TIGER 미국 대표지수 커버드콜 분배금 인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=188",
+          "상태": "진행중",
+          "시작": "2026-09-07",
+          "종료": "2026-11-15"
+        },
+        {
+          "제목": "TIGER ETF 미국대표지수 적립식 매수인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=183",
+          "상태": "진행중",
+          "시작": "2026-08-03",
+          "종료": "2026-12-31"
+        },
+        {
+          "제목": "TIGER ETF 증권사 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=192",
+          "상태": "진행중",
+          "시작": "",
+          "종료": ""
+        },
+        {
+          "제목": "TIGER KRX 금현물 ETF 매수 인증 & 퀴즈 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/list.do",
+          "상태": "종료",
+          "시작": "2026-09-21",
+          "종료": "2026-10-20"
+        }
+      ],
       "배너": [
         {
-          "제목": "[ETF 포트폴리오] 2026년 4분기 TIGER ETF 투자 전략",
-          "링크": "https://investments.miraeasset.com/tigeretf/ko/insight/etf-insight/view.do?listCnt=8&pageIndex=1&detailsKey=768&q=",
+          "제목": "[TIGER ETF 가이드북] 다가오는 연말, ETF 절세 투자는?",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/insight/marketReport/view.do?listCnt=8&pageIndex=1&detailsKey=508&q=",
           "노출": "메인 배너",
           "NEW": true,
-          "링크유형": "상품",
+          "링크유형": "홈페이지",
           "슬롯수": 1
         },
         {
           "제목": "[Hot ETF] TIGER 글로벌 MLCC&기판 ETF",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
@@ -149,15 +220,15 @@
           "제목": "[이벤트] TIGER미국S&P500 TIGER미국나스닥100 적립식 이벤트",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
         {
-          "제목": "[액티브 ETF] TIGER 코리아테크액티브",
+          "제목": "[연금] 연금 투자, 어떻게 시작하면 될까요?",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": false,
+          "NEW": true,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
@@ -170,7 +241,7 @@
           "슬롯수": 1
         }
       ],
-      "비고": "수집 실패(HTTPError) — 직전 데이터 유지"
+      "순서근거": "사이트 노출 순서"
     },
     {
       "브랜드": "ACE",
@@ -203,6 +274,13 @@
           "상태": "진행중",
           "시작": "2026-09-01",
           "종료": "2026-10-31"
+        },
+        {
+          "제목": "[EVENT] [세미나] 한투스테이션 40회_변동성의 시대, 다시 보는 자산배분의 기본",
+          "링크": "https://www.aceetf.co.kr/cs/notice/7242",
+          "상태": "",
+          "시작": "2026-10-28",
+          "종료": ""
         },
         {
           "제목": "[EVENT] [세미나] 한투스테이션 39회_미국 대표지수·채권혼합형 ETF 알아보기",
@@ -355,7 +433,7 @@
     {
       "브랜드": "RISE",
       "홈": "https://www.riseetf.co.kr",
-      "이벤트비고": "이벤트 수집 실패: ConnectTimeout",
+      "이벤트비고": "이벤트 수집 실패: SSLError",
       "배너": [
         {
           "제목": "RISE 글로벌AI 낸드메모리반도체 당신의 NEW 반도체 투자가 향하는 곳은 어디입니까?",
@@ -398,7 +476,7 @@
           "슬롯수": 1
         }
       ],
-      "비고": "수집 실패(ConnectTimeout) — 직전 데이터 유지"
+      "비고": "수집 실패(SSLError) — 직전 데이터 유지"
     },
     {
       "브랜드": "PLUS",
@@ -493,13 +571,6 @@
           "링크": "https://www.hanaroetf.com/customer/notice/78ec3519c9844d5a3089",
           "상태": "종료",
           "시작": "2026-03-03",
-          "종료": ""
-        },
-        {
-          "제목": "[EVENT 종료] NH-Amundi 대표 ETF & 펀드 매수 이벤트 🎁 국내 증시 & 유망 테마 투자하고 경품 당첨 행운까지!",
-          "링크": "https://www.hanaroetf.com/customer/notice/589c5d6d8ef4edfa9d1b",
-          "상태": "종료",
-          "시작": "2026-02-23",
           "종료": ""
         }
       ],
