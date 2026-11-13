@@ -1,10 +1,17 @@
 {
-  "asof": "2026-11-06",
+  "asof": "2026-11-13",
   "brands": [
     {
       "브랜드": "KODEX",
       "홈": "https://www.kodex.com",
       "이벤트목록": [
+        {
+          "제목": "(신규상장) KODEX 미국나스닥100미국채혼합50 ETF 투자&퀴즈 이벤트💵",
+          "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=109",
+          "상태": "진행중",
+          "시작": "2026-11-10",
+          "종료": "2026-12-31"
+        },
         {
           "제목": "1위를 담다🥇연금, Kodex하다💙 보유인증 이벤트",
           "링크": "https://www.samsungfund.com/etf/lounge/event-view.do?seq=108",
@@ -56,25 +63,17 @@
         }
       ],
       "이벤트": {
-        "라벨": "FunETF 전원증정 이벤트 진행중🎁 지금 바로 참여해보세요!",
-        "링크": "https://www.funetf.co.kr/membersLounge/event/8924"
+        "라벨": "EVENT Kodex 이벤트 안내🎁",
+        "링크": "https://www.kodex.com/etf/lounge/event.do"
       },
       "배너": [
         {
-          "제목": "상장예정(11/10) 종목코드 : 0261H0 KODEX 미국나스닥100 미국채혼합50 ETF 미국채의 안정성과 나스닥100의 성장성을 동시에",
+          "제목": "신규상장(11/10) 종목코드 : 0261H0 KODEX 미국나스닥100 미국채혼합50 ETF 미국채의 안정성과 나스닥100의 성장성을 동시에",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW9",
           "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 2
-        },
-        {
-          "제목": "신규상장(10/20) 종목코드 : 0254S0 KODEX 미국배당다우존스액티브 ETF 다우존스 지수로 미국 배당주 투자와 액티브한 초과성과 추구",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFW7",
-          "NEW": false,
-          "링크유형": "상품",
-          "노출": "메인 배너",
-          "슬롯수": 1
         },
         {
           "제목": "상품안내 종목코드 : 379800 KODEX 미국S&P500 ETF 장기 투자의 기본, 가장 먼저 담아야 할 연금·ISA 필수 상품 현재가 22",
@@ -85,16 +84,24 @@
           "슬롯수": 1
         },
         {
+          "제목": "상품안내 종목코드 : 0219E0 KODEX 200커버드콜액티브 ETF 월말배당 추구에 옵션 프리미엄 비과세까지 투자자가 기다린 그 상품! 현재",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFV8",
+          "NEW": false,
+          "링크유형": "상품",
+          "노출": "메인 배너",
+          "슬롯수": 1
+        },
+        {
           "제목": "상품안내 종목코드 : 379810 KODEX 미국나스닥100 ETF 장기 투자의 기본, 가장 먼저 담아야 할 연금·ISA 필수 상품 현재가 24",
           "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFE3",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 2
         },
         {
-          "제목": "상품안내 종목코드 : 0219E0 KODEX 200커버드콜액티브 ETF 월말배당 추구에 옵션 프리미엄 비과세까지 투자자가 기다린 그 상품! 현재",
-          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFV8",
+          "제목": "상품안내 종목코드 : 498400 KODEX 200타겟위클리커버드콜 ETF 코스피 주가흐름 기대와 월배당을 한번에 추구! 현재가 15,120원",
+          "링크": "https://www.kodex.com/etf/product/view.do?id=2ETFP4",
           "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
@@ -107,6 +114,20 @@
       "브랜드": "TIGER",
       "홈": "https://www.tigeretf.com",
       "이벤트목록": [
+        {
+          "제목": "세금은 아끼고 월배당은 기대하고, TIGER 200커버드콜액티브 ETF 매수인증 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=199",
+          "상태": "진행중",
+          "시작": "2026-11-10",
+          "종료": "2026-12-09"
+        },
+        {
+          "제목": "2026 TIGER ETF 모의고사(연금투자 영역) 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=198",
+          "상태": "진행중",
+          "시작": "2026-11-09",
+          "종료": "2026-11-30"
+        },
         {
           "제목": "연말맞이 투자는, 내년을 넘어 멀리 보는 TIGER 미국S&P500으로! TIGER 미국S&P500 ETF 매수 인증 이벤트",
           "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=197",
@@ -136,13 +157,6 @@
           "종료": "2026-11-20"
         },
         {
-          "제목": "2026 TIGER ETF 모의고사(대표지수 영역) 이벤트",
-          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=193",
-          "상태": "진행중",
-          "시작": "2026-10-19",
-          "종료": "2026-11-08"
-        },
-        {
           "제목": "월 2번 배당을 기대할 수 있다면? TIGER 미국 대표지수 커버드콜 분배금 인증 이벤트",
           "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=188",
           "상태": "진행중",
@@ -164,18 +178,11 @@
           "종료": ""
         },
         {
-          "제목": "TIGER 200 ETF 매수 인증 이벤트",
-          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/list.do",
+          "제목": "2026 TIGER ETF 모의고사(대표지수 영역) 이벤트",
+          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=193",
           "상태": "종료",
-          "시작": "2026-10-05",
-          "종료": "2026-11-04"
-        },
-        {
-          "제목": "(당첨자 발표) 순자산 규모 아시아 1등 미국 대표지수 TIGER ETF 보유 인증 이벤트",
-          "링크": "https://investments.miraeasset.com/tigeretf/ko/customer/event/view.do?detailsKey=190",
-          "상태": "종료",
-          "시작": "2026-09-23",
-          "종료": "2026-10-20"
+          "시작": "2026-10-19",
+          "종료": "2026-11-08"
         }
       ],
       "배너": [
@@ -191,7 +198,7 @@
           "제목": "[Hot ETF] TIGER 200커버드콜액티브",
           "링크": "https://investments.miraeasset.com",
           "노출": "메인 배너",
-          "NEW": true,
+          "NEW": false,
           "링크유형": "홈페이지",
           "슬롯수": 1
         },
@@ -253,21 +260,14 @@
           "상태": "",
           "시작": "2026-09-28",
           "종료": ""
-        },
-        {
-          "제목": "[EVENT] ACE를 소문내자!_추가 이벤트 (~10/31)",
-          "링크": "https://www.aceetf.co.kr/cs/notice/6967",
-          "상태": "종료",
-          "시작": "2026-09-17",
-          "종료": "2026-10-31"
         }
       ],
       "배너": [
         {
-          "제목": "ACE 반도체Plus전략산업 — 대한민국을 이끄는 전략산업, 반도체+조·방·원에 투자!",
-          "링크": "https://www.aceetf.co.kr/fund/K55101EY1762",
+          "제목": "ACE 미국 대표지수 시리즈 — 장기 투자의 필수템 미국 대표지수!",
+          "링크": "https://www.aceetf.co.kr/fund?theme=%252C%25EB%25AF%25B8%25EA%25B5%25AD%2520%25EB%258C%2580%25ED%2591%259C%25EC%25A7%2580%25EC%2588%2598&page=1",
           "순위근거": "rank 1-1",
-          "NEW": false,
+          "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -282,18 +282,9 @@
           "슬롯수": 1
         },
         {
-          "제목": "ACE K반도체TOP2+ — 삼성전자·SK하이닉스에 SK스퀘어·삼성전기까지!",
-          "링크": "https://www.aceetf.co.kr/fund/K55101EW2275",
-          "순위근거": "rank 2-1",
-          "NEW": false,
-          "링크유형": "상품",
-          "노출": "메인 배너",
-          "슬롯수": 1
-        },
-        {
           "제목": "ACE AI반도체TOP3+ — 삼성전자, SK하이닉스, 그리고 반도체 소부장에 집중!",
           "링크": "https://www.aceetf.co.kr/fund/K55101E67600",
-          "순위근거": "rank 3-1",
+          "순위근거": "rank 2-1",
           "NEW": false,
           "링크유형": "상품",
           "노출": "메인 배너",
@@ -302,8 +293,17 @@
         {
           "제목": "ACE 미국빅테크TOP7 Plus — 매그니피센트7이 바꾸는 세상",
           "링크": "https://www.aceetf.co.kr/fund/K55101E52479",
-          "순위근거": "rank 3-2",
+          "순위근거": "rank 2-2",
           "NEW": false,
+          "링크유형": "상품",
+          "노출": "메인 배너",
+          "슬롯수": 1
+        },
+        {
+          "제목": "ACE 미국10년/30년국채액티브 시리즈 — 미국 장기 채권에 투자하는 효율적인 방법",
+          "링크": "https://www.aceetf.co.kr/fund?&theme=,%EC%97%B0%EA%B8%88%20%EC%95%88%EC%A0%84%EC%9E%90%EC%82%B0&fund=,%EC%B1%84%EA%B6%8C&area=&pension=&etf=&page=1&searchText=%EA%B5%AD%EC%B1%84",
+          "순위근거": "rank 3-1",
+          "NEW": true,
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -464,20 +464,13 @@
           "상태": "종료",
           "시작": "2026-09-14",
           "종료": "2026-09-30"
-        },
-        {
-          "제목": "[매수 이벤트] PLUS SK하이닉스샌디스크채권혼합50 매수 인증 이벤트 (~9/4)",
-          "링크": "https://www.plusetf.co.kr/customer/notice/detail?n=31834",
-          "상태": "종료",
-          "시작": "2026-08-04",
-          "종료": "2026-09-04"
         }
       ],
       "배너": [
         {
-          "제목": "PLUS ETF 10월 분배금 지급 안내",
+          "제목": "PLUS ETF 11월 분배금 지급 안내",
           "링크": "https://www.plusetf.co.kr",
-          "NEW": false,
+          "NEW": true,
           "링크유형": "홈",
           "노출": "메인 배너",
           "슬롯수": 1
@@ -522,6 +515,13 @@
       "홈": "https://www.hanaroetf.com",
       "이벤트목록": [
         {
+          "제목": "[EVENT] HANARO 삼성전기고정AI핵심기판 ETF 거래량 이벤트 (한국투자증권)",
+          "링크": "https://www.hanaroetf.com/customer/notice/6fadb7a70864e8fac695",
+          "상태": "",
+          "시작": "2026-11-10",
+          "종료": ""
+        },
+        {
           "제목": "[EVENT 종료] HANARO 반도체 투자 세트 매수 인증 이벤트 🎁",
           "링크": "https://www.hanaroetf.com/customer/notice/9f4823dfc6044959b174",
           "상태": "종료",
@@ -534,16 +534,21 @@
           "상태": "종료",
           "시작": "2026-05-11",
           "종료": ""
-        },
-        {
-          "제목": "[EVENT 종료] HANARO K휴머노이드테마TOP10 거래량이벤트 (한국투자증권)",
-          "링크": "https://www.hanaroetf.com/customer/notice/78ec3519c9844d5a3089",
-          "상태": "종료",
-          "시작": "2026-03-03",
-          "종료": ""
         }
       ],
+      "이벤트": {
+        "라벨": "제목 [EVENT] HANARO 삼성전기고정AI핵심기판 ETF 거래량 이벤트 (한국투자증권) 날짜 2026.11.10",
+        "링크": "https://www.hanaroetf.com/customer/notice/6fadb7a70864e8fac695"
+      },
       "배너": [
+        {
+          "제목": "HANARO 삼성전기고정AI핵심기판 국내 MLCC와 AI기판 핵심 벨류체인에 ‘삼성전기’를 고정하여 투자하는 ETF",
+          "링크": "https://www.hanaroetf.com/fund/09BC09C727E64FDD",
+          "NEW": true,
+          "링크유형": "상품",
+          "노출": "메인 배너",
+          "슬롯수": 1
+        },
         {
           "제목": "HANARO 미국에이전틱AI TOP2+ 미국 에이전틱 AI 밸류체인 핵심기업 TOP2를 중심으로 투자하는 ETF",
           "링크": "https://www.hanaroetf.com/fund/E5B1094831A64EB6",
@@ -575,14 +580,6 @@
           "링크유형": "상품",
           "노출": "메인 배너",
           "슬롯수": 1
-        },
-        {
-          "제목": "HANARO 증권고배당TOP3플러스 코스피 밸류업 정책으로 증권업 구조적 성장과 고배당 매력을 동시에 누리는 ETF",
-          "링크": "https://www.hanaroetf.com/fund/8B788EE0BB4342A9",
-          "NEW": false,
-          "링크유형": "상품",
-          "노출": "메인 배너",
-          "슬롯수": 1
         }
       ],
       "순서근거": "사이트 노출 순서"
@@ -592,11 +589,11 @@
       "홈": "https://timeetf.co.kr",
       "이벤트목록": [
         {
-          "제목": "[EVENT] TIME 액티브 ETF 순자산 10조 돌파 기념! 액티브 ETF 가이드북 무료 배포 이벤트",
+          "제목": "[EVENT] 알아서 관리해주는 나의 연금 AGENT, TIME 액티브 ETF 경험하기! 질문 & 매수 이벤트(~12/15)",
           "링크": "https://timeetf.co.kr/board/board.php?bbsid=event",
-          "상태": "종료",
-          "시작": "2026-07-06",
-          "종료": "2026-07-31"
+          "상태": "진행중",
+          "시작": "2026-11-16",
+          "종료": "2026-12-15"
         }
       ],
       "이벤트": {
