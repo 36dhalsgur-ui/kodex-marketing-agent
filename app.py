@@ -1745,13 +1745,39 @@ with tab_channel:
         # 걸러내는 기준에 IRP·ISA·연금투자가 들어 있어, 'ETF 관련'이라고만 쓰면 ETF를
         # 직접 다루지 않은 연금 안내 글까지 ETF 콘텐츠로 읽힌다. 기준대로 'ETF·연금'이라 쓴다.
         only_etf = st.toggle("ETF·연금 관련 콘텐츠만 보기", value=True, key=f"etf_only_{group}",
-                             help="제목에 ETF·커버드콜·월배당·연금투자·IRP·ISA가 포함된 게시물만 표시")
+                             help="켜면 제목에 ETF·커버드콜·월배당·연금투자·IRP·ISA가 포함된 게시물 목록, "
+                                  "끄면 회사별 최신 게시물 1건씩")
         shown = etf_feed if only_etf else feed
         # ETF·연금 노출 비중 = 판매채널이 ETF·연금 상품을 얼마나 미는지의 지표
         share = f"{len(etf_feed)}/{len(feed)}" if feed else "0/0"
         st.caption(f"수집 {len(feed)}건 중 ETF·연금 관련 <b>{len(etf_feed)}건</b> ({share}) — {group} 채널의 ETF·연금 노출 비중입니다."
                    if feed else "수집된 게시물이 없습니다.", unsafe_allow_html=True)
-        if shown:
+        if not only_etf and feed:
+            # 전체 보기는 회사별 최신 1건을 썸네일 카드로 — 시간순 목록으로 두면 영상을
+            # 자주 올리는 한두 곳이 화면을 다 차지해 '각 채널이 지금 뭘 밀고 있나'가 안 보였다.
+            # 유튜브·블로그 중 더 최근 것 하나. 운용사 탭 '공식 유튜브'와 같은 카드를 쓴다.
+            latest = {}
+            for f in feed:                              # feed는 날짜 내림차순
+                latest.setdefault(f["회사"], f)
+            cards = [latest[ch["회사"]] for ch in rows if ch["회사"] in latest]
+            cols = st.columns(len(rows), gap="small")
+            for col, f in zip(cols, cards):
+                views = f" · {f['views']:,}회" if f.get("views") else ""
+                thumb = (f'<img src="{f["thumb"]}" alt="thumbnail" loading="lazy" '
+                         f'referrerpolicy="no-referrer">' if f.get("thumb") else
+                         f'<div style="aspect-ratio:16/9;background:#F2F4F7;display:flex;'
+                         f'align-items:center;justify-content:center;color:{FAINT};'
+                         f'font-size:0.72rem;">이미지 없음</div>')
+                col.markdown(
+                    f'<div class="yt-card"><a class="yt-real-thumb" href="{f["link"]}" target="_blank">'
+                    f'{thumb}<span class="yt-brand-chip">{f["회사"]} · {f["소스"]}</span></a>'
+                    f'<div class="yt-body"><a class="yt-title" href="{f["link"]}" target="_blank">'
+                    f'{f["title"]}</a><div class="yt-meta">{f["date"]}{views}</div></div></div>',
+                    unsafe_allow_html=True)
+            missing = [ch["회사"] for ch in rows if ch["회사"] not in latest]
+            if missing:
+                st.caption(f"수집된 게시물 없음 — {' · '.join(missing)}")
+        elif shown:
             items = "".join(
                 f'<a class="kw-link" href="{f["link"]}" target="_blank"><div class="kw-row">'
                 f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
@@ -1765,7 +1791,7 @@ with tab_channel:
         elif only_etf and feed:
             st.info(f"최근 수집분에 ETF·연금 관련 게시물이 없습니다 — {group} 채널은 지금 ETF를 거의 노출하지 않는다는 신호입니다. "
                     "이 수치가 올라가는 시점이 판매채널로의 ETF 확산·제휴 징후입니다.\n\n"
-                    "토글을 끄면 전체 콘텐츠를 볼 수 있습니다.")
+                    "토글을 끄면 회사별 최신 게시물을 볼 수 있습니다.")
         else:
             st.info("수집된 게시물이 없습니다.")
         st.caption(note)

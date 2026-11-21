@@ -863,8 +863,15 @@ def _fetch_blog(brand: str, url: str, n: int = 6) -> list[dict]:
         title = (item.findtext("title") or "").strip()
         link = (item.findtext("link") or "").strip()
         date_s = _rss_date(item.findtext("pubDate") or "")
+        # 네이버 블로그 RSS는 본문 대표 이미지를 description의 <img>로 준다. 기본 크기
+        # (type=s3)는 365×365 정사각형이라 카드에서 잘린다 — w2(743×418)가 유튜브
+        # 썸네일과 같은 비율이다. 이 이미지는 다른 사이트 Referer로 부르면 403이라
+        # 화면에서 referrerpolicy="no-referrer"로 불러야 한다.
+        m = re.search(r'<img[^>]+src="([^"]+)"', item.findtext("description") or "")
+        thumb = re.sub(r"\?type=\w+$", "", m.group(1)) + "?type=w2" if m else ""
         if title:
-            posts.append({"brand": brand, "title": title, "link": link, "date": date_s})
+            posts.append({"brand": brand, "title": title, "link": link, "date": date_s,
+                          "thumb": thumb})
         if len(posts) >= n:
             break
     return posts
@@ -932,6 +939,7 @@ def fetch_partners(n_per_source: int = 8) -> list[dict]:
                         "link": it.get("url") or it.get("link", ""),
                         "date": it.get("published") or it.get("date", ""),
                         "views": it.get("views", 0),
+                        "thumb": it.get("thumbnail") or it.get("thumb", ""),
                     })
             except Exception:
                 pass
