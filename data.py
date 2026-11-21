@@ -885,7 +885,10 @@ def fetch_blogs(n_per_blog: int = 6) -> dict[str, list[dict]]:
 
 # ══════════════════════════════════════════════
 # 판매채널 (증권·은행) 유튜브·블로그 — 키 불필요
-# 채널 ID·블로그 ID는 공식 사이트 푸터 + 영상/게시물 제목으로 정체 검증 (2026-07 실측, 우리은행 2026-11)
+# 채널 ID·블로그 ID는 공식 사이트 푸터 + 영상/게시물 제목으로 정체 검증 (2026-07 실측)
+# 은행은 2026-11 재검증 — 금융그룹·중앙회 채널이 은행 자리에 들어가 있던 것을 바로잡았다
+# (하나 → 하나금융그룹 채널, NH → 농협중앙회 채널). 그룹 채널은 골프대회·사옥 홍보 위주라
+# '은행 판매채널이 ETF를 얼마나 노출하나'를 재는 데 쓸 수 없다.
 # 블로그가 None인 곳은 네이버 블로그 미운영 (토스증권·신한은행·한국투자증권)
 # ══════════════════════════════════════════════
 PARTNER_CHANNELS = [
@@ -896,8 +899,11 @@ PARTNER_CHANNELS = [
     {"그룹": "증권", "회사": "한국투자증권", "yt": "UCh_9ffn36zS3HIQCwb3pgSQ", "blog": None},
     {"그룹": "은행", "회사": "KB국민은행",   "yt": "UCHq8auIJ8ewo7iD2pqX22UA", "blog": "youngkbblog"},
     {"그룹": "은행", "회사": "신한은행",     "yt": "UC4E394G9WuS9y6SlBZslMsQ", "blog": None},
-    {"그룹": "은행", "회사": "하나은행",     "yt": "UCejh7cdlFSkCh_rqQT6WB8Q", "blog": "kebhana_official"},
-    {"그룹": "은행", "회사": "NH농협은행",   "yt": "UCsR09lr9oy0DMv6gtqh-XCw", "blog": "nhbanksns"},
+    # 유튜브: 하나은행 사이트 푸터 youtube.com/user/HanabankNewBiz (하나TV [하나은행]).
+    # 블로그: kebhana_official은 0건 — 현재 운영 중인 hanabank_official로 옮겼다.
+    {"그룹": "은행", "회사": "하나은행",     "yt": "UCSHbm2TrspNZ_p_yd39kMNg", "blog": "hanabank_official"},
+    # 유튜브: NH농협은행 사이트가 연결한 채널. 기존 UCsR09...는 농협중앙회 채널이었다.
+    {"그룹": "은행", "회사": "NH농협은행",   "yt": "UCmkkFJIalgnWovxFigYK2EA", "blog": "nhbanksns"},
     # 우리은행 공식 사이트 푸터의 SNS 링크로 확인(2026-11). 유튜브 핸들 @woori_bank는
     # 영상 0건인 별도 채널이라 쓰지 않는다 — 실제 운영 채널은 youtube.com/user/wooribank.
     {"그룹": "은행", "회사": "우리은행",     "yt": "UCcQ9V6nEYVMSRWWOrvHQqLg", "blog": "woori_official"},

@@ -1742,12 +1742,14 @@ with tab_channel:
             )
         st.write("")
         etf_feed = [f for f in feed if re.search(D.ETF_CONTENT_PAT, f["title"])]
-        only_etf = st.toggle("ETF 관련 콘텐츠만 보기", value=True, key=f"etf_only_{group}",
+        # 걸러내는 기준에 IRP·ISA·연금투자가 들어 있어, 'ETF 관련'이라고만 쓰면 ETF를
+        # 직접 다루지 않은 연금 안내 글까지 ETF 콘텐츠로 읽힌다. 기준대로 'ETF·연금'이라 쓴다.
+        only_etf = st.toggle("ETF·연금 관련 콘텐츠만 보기", value=True, key=f"etf_only_{group}",
                              help="제목에 ETF·커버드콜·월배당·연금투자·IRP·ISA가 포함된 게시물만 표시")
         shown = etf_feed if only_etf else feed
-        # ETF 노출 비중 = 판매채널이 ETF를 얼마나 미는지의 지표
+        # ETF·연금 노출 비중 = 판매채널이 ETF·연금 상품을 얼마나 미는지의 지표
         share = f"{len(etf_feed)}/{len(feed)}" if feed else "0/0"
-        st.caption(f"수집 {len(feed)}건 중 ETF 관련 <b>{len(etf_feed)}건</b> ({share}) — {group} 채널의 ETF 노출 비중입니다."
+        st.caption(f"수집 {len(feed)}건 중 ETF·연금 관련 <b>{len(etf_feed)}건</b> ({share}) — {group} 채널의 ETF·연금 노출 비중입니다."
                    if feed else "수집된 게시물이 없습니다.", unsafe_allow_html=True)
         if shown:
             items = "".join(
@@ -1761,7 +1763,7 @@ with tab_channel:
             )
             st.markdown(f'<div class="card" style="padding:8px 16px;">{items}</div>', unsafe_allow_html=True)
         elif only_etf and feed:
-            st.info(f"최근 수집분에 ETF 관련 게시물이 없습니다 — {group} 채널은 지금 ETF를 거의 노출하지 않는다는 신호입니다. "
+            st.info(f"최근 수집분에 ETF·연금 관련 게시물이 없습니다 — {group} 채널은 지금 ETF를 거의 노출하지 않는다는 신호입니다. "
                     "이 수치가 올라가는 시점이 판매채널로의 ETF 확산·제휴 징후입니다.\n\n"
                     "토글을 끄면 전체 콘텐츠를 볼 수 있습니다.")
         else:
@@ -1773,7 +1775,7 @@ with tab_channel:
         partner_group("증권", "유튜브 채널 RSS + 네이버 블로그 RSS 실시간 수집 (30분 캐시) · 토스증권·한국투자증권은 네이버 블로그 미운영으로 유튜브만 수집")
     with grp_bank:
         st.write("")
-        partner_group("은행", "유튜브 채널 RSS + 네이버 블로그 RSS 실시간 수집 (30분 캐시) · 신한은행은 네이버 블로그 미운영으로 유튜브만 수집 · 은행 ETF 콘텐츠는 주로 퇴직연금(IRP) 맥락에서 등장")
+        partner_group("은행", "유튜브 채널 RSS + 네이버 블로그 RSS 실시간 수집 (30분 캐시) · 신한은행은 네이버 블로그 미운영으로 유튜브만 수집 · 은행의 ETF·연금 콘텐츠는 주로 퇴직연금(IRP) 맥락에서 등장")
 
     with grp_amc:
         st.write("")
