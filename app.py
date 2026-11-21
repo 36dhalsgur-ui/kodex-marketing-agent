@@ -706,7 +706,13 @@ def load_blogs():
 
 @st.cache_data(ttl=1800)
 def load_partners():
-    return D.fetch_partners(n_per_source=10)
+    # RSS가 주는 최대치(15)까지 받는다 — ETF 게시물만 남기므로 창이 좁으면 거의 비어 버린다
+    return D.fetch_partners(n_per_source=15)
+
+
+@st.cache_data(ttl=3600)
+def load_partner_news():
+    return D.fetch_partner_news(n_per_company=3)
 
 
 @st.cache_data(ttl=3600)
@@ -1725,83 +1731,135 @@ with tab_channel:
     partners = load_partners()
 
     def partner_group(group: str, note: str):
-        """증권/은행 서브탭 본문 — 회사별 채널 요약 + 통합 피드 (유튜브·블로그 시간순)."""
+        """증권/은행 서브탭 — 운용사 탭과 같은 형식(번호 소제목·같은 카드)으로 ETF 마케팅만 본다.
+
+        판매채널에는 연말정산·IRP 세액공제 같은 연금 안내가 많지만, IRP·ISA는 ETF를 담는
+        그릇일 뿐이라 ETF 수요를 뜻하지 않는다. ETF를 직접 다룬 게시물·기사만 남긴다.
+        섹션은 운용사 탭과 1:1 — 은행은 이벤트 페이지를 읽을 수 없어 02를 뉴스가 맡는다."""
         rows = [c for c in D.PARTNER_CHANNELS if c["그룹"] == group]
         feed = [f for f in partners if f["그룹"] == group]
-        # 회사별 요약 카드
-        cols = st.columns(len(rows), gap="small")
+        etf = [f for f in feed if re.search(D.ETF_CONTENT_PAT, f["title"])]
+        news_all = load_partner_news()
+        news = {c["회사"]: news_all.get(c["회사"], []) for c in rows}
+        n_news = sum(len(v) for v in news.values())
+        n = len(rows)
+
+        def _ago(s) -> str:
+            try:
+                d = (dt.date.today() - dt.date.fromisoformat(str(s)[:10])).days
+            except (ValueError, TypeError):
+                return "—"
+            return "오늘" if d <= 0 else "어제" if d == 1 else f"{d}일"
+
+        def _empty_card(msg: str) -> str:
+            return (f'<div class="card" style="padding:12px 14px;display:flex;align-items:center;'
+                    f'justify-content:center;min-height:120px;font-size:0.76rem;color:{FAINT};'
+                    f'text-align:center;"><div>{msg}</div></div>')   # flex 안 <br>은 줄을 안 바꾼다
+
+        # ── 01 ETF 노출 — 회사별로 ETF를 직접 다룬 것이 몇 건인가
+        sub_header("01", "ETF 노출", f"{n}개사 유튜브·블로그·뉴스 중 ETF를 직접 다룬 것")
+        cols = st.columns(n, gap="small")
         for col, ch in zip(cols, rows):
-            n_wk = sum(1 for f in feed if f["회사"] == ch["회사"] and f["date"] >= _week_ago)
-            blog_txt = "블로그 ○" if ch["blog"] else "블로그 미운영"
+            mine = [f for f in etf if f["회사"] == ch["회사"]]
+            n_yt = sum(1 for f in mine if f["소스"] == "유튜브")
+            n_bl = sum(1 for f in mine if f["소스"] == "블로그")
+            n_nw = len(news[ch["회사"]])
+            tot = n_yt + n_bl + n_nw
             col.markdown(
-                f'<div class="card" style="padding:10px 12px;text-align:center;">'
+                f'<div class="card" style="padding:11px 10px;text-align:center;'
+                f'{"border-color:" + BRAND + ";box-shadow:0 0 0 1px " + BRAND + " inset;" if tot else ""}">'
                 f'<div style="font-weight:800;font-size:0.85rem;">{ch["회사"]}</div>'
-                f'<div style="font-size:0.72rem;color:{GRAY};margin-top:2px;">유튜브 ○ · {blog_txt}</div>'
-                f'<div style="font-size:0.78rem;color:#475467;margin-top:4px;">이번 주 게시물 <b>{n_wk}</b>건</div></div>',
-                unsafe_allow_html=True,
-            )
+                f'<div style="font-size:1.55rem;font-weight:800;line-height:1.1;margin:5px 0 3px;'
+                f'color:{BRAND if tot else FAINT};">{tot}<span style="font-size:0.68rem;'
+                f'margin-left:3px;">건</span></div>'
+                f'<div style="font-size:0.7rem;color:{GRAY};">유튜브 {n_yt} · '
+                f'{"블로그 " + str(n_bl) if ch["blog"] else "블로그 미운영"} · 뉴스 {n_nw}</div></div>',
+                unsafe_allow_html=True)
+        st.caption(f"유튜브·블로그 최근 게시물 {len(feed)}건 중 ETF를 직접 다룬 것 {len(etf)}건 · "
+                   f"최근 30일 ETF 기사 {n_news}건 — 제목에 ETF·상장지수·커버드콜이 들어간 것만 셉니다.")
+
+        # ── 02 ETF 이벤트·서비스 — 뉴스 (운용사 탭 '진행 중 이벤트' 자리)
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        sub_header("02", "ETF 이벤트·서비스 — 뉴스",
+                   f"제목에 회사명과 ETF가 함께 있는 기사 · 구글 뉴스 최근 30일 {n_news}건")
+        _nfail = getattr(D, "PARTNER_NEWS_STATUS", {})
+        cols = st.columns(n, gap="small")
+        for col, ch in zip(cols, rows):
+            arts = news[ch["회사"]]
+            body = "".join(
+                f'<a href="{a["url"]}" target="_blank" style="display:block;text-decoration:none;'
+                f'padding:7px 0;border-top:{"1px solid " + LINE if i else "none"};">'
+                f'<div style="font-size:0.78rem;font-weight:600;color:{INK};line-height:1.45;">'
+                f'{a["title"][:60]}</div><div style="font-size:0.66rem;color:{FAINT};margin-top:3px;">'
+                f'{a["source"]}{" · " + a["date"] if a["date"] else ""}</div></a>'
+                for i, a in enumerate(arts)) or (
+                f'<div style="font-size:0.75rem;color:{FAINT};padding:10px 0;">'
+                f'{"수집 실패" if ch["회사"] in _nfail else "최근 30일 ETF 기사 없음"}</div>')
+            col.markdown(
+                f'<div class="card" style="padding:12px 14px;height:100%;border-top:3px solid {NAVY};">'
+                f'<div style="font-size:0.78rem;font-weight:800;color:{NAVY};margin-bottom:6px;">'
+                f'{ch["회사"]}</div>{body}</div>', unsafe_allow_html=True)
         st.write("")
-        etf_feed = [f for f in feed if re.search(D.ETF_CONTENT_PAT, f["title"])]
-        # 걸러내는 기준에 IRP·ISA·연금투자가 들어 있어, 'ETF 관련'이라고만 쓰면 ETF를
-        # 직접 다루지 않은 연금 안내 글까지 ETF 콘텐츠로 읽힌다. 기준대로 'ETF·연금'이라 쓴다.
-        only_etf = st.toggle("ETF·연금 관련 콘텐츠만 보기", value=True, key=f"etf_only_{group}",
-                             help="켜면 제목에 ETF·커버드콜·월배당·연금투자·IRP·ISA가 포함된 게시물 목록, "
-                                  "끄면 회사별 최신 게시물 1건씩")
-        shown = etf_feed if only_etf else feed
-        # ETF·연금 노출 비중 = 판매채널이 ETF·연금 상품을 얼마나 미는지의 지표
-        share = f"{len(etf_feed)}/{len(feed)}" if feed else "0/0"
-        st.caption(f"수집 {len(feed)}건 중 ETF·연금 관련 <b>{len(etf_feed)}건</b> ({share}) — {group} 채널의 ETF·연금 노출 비중입니다."
-                   if feed else "수집된 게시물이 없습니다.", unsafe_allow_html=True)
-        if not only_etf and feed:
-            # 전체 보기는 회사별 최신 1건을 썸네일 카드로 — 시간순 목록으로 두면 영상을
-            # 자주 올리는 한두 곳이 화면을 다 차지해 '각 채널이 지금 뭘 밀고 있나'가 안 보였다.
-            # 유튜브·블로그 중 더 최근 것 하나. 운용사 탭 '공식 유튜브'와 같은 카드를 쓴다.
-            latest = {}
-            for f in feed:                              # feed는 날짜 내림차순
-                latest.setdefault(f["회사"], f)
-            cards = [latest[ch["회사"]] for ch in rows if ch["회사"] in latest]
-            cols = st.columns(len(rows), gap="small")
-            for col, f in zip(cols, cards):
-                views = f" · {f['views']:,}회" if f.get("views") else ""
-                thumb = (f'<img src="{f["thumb"]}" alt="thumbnail" loading="lazy" '
-                         f'referrerpolicy="no-referrer">' if f.get("thumb") else
-                         f'<div style="aspect-ratio:16/9;background:#F2F4F7;display:flex;'
-                         f'align-items:center;justify-content:center;color:{FAINT};'
-                         f'font-size:0.72rem;">이미지 없음</div>')
-                col.markdown(
-                    f'<div class="yt-card"><a class="yt-real-thumb" href="{f["link"]}" target="_blank">'
-                    f'{thumb}<span class="yt-brand-chip">{f["회사"]} · {f["소스"]}</span></a>'
-                    f'<div class="yt-body"><a class="yt-title" href="{f["link"]}" target="_blank">'
-                    f'{f["title"]}</a><div class="yt-meta">{f["date"]}{views}</div></div></div>',
-                    unsafe_allow_html=True)
-            missing = [ch["회사"] for ch in rows if ch["회사"] not in latest]
-            if missing:
-                st.caption(f"수집된 게시물 없음 — {' · '.join(missing)}")
-        elif shown:
-            items = "".join(
-                f'<a class="kw-link" href="{f["link"]}" target="_blank"><div class="kw-row">'
-                f'<span style="font-size:0.7rem;font-weight:700;color:#475467;background:#F2F4F7;'
-                f'border-radius:5px;padding:2px 7px;margin-right:8px;white-space:nowrap;">{f["회사"]} · {f["소스"]}</span>'
-                f'<span class="kw-name" style="flex:1;font-size:0.83rem;font-weight:600;">{f["title"][:56]}</span>'
-                f'<span style="font-size:0.72rem;color:{GRAY};white-space:nowrap;">{f["date"]}</span>'
-                f'</div></a>'
-                for f in shown[:25]
-            )
-            st.markdown(f'<div class="card" style="padding:8px 16px;">{items}</div>', unsafe_allow_html=True)
-        elif only_etf and feed:
-            st.info(f"최근 수집분에 ETF·연금 관련 게시물이 없습니다 — {group} 채널은 지금 ETF를 거의 노출하지 않는다는 신호입니다. "
-                    "이 수치가 올라가는 시점이 판매채널로의 ETF 확산·제휴 징후입니다.\n\n"
-                    "토글을 끄면 회사별 최신 게시물을 볼 수 있습니다.")
-        else:
-            st.info("수집된 게시물이 없습니다.")
+
+        # ── 03 공식 유튜브 — ETF 영상
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        sub_header("03", "공식 유튜브 — ETF 영상", f"{n}개사 채널 RSS 실시간 · 회사별 최신 ETF 영상 1건")
+        cols = st.columns(n, gap="small")
+        for col, ch in zip(cols, rows):
+            v = next((f for f in etf if f["회사"] == ch["회사"] and f["소스"] == "유튜브"), None)
+            if not v:
+                n_seen = sum(1 for f in feed if f["회사"] == ch["회사"] and f["소스"] == "유튜브")
+                col.markdown(_empty_card(f'<b style="color:{INK};">{ch["회사"]}</b><br>'
+                                         f'최근 영상 {n_seen}개 중<br>ETF 영상 없음'),
+                             unsafe_allow_html=True)
+                continue
+            views = f"{v['views']:,}회 · " if v.get("views") else ""
+            col.markdown(
+                f'<div class="yt-card"><a class="yt-real-thumb" href="{v["link"]}" target="_blank">'
+                f'<img src="{v["thumb"]}" alt="thumbnail" loading="lazy" referrerpolicy="no-referrer">'
+                f'<span class="yt-brand-chip">{ch["회사"]}</span></a>'
+                f'<div class="yt-body"><a class="yt-title" href="{v["link"]}" target="_blank">{v["title"]}</a>'
+                f'<div class="yt-meta">{views}{v["date"]}</div></div></div>', unsafe_allow_html=True)
+        st.write("")
+
+        # ── 04 공식 블로그 — ETF 글 (운용사 탭 04와 같은 2열 목록)
+        st.markdown('<hr class="sec-divider">', unsafe_allow_html=True)
+        sub_header("04", "공식 블로그 — ETF 글", "회사별 최신 ETF 글 4건 · 네이버 블로그 RSS 실시간")
+        bcols = st.columns(2, gap="large")
+        for i, ch in enumerate(rows):
+            if not ch["blog"]:
+                items = (f'<div style="font-size:0.75rem;color:{GRAY};padding:4px 0;">'
+                         f'네이버 블로그 미운영 — 유튜브만 수집합니다</div>')
+                head = "블로그 미운영"
+            else:
+                seen_n = sum(1 for f in feed if f["회사"] == ch["회사"] and f["소스"] == "블로그")
+                posts = [f for f in etf if f["회사"] == ch["회사"] and f["소스"] == "블로그"][:4]
+                items = "".join(
+                    f'<a class="kw-link" href="{p_["link"]}" target="_blank">'
+                    f'<div class="kw-row" style="align-items:center;">'
+                    f'<span class="kw-name" style="flex:1;min-width:0;overflow:hidden;'
+                    f'text-overflow:ellipsis;white-space:nowrap;font-size:0.82rem;">{p_["title"]}</span>'
+                    f'<span style="flex:none;font-size:0.72rem;color:{GRAY};white-space:nowrap;'
+                    f'margin-left:10px;">{_ago(p_["date"])}</span></div></a>' for p_ in posts) or (
+                    f'<div style="font-size:0.75rem;color:{GRAY};padding:4px 0;">'
+                    f'최근 글 {seen_n}건 중 ETF 글 없음</div>')
+                head = f"ETF 글 {len(posts)}건"
+            bcols[i % 2].markdown(
+                f'<div class="card" style="padding:10px 16px;margin-bottom:14px;">'
+                f'<div class="card-title" style="margin-bottom:2px;">{ch["회사"]}'
+                f'<span style="font-size:0.7rem;font-weight:600;color:{FAINT};margin-left:9px;">'
+                f'{head}</span></div>{items}</div>', unsafe_allow_html=True)
         st.caption(note)
 
     with grp_sec:
         st.write("")
-        partner_group("증권", "유튜브 채널 RSS + 네이버 블로그 RSS 실시간 수집 (30분 캐시) · 토스증권·한국투자증권은 네이버 블로그 미운영으로 유튜브만 수집")
+        partner_group("증권", "유튜브·네이버 블로그 RSS(30분 캐시) + 구글 뉴스(1시간 캐시) · "
+                              "토스증권·한국투자증권은 네이버 블로그 미운영으로 유튜브만 수집")
     with grp_bank:
         st.write("")
-        partner_group("은행", "유튜브 채널 RSS + 네이버 블로그 RSS 실시간 수집 (30분 캐시) · 신한은행은 네이버 블로그 미운영으로 유튜브만 수집 · 은행의 ETF·연금 콘텐츠는 주로 퇴직연금(IRP) 맥락에서 등장")
+        partner_group("은행", "유튜브·네이버 블로그 RSS(30분 캐시) + 구글 뉴스(1시간 캐시) · "
+                              "신한은행은 네이버 블로그 미운영으로 유튜브만 수집 · 은행의 ETF는 주로 퇴직연금(IRP) "
+                              "계좌 안에서 팔리지만, 연금·IRP 안내 글은 ETF 마케팅이 아니라 세지 않습니다")
 
     with grp_amc:
         st.write("")

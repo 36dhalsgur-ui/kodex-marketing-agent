@@ -916,7 +916,71 @@ PARTNER_CHANNELS = [
     {"그룹": "은행", "회사": "우리은행",     "yt": "UCcQ9V6nEYVMSRWWOrvHQqLg", "blog": "woori_official"},
 ]
 
-ETF_CONTENT_PAT = r"ETF|etf|상장지수|이티에프|커버드콜|월배당|연금.?투자|IRP|ISA"
+# 판매채널에서 'ETF 마케팅'으로 셀 기준 — ETF를 직접 다룬 것만.
+# 예전에는 월배당·연금투자·IRP·ISA까지 넣었는데, 은행 'ETF 관련' 7건 중 4건이 연말정산·
+# 세액공제 안내였다(실측 2026-11). IRP·ISA는 ETF를 담는 그릇일 뿐 ETF 수요를 뜻하지
+# 않는다 — IRP 적립금의 72%가 원리금보장형이다.
+ETF_CONTENT_PAT = r"ETF|etf|상장지수|이티에프|커버드콜"
+
+# 판매채널 뉴스 — 제목에 회사명이 있어야 남긴다. 검색어만으로는 다른 회사 기사
+# ('KB국민은행 ETF'에 신한·하나 기사)나 같은 그룹 자산운용사 기사가 섞인다.
+PARTNER_NEWS_NAME = {
+    "KB국민은행": r"국민은행|KB국민", "신한은행": r"신한은행", "하나은행": r"하나은행",
+    "NH농협은행": r"농협은행|NH농협(?!증권)", "우리은행": r"우리은행",
+    "키움증권": r"키움증권|키움", "토스증권": r"토스증권", "미래에셋증권": r"미래에셋증권",
+    "삼성증권": r"삼성증권", "한국투자증권": r"한국투자증권|한투증권",
+}
+PARTNER_NEWS_STATUS: dict[str, str] = {}
+
+
+def _fetch_partner_news_one(company: str, n: int = 3) -> list[dict]:
+    """회사 하나의 최근 30일 ETF 기사 — 제목에 회사명과 ETF가 함께 있는 것만."""
+    url = (f"https://news.google.com/rss/search?q={quote(company + ' ETF when:30d')}"
+           f"&hl=ko&gl=KR&ceid=KR:ko")
+    root = None
+    for attempt in range(3):     # 몰아서 부르면 429·HTML 페이지가 온다
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+        try:
+            root = ET.fromstring(r.content)
+            break
+        except ET.ParseError:
+            time.sleep(1.5 * (attempt + 1))
+    if root is None:
+        raise RuntimeError(f"HTTP {r.status_code}")
+    name = re.compile(PARTNER_NEWS_NAME.get(company, re.escape(company)))
+    out, seen = [], set()
+    for it in root.findall(".//item"):
+        raw = it.findtext("title") or ""
+        title, _, source = raw.rpartition(" - ")
+        title = (title or raw).strip()
+        if title in seen or not name.search(title) or not re.search(ETF_CONTENT_PAT, title):
+            continue
+        seen.add(title)
+        try:
+            date = dt.datetime.strptime((it.findtext("pubDate") or "")[5:16], "%d %b %Y").date().isoformat()
+        except ValueError:
+            date = ""
+        out.append({"title": title, "source": source.strip(), "url": it.findtext("link") or "#",
+                    "date": date})
+    out.sort(key=lambda x: x["date"], reverse=True)
+    return out[:n]
+
+
+def fetch_partner_news(n_per_company: int = 3) -> dict[str, list[dict]]:
+    """판매채널(증권·은행) 회사별 ETF 기사. 은행은 이벤트 페이지를 읽을 수 없어(보안·
+    자바스크립트) 은행의 ETF 이벤트·서비스 개편은 보도자료로 잡는 게 유일한 경로다."""
+    out: dict[str, list[dict]] = {}
+    PARTNER_NEWS_STATUS.clear()
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        futures = {ex.submit(_fetch_partner_news_one, c["회사"], n_per_company): c["회사"]
+                   for c in PARTNER_CHANNELS}
+        for fut, co in futures.items():
+            try:
+                out[co] = fut.result()
+            except Exception as e:
+                out[co] = []
+                PARTNER_NEWS_STATUS[co] = f"{type(e).__name__}: {e}"
+    return out
 
 
 def fetch_partners(n_per_source: int = 8) -> list[dict]:
